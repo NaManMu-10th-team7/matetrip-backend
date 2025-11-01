@@ -7,7 +7,6 @@ import {
   Param,
   Delete,
   Req,
-  UseGuards,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';

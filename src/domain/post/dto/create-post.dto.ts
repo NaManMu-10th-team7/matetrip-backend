@@ -1,15 +1,13 @@
 import {
   IsArray,
+  IsDateString,
   IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
-  Matches,
   MaxLength,
 } from 'class-validator';
 import { KeywordType } from '../entities/keywords-type.enum.js';
-
-const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
 export class CreatePostDto {
   @IsNotEmpty()
@@ -27,11 +25,11 @@ export class CreatePostDto {
   location: string;
 
   @IsOptional()
-  @Matches(YMD, { message: '시작일은 YYYY-MM-DD 형식으로 입력해줘' })
+  @IsDateString({}, { message: '시작일은 YYYY-MM-DD 형식으로 입력해주세요' })
   startDate?: string;
 
   @IsOptional()
-  @Matches(YMD, { message: '시작일은 YYYY-MM-DD 형식으로 입력해줘' })
+  @IsDateString({}, { message: '종료일은 YYYY-MM-DD 형식으로 입력해주세요' })
   endDate?: string;
 
   @IsArray()

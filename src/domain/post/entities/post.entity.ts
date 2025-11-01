@@ -1,8 +1,8 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Users } from '../../users/entities/users.entity';
 import { PostStatus } from './post-status.enum.js';
-import { KeywordType } from '../../enum/keywords-type.enum.js';
 import { BaseTimestampEntity } from '../../base.entity.js';
+import { KeywordType } from './keywords-type.enum.js';
 
 @Entity('post')
 export class Post extends BaseTimestampEntity {
