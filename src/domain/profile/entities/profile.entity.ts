@@ -10,8 +10,8 @@ import {
 import { BinaryContent } from '../../binary-content/entities/binary-content.entity';
 import { Users } from '../../users/entities/users.entity';
 import { BaseTimestampEntity } from '../../../base.entity';
-import { TravelStyleType } from '../../../../output/travel-style-type.enum.js';
-import { TendencyType } from '../../../../output/tendency-type.enum.js';
+import { TravelStyleType } from '../../../common/enum/travel-style-type.enum.js';
+import { TendencyType } from '../../../common/enum/tendency-type.enum.js';
 import { GENDER } from './gender.enum.js';
 
 @Unique('profile_user_id_key', ['user'])

@@ -1,8 +1,8 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Users } from '../../users/entities/users.entity';
 import { BaseUuidEntity } from '../../../base.entity';
-import { PostStatus } from '../../../../output/post-status.enum';
-import { KeywordType } from '../../../../output/keywords-type.enum';
+import { PostStatus } from '../../../common/enum/post-status.enum';
+import { KeywordType } from '../../../common/enum/keywords-type.enum';
 
 @Entity('post', { schema: 'public' })
 export class Post extends BaseUuidEntity {
