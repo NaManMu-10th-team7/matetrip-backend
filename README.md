@@ -1,4 +1,4 @@
-# 추가한 패키지
+# 필요한 패키지
 
 - class-validator
 - class-transformer
@@ -7,3 +7,4 @@
 - pg
 - @nestjs/config
 - dotenv
+- typeorm-model-generator

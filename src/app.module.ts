@@ -4,6 +4,17 @@ import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { getTypeOrmConfig } from './config/typeorm.config.js';
+import { BinaryContentModule } from './domain/binary-content/binary-content.module';
+import { ProfileModule } from './domain/profile/profile.module';
+import { UsersModule } from './domain/users/users.module';
+import { PostModule } from './domain/post/post.module';
+import { PostParticipationModule } from './domain/post-participation/post-participation.module';
+import { ReviewModule } from './domain/review/review.module';
+import { WorkspaceModule } from './domain/workspace/workspace.module';
+import { ChatMessageModule } from './domain/chat-message/chat-message.module';
+import { PoiModule } from './domain/poi/poi.module';
+import { PoiConnectionModule } from './domain/poi-connection/poi-connection.module';
+import { PlanDayModule } from './domain/plan-day/plan-day.module';
 
 @Module({
   imports: [
@@ -13,6 +24,17 @@ import { getTypeOrmConfig } from './config/typeorm.config.js';
       inject: [ConfigService],
       useFactory: getTypeOrmConfig,
     }),
+    BinaryContentModule,
+    ProfileModule,
+    UsersModule,
+    PostModule,
+    PostParticipationModule,
+    ReviewModule,
+    WorkspaceModule,
+    ChatMessageModule,
+    PoiModule,
+    PoiConnectionModule,
+    PlanDayModule,
   ],
   controllers: [AppController],
   providers: [AppService],

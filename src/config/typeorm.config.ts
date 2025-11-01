@@ -11,6 +11,6 @@ export const getTypeOrmConfig = (
   password: configService.get<string>('DB_PASSWORD'),
   database: configService.get<string>('DB_DATABASE'),
   entities: [__dirname + '/../**/*.entity.{js,ts}'],
-  synchronize: true,
+  synchronize: false,
   autoLoadEntities: true, // Nest의 엔티티 자동 로드 기능
 });

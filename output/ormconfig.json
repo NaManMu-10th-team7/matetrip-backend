@@ -1,0 +1,13 @@
+[
+  {
+    "name": "default",
+    "type": "postgres",
+    "host": "caboose.proxy.rlwy.net",
+    "port": 34679,
+    "username": "postgres",
+    "password": "MNqQwZlXhgRNshGjSNJVYGQiTbGosIfh",
+    "database": "",
+    "synchronize": false,
+    "entities": ["entities/*.js"]
+  }
+]
