@@ -2,7 +2,7 @@ import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Post } from '../../post/entities/post.entity';
 import { Users } from '../../users/entities/users.entity';
 import { BaseTimestampEntity } from '../../../base.entity';
-import { PostParticipationStatus } from '../../../common/enum/post-participation-status.js';
+import { PostParticipationStatus } from './post-participation-status.js';
 
 @Entity('post_participation', { schema: 'public' })
 export class PostParticipation extends BaseTimestampEntity {
