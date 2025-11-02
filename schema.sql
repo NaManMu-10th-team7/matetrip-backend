@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS users
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ,
     email           TEXT        NOT NULL,
-    login_id        TEXT        NOT NULL,
     hashed_password TEXT        NOT NULL
 );
 

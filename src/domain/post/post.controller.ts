@@ -8,7 +8,6 @@ import {
   Delete,
   Req,
   ParseUUIDPipe,
-  Query,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -24,6 +23,7 @@ export class PostController {
     // const userId = req.user.id;
     // 임시 mock user의 id
     const userId = '33b9b8fe-0a49-4866-8618-74a351c656ad';
+
     return this.postService.create(createPostDto, userId);
   }
 
@@ -37,9 +37,11 @@ export class PostController {
     return this.postService.findOne(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePostDto: UpdatePostDto) {
-    return this.postService.update(+id, updatePostDto);
+  @Patch()
+  update(@Body() updatePostDto: UpdatePostDto, @Req() req) {
+    // 임시 mock user의 id
+    const userId = '33b9b8fe-0a49-4866-8618-74a351c656ad';
+    return this.postService.update(userId, updatePostDto);
   }
 
   @Delete(':id')
