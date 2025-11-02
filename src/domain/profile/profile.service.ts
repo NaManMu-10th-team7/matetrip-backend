@@ -4,17 +4,31 @@ import { Repository } from 'typeorm';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Profile } from './entities/profile.entity';
+import { Users } from '../users/entities/users.entity';
 
 @Injectable()
 export class ProfileService {
   constructor(
     @InjectRepository(Profile)
     private profileRepository: Repository<Profile>,
+    @InjectRepository(Users)
+    private usersRepository: Repository<Users>,
   ) {}
   async create(createProfileDto: CreateProfileDto): Promise<Profile> {
     // 1. DTO 데이터를 기반으로 새로운 Profile 엔티티 인스턴스를 생성합니다.
-    // 아직 DB에 저장된 상태는 아닙니다. (TypeORM의 create 메서드)
-    const newProfile = this.profileRepository.create(createProfileDto);
+    // profileData는 createProfileDto에서 userId만 빼고 나머지 필드들을 모아 둔 객체
+    const { userId, ...profileData } = createProfileDto;
+
+    //userId 가져오기
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    const newProfile = this.profileRepository.create({
+      ...profileData,
+      user,
+    });
 
     // 2. newProfile 엔티티 객체를 데이터베이스에 저장(INSERT)합니다.
     // save() 메서드가 DB에 데이터를 삽입하고, ID가 채워진 객체를 반환합니다.
