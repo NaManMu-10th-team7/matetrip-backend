@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -7,6 +11,8 @@ import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto.js';
 import { PostsPageQueryDto } from './dto/list-posts-query.dto.js';
+import { isUUID } from 'class-validator';
+import { merge } from 'rxjs';
 
 @Injectable()
 export class PostService {
@@ -25,6 +31,7 @@ export class PostService {
     return this.toPostResponseDto(savedPost);
   }
 
+  // 아직 미정
   findAll() {
     return `This action returns all post`;
   }
@@ -49,40 +56,35 @@ export class PostService {
       skip: (page - 1) * limit,
       take: limit,
     });
+    // todo : meta 데이터도 클라에 넘겨주기
     return result.map((post) => this.toPostResponseDto(post));
   }
 
-  async update(userId: string, updatePostDto: UpdatePostDto) {
-    const exist = await this.postRepository.exists({
-      where: { id: updatePostDto.id, writer: { id: userId } },
+  async update(userId: string, dto: UpdatePostDto) {
+    const entity = await this.postRepository.findOne({
+      where: { id: dto.id, writer: { id: userId } },
     });
-    if (!exist) {
+    if (!entity) {
       throw new NotFoundException('Post update failed');
     }
 
-    const result = await this.postRepository.update(
-      updatePostDto.id,
-      updatePostDto,
-    );
+    const merged = this.postRepository.merge(entity, dto);
+    const savedPost = await this.postRepository.save(merged);
+    return this.toPostResponseDto(savedPost);
+  }
 
-    if (result.affected === 0) {
-      throw new NotFoundException('Post update failed');
-    }
-
-    // 일단 toPostResponseDto써야되서 임시(나중에 이거 제거하고 다시)
-    const updatedPost = await this.postRepository.findOne({
-      where: { id: updatePostDto.id },
-      //relations: ['writer'],
+  async remove(id: string, userId: string) {
+    const result = await this.postRepository.delete({
+      id: id,
+      writer: { id: userId },
     });
 
-    return this.toPostResponseDto(updatedPost);
+    if (!result.affected) {
+      throw new NotFoundException('Post delete failed');
+    }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} post`;
-  }
-
-  toPostResponseDto(post: Post | null) {
+  private toPostResponseDto(post: Post | null) {
     if (!post) {
       throw new NotFoundException("Post doesn't exist");
     }
