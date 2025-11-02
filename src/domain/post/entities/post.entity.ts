@@ -30,6 +30,9 @@ export class Post extends BaseTimestampEntity {
   @Column({ type: 'text', name: 'location' })
   location: string; // 여행 장소 (배열로 할지 말지 나중에 정하기)
 
+  @Column({ type: 'integer', name: 'max_participants' })
+  max_participants: number;
+
   @Column({
     type: 'enum',
     name: 'keywords',

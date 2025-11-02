@@ -2,10 +2,12 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
+  Min,
 } from 'class-validator';
 import { KeywordType } from '../entities/keywords-type.enum.js';
 
@@ -23,6 +25,11 @@ export class CreatePostDto {
   @IsString()
   @MaxLength(50)
   location: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  max_participants: number = 2;
 
   @IsOptional()
   @IsDateString({}, { message: '시작일은 YYYY-MM-DD 형식으로 입력해주세요' })

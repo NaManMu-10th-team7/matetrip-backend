@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS post
     content   TEXT        NOT NULL,
     status    post_status NOT NULL DEFAULT '모집중',
     location  TEXT        NOT NULL,
+    max_participants INT NOT NULL DEFAULT 2,
     keywords  keyword_type[] DEFAULT '{}'::keyword_type[],
     start_date DATE NULL,
     end_date  DATE NULL
