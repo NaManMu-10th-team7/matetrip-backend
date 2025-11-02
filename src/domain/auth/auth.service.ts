@@ -1,8 +1,14 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { Users } from '../users/entities/users.entity';
+import { CreateUserDto } from '../users/dto/create-user.dto';
 
 @Injectable()
 export class AuthService {
@@ -45,5 +51,34 @@ export class AuthService {
     return {
       accessToken: this.jwtService.sign(payload),
     };
+  }
+
+  // 회원가입
+  // @param createUserDto
+  // @returns 생성된 사용자 정보 (비밀번호 제외)
+  async signUp(
+    createUserDto: CreateUserDto,
+  ): Promise<Omit<Users, 'hashedPassword'>> {
+    try {
+      // UserService의 create 메서드 호출. 안에서 트랜잭션, 해싱, 중복 검사 모두 일어남
+      const newUser = await this.usersService.create(createUserDto);
+
+      const { hashedPassword, ...result } = newUser;
+
+      return result;
+    } catch (error) {
+      // UserService에서 던진 에러를 여기서 처리
+      if (error instanceof ConflictException) {
+        throw error;
+      }
+
+      // 그 외 모든 에러
+      // 서버 로그에 에러 기록
+      console.error(error);
+
+      throw new InternalServerErrorException(
+        '회원가입 처리 중 오류가 발생했습니다.',
+      );
+    }
   }
 }

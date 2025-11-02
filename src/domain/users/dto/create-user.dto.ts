@@ -1,12 +1,31 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsObject,
+  IsString,
+  Matches,
+  ValidateNested,
+} from 'class-validator';
+import { CreateProfileDto } from 'src/domain/profile/dto/create-profile.dto';
 
 export class CreateUserDto {
-  @IsString()
   @IsNotEmpty()
   @IsEmail()
   email: string;
 
   @IsString()
-  @MinLength(8, { message: '비밀번호는 적어도 8글자 이상이어야 합니다.' })
+  @Matches(/^(?=.*[a-zA-Z])(?=.*[0-9]).{8,25}$/, {
+    message: '비밀번호는 영문, 숫자 조합으로 8자 이상이어야 합니다.',
+  })
   password: string;
+
+  //   @IsString()
+  //   @IsNotEmpty()
+  //   passwordConfirmation: string;
+
+  @IsObject()
+  @ValidateNested()
+  @Type(() => CreateProfileDto)
+  profile: CreateProfileDto;
 }

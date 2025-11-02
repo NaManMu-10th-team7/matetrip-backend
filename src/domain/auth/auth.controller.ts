@@ -1,21 +1,36 @@
-import { Body, Controller, Post, UseGuards, Request } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  UseGuards,
+  Request,
+  HttpCode,
+  HttpStatus,
+  ValidationPipe,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
 import { LoginDto } from './dto/login.dto';
+import { CreateUserDto } from '../users/dto/create-user.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
-  // 로그인 API Post /auth/login
+  // 로그인 API POST /auth/login
   // 'local' 전략 가드 적용
   @UseGuards(AuthGuard('local'))
   @Post('login')
-  async login(
-    @Request() req: any,
-    @Body() loginDto: LoginDto,
-  ): Promise<{ accessToken: string }> {
+  async login(@Request() req: { user: any }): Promise<{ accessToken: string }> {
     return this.authService.login(req.user);
+  }
+
+  // 회원가입 API POST /auth/signup
+  @Post('signup')
+  @HttpCode(HttpStatus.CREATED) // 회원가입 성공 시 201 Created 상태 코드 반환
+  async signUp(@Body(ValidationPipe) createUserDto: CreateUserDto) {
+    // ValidationPipe : DTO 유효성 검사 자동 수행
+    return this.authService.signUp(createUserDto);
   }
 }
 

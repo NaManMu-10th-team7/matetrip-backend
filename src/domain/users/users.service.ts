@@ -1,40 +1,88 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { IsStrongPassword } from 'class-validator';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Users } from './entities/users.entity';
 import * as bcrypt from 'bcrypt';
+import { Profile } from '../profile/entities/profile.entity';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(Users)
     private usersRepository: Repository<Users>,
+
+    @InjectRepository(Profile)
+    private profileRepository: Repository<Profile>,
+
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<Users> {
-    const { email, password } = createUserDto;
+    const { email, password, profile } = createUserDto;
+
+    // 이메일 중복 여부를 DB 에러가 아닌 로직으로 미리 확인
+    const userExists = await this.existsByEmail(email);
+    if (userExists) {
+      throw new ConflictException('이미 존재하는 이메일입니다.');
+    }
 
     // 비밀번호 해싱. 기본값 10
-    const salt = await bcrypt.genSalt();
+    const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const newUser = this.usersRepository.create({
-      email,
-      hashedPassword,
-    });
-
     try {
-      return await this.usersRepository.save(newUser);
+      const createdUser = await this.dataSource.transaction(async (manager) => {
+        // 트랜잭션 내에서 User를 먼저 생성
+        const newUser = manager.create(Users, {
+          email,
+          hashedPassword,
+        });
+
+        const savedUser = await manager.save(newUser);
+
+        // User와 연결된 Profile 생성
+        const newProfile = manager.create(Profile, {
+          ...profile,
+          user: savedUser,
+        });
+        await manager.save(newProfile);
+
+        // 관계가 설정된 user를 다시 조회해 반환
+        const userWithProfile = await manager.findOne(Users, {
+          where: { id: savedUser.id },
+          relations: ['profile'],
+        });
+
+        if (!userWithProfile) {
+          throw new InternalServerErrorException(
+            '사용자 생성 후 조회에 실패했습니다.',
+          );
+        }
+
+        return userWithProfile;
+      });
+
+      return createdUser;
     } catch (error) {
-      // 이메일 중복 체크. PostgreSQL unique violation
-      if ('23505' == error.code) {
-        throw new ConflictException('이미 존재하는 아이디입니다.');
+      // DB 트랜잭션 중 발생한 에러 처리
+      if (error instanceof ConflictException) {
+        // 이메일 중복 에러는 그대로 다시 던짐
+        throw error;
       }
 
-      throw error;
+      // 그 외 에러는 로깅
+      console.error(error);
+
+      throw new InternalServerErrorException(
+        '회원가입 중 오류가 발생했습니다.',
+      );
     }
   }
 
@@ -44,6 +92,10 @@ export class UsersService {
 
   async findOne(email: string): Promise<Users | null> {
     return this.usersRepository.findOneBy({ email });
+  }
+
+  async existsByEmail(email: string): Promise<boolean> {
+    return this.usersRepository.existsBy({ email });
   }
 
   update(id: number, updateUserDto: UpdateUserDto) {
