@@ -7,6 +7,8 @@ import {
   Param,
   Delete,
   Req,
+  ParseUUIDPipe,
+  Query,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -26,13 +28,13 @@ export class PostController {
   }
 
   @Get()
-  findAll() {
+  getAll() {
     return this.postService.findAll();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.postService.findOne(+id);
+  getOne(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.postService.findOne(id);
   }
 
   @Patch(':id')
