@@ -11,8 +11,6 @@ import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto.js';
 import { PostsPageQueryDto } from './dto/list-posts-query.dto.js';
-import { isUUID } from 'class-validator';
-import { merge } from 'rxjs';
 
 @Injectable()
 export class PostService {
