@@ -20,7 +20,7 @@ export class BinaryContentService {
   }
 
   async findAll(): Promise<BinaryContent[]> {
-    return await this.binaryContentRepository.find();
+    return this.binaryContentRepository.find();
   }
 
   async findOne(id: string): Promise<BinaryContent> {
