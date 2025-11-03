@@ -21,6 +21,7 @@ export class AuthController {
   // 'local' 전략 가드 적용
   @UseGuards(AuthGuard('local'))
   @Post('login')
+  @HttpCode(HttpStatus.OK) // 로그인 성공 시 200 OK 상태 코드 반환
   async login(@Request() req: { user: any }): Promise<{ accessToken: string }> {
     return this.authService.login(req.user);
   }
@@ -28,8 +29,7 @@ export class AuthController {
   // 회원가입 API POST /auth/signup
   @Post('signup')
   @HttpCode(HttpStatus.CREATED) // 회원가입 성공 시 201 Created 상태 코드 반환
-  async signUp(@Body(ValidationPipe) createUserDto: CreateUserDto) {
-    // ValidationPipe : DTO 유효성 검사 자동 수행
+  async signUp(@Body() createUserDto: CreateUserDto) {
     return this.authService.signUp(createUserDto);
   }
 }

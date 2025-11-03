@@ -5,12 +5,13 @@ import {
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { IsStrongPassword } from 'class-validator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Users } from './entities/users.entity';
 import * as bcrypt from 'bcrypt';
 import { Profile } from '../profile/entities/profile.entity';
+import { UserPayloadDto } from './dto/user.payload.dto';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class UsersService {
@@ -24,14 +25,8 @@ export class UsersService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<Users> {
+  async create(createUserDto: CreateUserDto): Promise<UserPayloadDto> {
     const { email, password, profile } = createUserDto;
-
-    // 이메일 중복 여부를 DB 에러가 아닌 로직으로 미리 확인
-    const userExists = await this.existsByEmail(email);
-    if (userExists) {
-      throw new ConflictException('이미 존재하는 이메일입니다.');
-    }
 
     // 비밀번호 해싱. 기본값 10
     const salt = await bcrypt.genSalt(10);
@@ -39,6 +34,12 @@ export class UsersService {
 
     try {
       const createdUser = await this.dataSource.transaction(async (manager) => {
+        // 이메일 중복 여부를 DB 에러가 아닌 로직으로 미리 확인
+        const userExists = await manager.existsBy(Users, { email });
+        if (userExists) {
+          throw new ConflictException('이미 존재하는 이메일입니다.');
+        }
+
         // 트랜잭션 내에서 User를 먼저 생성
         const newUser = manager.create(Users, {
           email,
@@ -69,7 +70,7 @@ export class UsersService {
         return userWithProfile;
       });
 
-      return createdUser;
+      return this.toUserPayloadDto(createdUser);
     } catch (error) {
       // DB 트랜잭션 중 발생한 에러 처리
       if (error instanceof ConflictException) {
@@ -104,6 +105,13 @@ export class UsersService {
 
   remove(id: number) {
     return `This action removes a #${id} user`;
+  }
+
+  // Users 엔티티를 UserPayloadDto로 변환 헬퍼 함수
+  public toUserPayloadDto(user: Users): UserPayloadDto {
+    return plainToInstance(UserPayloadDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
 
   /**

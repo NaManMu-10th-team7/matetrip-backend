@@ -13,10 +13,10 @@ import { LocalStrategy } from './local.strategy';
     // 1. UsersModule 임포트 (AuthService에서 UsersService를 주입받아야 함)
     UsersModule,
 
-    // 3. PassportModule 등록 (기본 전략을 'jwt'로 설정)
+    // 2. PassportModule 등록 (기본 전략을 'jwt'로 설정)
     PassportModule.register({ defaultStrategy: 'jwt' }),
 
-    // 4. JwtModule 등록 (비동기 방식)
+    // 3. JwtModule 등록 (비동기 방식)
     JwtModule.registerAsync({
       // .env 값을 사용하기 위해 ConfigService 주입
       inject: [ConfigService],
