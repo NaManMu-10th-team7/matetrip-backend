@@ -14,7 +14,6 @@ import { WorkspaceModule } from './domain/workspace/workspace.module';
 import { ChatMessageModule } from './domain/chat-message/chat-message.module';
 import { PoiModule } from './domain/poi/poi.module';
 import { PoiConnectionModule } from './domain/poi-connection/poi-connection.module';
-import { PlanDayModule } from './domain/workspace/plan-day/plan-day.module';
 import { AuthModule } from './domain/auth/auth.module';
 import { RedisModule } from './redis/redis.module';
 
@@ -36,7 +35,6 @@ import { RedisModule } from './redis/redis.module';
     ChatMessageModule,
     PoiModule,
     PoiConnectionModule,
-    PlanDayModule,
     AuthModule,
     RedisModule,
   ],

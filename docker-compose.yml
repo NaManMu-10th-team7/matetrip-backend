@@ -9,4 +9,5 @@ services:
     volumes:
       - redis_data:/usr/local/etc/redis/redis.conf
 
-volumes: redis_data
+volumes:
+  redis_data:
