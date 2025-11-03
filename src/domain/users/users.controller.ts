@@ -6,14 +6,21 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { PostService } from '../post/post.service.js';
+import { PostResponseDto } from '../post/dto/post-response.dto.js';
+import { PostsPageQueryDto } from '../post/dto/list-posts-query.dto.js';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly postService: PostService,
+  ) {}
 
   @Post()
   create(@Body() createUserDto: CreateUserDto) {
@@ -27,7 +34,7 @@ export class UsersController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.usersService.findOne(+id);
+    return this.usersService.findOne(id);
   }
 
   @Patch(':id')
@@ -38,5 +45,13 @@ export class UsersController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.usersService.remove(+id);
+  }
+
+  @Get(':id/posts')
+  findUserPosts(
+    @Param('id') id: string,
+    @Query() listPostsQueryDto: PostsPageQueryDto,
+  ): Promise<PostResponseDto[]> {
+    return this.postService.findAllByUserId(id, listPostsQueryDto);
   }
 }

@@ -15,6 +15,7 @@ import { ChatMessageModule } from './domain/chat-message/chat-message.module';
 import { PoiModule } from './domain/poi/poi.module';
 import { PoiConnectionModule } from './domain/poi-connection/poi-connection.module';
 import { PlanDayModule } from './domain/plan-day/plan-day.module';
+import { AuthModule } from './domain/auth/auth.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { PlanDayModule } from './domain/plan-day/plan-day.module';
     PoiModule,
     PoiConnectionModule,
     PlanDayModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

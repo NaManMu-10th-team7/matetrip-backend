@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS users
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ,
     email           TEXT        NOT NULL,
-    login_id        TEXT        NOT NULL,
     hashed_password TEXT        NOT NULL
 );
 
@@ -45,10 +44,15 @@ CREATE TABLE IF NOT EXISTS post
 (
     id        UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
     writer_id UUID        NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     title     TEXT        NOT NULL,
+    content   TEXT        NOT NULL,
     status    post_status NOT NULL DEFAULT '모집중',
     location  TEXT        NOT NULL,
-    keywords  keyword_type[] DEFAULT '{}'::keyword_type[]
+    max_participants INT NOT NULL DEFAULT 2,
+    keywords  keyword_type[] DEFAULT '{}'::keyword_type[],
+    start_date DATE NULL,
+    end_date  DATE NULL
 );
 
 CREATE TABLE IF NOT EXISTS workspace
