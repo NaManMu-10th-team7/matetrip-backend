@@ -38,6 +38,7 @@ export class PostService {
   async findOne(id: string) {
     const foundedPost = await this.postRepository.findOne({
       where: { id: id },
+      relations: ['writer'],
     });
     return this.toPostResponseDto(foundedPost);
   }
@@ -59,17 +60,20 @@ export class PostService {
     return result.map((post) => this.toPostResponseDto(post));
   }
 
-  async update(userId: string, dto: UpdatePostDto) {
-    const entity = await this.postRepository.findOne({
-      where: { id: dto.id, writer: { id: userId } },
+  async update(id: string, userId: string, dto: UpdatePostDto) {
+    const post = await this.postRepository.findOne({
+      where: { id: id, writer: { id: userId } },
     });
-    if (!entity) {
+    if (!post) {
       throw new NotFoundException('Post update failed');
     }
 
-    const merged = this.postRepository.merge(entity, dto);
-    const savedPost = await this.postRepository.save(merged);
-    return this.toPostResponseDto(savedPost);
+    // dto의 내용을 post 엔티티에 병합합니다.
+    this.postRepository.merge(post, dto);
+    // 변경된 엔티티를 저장합니다.
+    await this.postRepository.save(post);
+    // writer 정보를 포함하여 다시 조회한 후 DTO로 변환하여 반환합니다.
+    return this.findOne(id);
   }
 
   async remove(id: string, userId: string) {

@@ -52,14 +52,15 @@ export class PostController {
     return this.postService.findOne(id);
   }
 
-  @Patch()
+  @Patch(':id')
   @HttpCode(HttpStatus.OK)
   async update(
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() updatePostDto: UpdatePostDto,
     @Req() req,
   ): Promise<PostResponseDto> {
     // 임시 mock user의 id
-    return this.postService.update(this.mockUserId, updatePostDto);
+    return this.postService.update(id, this.mockUserId, updatePostDto);
   }
 
   @Delete(':id')
