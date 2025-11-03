@@ -59,7 +59,10 @@ export class AuthService {
       return newUser;
     } catch (error) {
       // UserService에서 던진 에러를 여기서 처리
-      if (error instanceof ConflictException) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof InternalServerErrorException
+      ) {
         throw error;
       }
 
