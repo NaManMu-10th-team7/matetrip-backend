@@ -14,9 +14,6 @@ export class Users extends BaseTimestampEntity {
   @Column({ type: 'text', name: 'email', unique: true })
   email: string;
 
-  @Column({ type: 'text', name: 'login_id', unique: true })
-  loginId: string;
-
   @Column({ type: 'text', name: 'hashed_password' })
   hashedPassword: string;
 
