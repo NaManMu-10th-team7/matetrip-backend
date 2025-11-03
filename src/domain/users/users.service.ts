@@ -94,7 +94,11 @@ export class UsersService {
     return `This action returns all users`;
   }
 
-  async findOne(email: string): Promise<Users | null> {
+  findOne(id: string) {
+    return `This action returns 가${id} user`;
+  }
+
+  async findByEmail(email: string): Promise<Users | null> {
     // Users 엔티티 조회 시, 관련 Profile 엔티티도 불러와야 누락 발생 안함
     return this.usersRepository.findOne({
       where: { email },

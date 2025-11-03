@@ -22,7 +22,7 @@ export class AuthService {
   // @param password 일반 텍스트 비밀번호
   // @returns 비밀번호를 제외한 사용자 정보. 실패 시 UnauthorizedException
   async validateUser(email: string, password: string): Promise<UserPayloadDto> {
-    const user = await this.usersService.findOne(email);
+    const user = await this.usersService.findByEmail(email);
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
