@@ -13,4 +13,7 @@ export const getTypeOrmConfig = (
   entities: [__dirname + '/../**/*.entity.{js,ts}'],
   synchronize: false,
   autoLoadEntities: true, // Nest의 엔티티 자동 로드 기능
+
+  //터미널 에 console 찍히는거
+  logging: true,
 });

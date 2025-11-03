@@ -13,28 +13,48 @@ import { BaseTimestampEntity } from '../../../base.entity';
 import { GENDER } from './gender.enum.js';
 import { TravelStyleType } from './travel-style-type.enum.js';
 import { TendencyType } from './tendency-type.enum.js';
+//import { MBTI_TYPES } from './mbti.enum';
 
 @Unique('profile_user_id_key', ['user'])
 @Entity('profile', { schema: 'public' })
 export class Profile extends BaseTimestampEntity {
+  /*id와 created_at은 기본제공*/
+
+  /*updated_at*/
   @UpdateDateColumn({ type: 'timestamp with time zone', name: 'updated_at' })
   updatedAt: Date | null;
-
+  /*nickname*/
   @Column({ type: 'text', name: 'nickname' })
   nickname: string;
 
+  /*Gender*/
   @Column({
     type: 'enum',
     name: 'gender',
     enum: GENDER,
     enumName: 'gender',
     default: GENDER.MALE,
+    nullable: false,
   })
   gender: GENDER;
 
+  /*description*/
   @Column({ type: 'text', name: 'description' })
   description: string;
 
+  // /*shortDescription*/
+  // @Column({ type: 'text', name: 'short_description' })
+  // shortDescription: string;
+
+  // @Column({
+  //   type: 'enum',
+  //   name: 'mbti',
+  //   enum: MBTI_TYPES,
+  //   enumName: 'mbti_type',
+  // })
+  // mbtiTypes: MBTI_TYPES;
+
+  /*travel_style*/
   @Column({
     type: 'enum',
     name: 'travel_styles',
@@ -45,6 +65,7 @@ export class Profile extends BaseTimestampEntity {
   })
   travelStyles: TravelStyleType[];
 
+  /*tendency*/
   @Column({
     type: 'enum',
     name: 'tendency',

@@ -27,7 +27,7 @@ export class BinaryContentController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.binaryContentService.findOne(+id);
+    return this.binaryContentService.findOne(id);
   }
 
   @Patch(':id')
@@ -35,11 +35,11 @@ export class BinaryContentController {
     @Param('id') id: string,
     @Body() updateBinaryContentDto: UpdateBinaryContentDto,
   ) {
-    return this.binaryContentService.update(+id, updateBinaryContentDto);
+    return this.binaryContentService.update(id, updateBinaryContentDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.binaryContentService.remove(+id);
+    return this.binaryContentService.remove(id);
   }
 }
