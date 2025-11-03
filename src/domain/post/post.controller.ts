@@ -10,11 +10,13 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostResponseDto } from './dto/post-response.dto.js';
+import { SearchPostDto } from './dto/search-post.dto';
 
 @Controller('post')
 export class PostController {
@@ -35,6 +37,11 @@ export class PostController {
   @Get()
   getAll() {
     return this.postService.findAll();
+  }
+
+  @Get('search')
+  searchPosts(@Query() searchPostDto: SearchPostDto) {
+    return this.postService.searchPosts(searchPostDto);
   }
 
   @Get(':id')
