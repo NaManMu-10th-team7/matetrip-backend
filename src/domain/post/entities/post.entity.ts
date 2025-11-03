@@ -1,24 +1,37 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Users } from '../../users/entities/users.entity';
-import { BaseUuidEntity } from '../../../base.entity';
 import { PostStatus } from './post-status.enum.js';
-import { KeywordType } from '../../enum/keywords-type.enum.js';
+import { BaseTimestampEntity } from '../../base.entity.js';
+import { KeywordType } from './keywords-type.enum.js';
 
-@Entity('post', { schema: 'public' })
-export class Post extends BaseUuidEntity {
+@Entity('post')
+export class Post extends BaseTimestampEntity {
   @Column({ type: 'text', name: 'title' })
   title: string;
+
+  @Column({ type: 'text', name: 'content' })
+  content: string;
 
   @Column({
     type: 'enum',
     name: 'status',
     enum: PostStatus,
     enumName: 'post_status',
+    default: PostStatus.RECRUITING,
   })
-  status: PostStatus;
+  status: PostStatus = PostStatus.RECRUITING;
+
+  @Column({ type: 'date', name: 'start_date', nullable: true })
+  startDate: string | null;
+
+  @Column({ type: 'date', name: 'end_date', nullable: true })
+  endDate: string | null;
 
   @Column({ type: 'text', name: 'location' })
-  location: string;
+  location: string; // 여행 장소 (배열로 할지 말지 나중에 정하기)
+
+  @Column({ type: 'integer', name: 'max_participants' })
+  maxParticipants: number;
 
   @Column({
     type: 'enum',
@@ -26,8 +39,9 @@ export class Post extends BaseUuidEntity {
     enum: KeywordType,
     enumName: 'keyword_type',
     array: true,
+    default: () => "'{}'::keyword_type[]",
   })
-  keywords: KeywordType[];
+  keywords: KeywordType[] = []; // 걍 초기화
 
   @ManyToOne((): typeof Users => Users, { onDelete: 'RESTRICT' })
   @JoinColumn([{ name: 'writer_id', referencedColumnName: 'id' }])
