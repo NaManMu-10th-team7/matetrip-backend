@@ -1,10 +1,10 @@
-import { Column, Entity, OneToOne } from 'typeorm';
+import { Column, Entity, OneToOne, UpdateDateColumn } from 'typeorm';
 import { Profile } from '../../profile/entities/profile.entity';
 import { BaseTimestampEntity } from '../../../base.entity';
 
 @Entity('users', { schema: 'public' })
 export class Users extends BaseTimestampEntity {
-  @Column({
+  @UpdateDateColumn({
     type: 'timestamp with time zone',
     name: 'updated_at',
     nullable: true,

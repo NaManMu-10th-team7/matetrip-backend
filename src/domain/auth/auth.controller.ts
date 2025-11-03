@@ -6,12 +6,11 @@ import {
   Request,
   HttpCode,
   HttpStatus,
-  ValidationPipe,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
-import { LoginDto } from './dto/login.dto';
 import { CreateUserDto } from '../users/dto/create-user.dto';
+import { UserPayloadDto } from '../users/dto/user.payload.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -22,7 +21,9 @@ export class AuthController {
   @UseGuards(AuthGuard('local'))
   @Post('login')
   @HttpCode(HttpStatus.OK) // 로그인 성공 시 200 OK 상태 코드 반환
-  async login(@Request() req: { user: any }): Promise<{ accessToken: string }> {
+  async login(
+    @Request() req: { user: UserPayloadDto },
+  ): Promise<{ accessToken: string }> {
     return this.authService.login(req.user);
   }
 
