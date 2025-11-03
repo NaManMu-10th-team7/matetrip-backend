@@ -1,6 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Users } from '../../users/entities/users.entity';
-import { PlanDay } from '../../plan-day/entities/plan-day.entity';
+import { PlanDay } from '../../workspace/entities/plan-day.entity';
 import { BaseTimestampEntity } from '../../../base.entity';
 
 @Entity('poi', { schema: 'public' })
