@@ -5,12 +5,14 @@ import {
   UseGuards,
   Request,
   HttpCode,
+  Res,
   HttpStatus,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UserPayloadDto } from '../users/dto/user.payload.dto';
+import { type Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -23,8 +25,22 @@ export class AuthController {
   @HttpCode(HttpStatus.OK) // 로그인 성공 시 200 OK 상태 코드 반환
   async login(
     @Request() req: { user: UserPayloadDto },
-  ): Promise<{ accessToken: string }> {
-    return this.authService.login(req.user);
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const accessToken = await this.authService.login(req.user);
+
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      // secure: process.env.NODE_ENV === 'production', // 프로덕션 환경에서는 https를 사용하므로 true로 설정
+      sameSite: 'lax', // 프론트엔드와 백엔드 도메인이 다른 경우 'lax' 또는 'none'으로 설정해야 할 수 있습니다.
+      path: '/', // 쿠키를 전체 사이트에서 사용할 수 있도록 설정
+      maxAge: 3600 * 1000, // 1시간(밀리초 단위), JWT 만료 시간과 일치시키는 것이 좋습니다.
+    });
+
+    return {
+      message: 'Login successful',
+      user: req.user,
+    };
   }
 
   // 회원가입 API POST /auth/signup
