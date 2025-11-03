@@ -1,9 +1,14 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import { RedisIoAdapter } from './redis/redis-io.adapter.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   app.useGlobalPipes(
     new ValidationPipe({

@@ -7,7 +7,10 @@ import { Profile } from '../profile/entities/profile.entity';
 import { PostModule } from '../post/post.module.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Users, Profile]), forwardRef(() => PostModule)],
+  imports: [
+    TypeOrmModule.forFeature([Users, Profile]),
+    forwardRef(() => PostModule),
+  ],
   controllers: [UsersController],
   providers: [UsersService],
 

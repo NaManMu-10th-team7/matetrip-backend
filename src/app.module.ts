@@ -16,6 +16,7 @@ import { PoiModule } from './domain/poi/poi.module';
 import { PoiConnectionModule } from './domain/poi-connection/poi-connection.module';
 import { PlanDayModule } from './domain/plan-day/plan-day.module';
 import { AuthModule } from './domain/auth/auth.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { AuthModule } from './domain/auth/auth.module';
     PoiConnectionModule,
     PlanDayModule,
     AuthModule,
+    RedisModule,
   ],
   controllers: [AppController],
   providers: [AppService],
