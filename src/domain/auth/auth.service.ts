@@ -43,6 +43,10 @@ export class AuthService {
     // 토큰에 담길 정보 (payload)
     const payload = { email: user.email, sub: user.id };
 
+    const accessToken = await this.jwtService.sign(payload);
+
+    console.log(`accessToken: ${accessToken}`);
+
     return {
       accessToken: this.jwtService.sign(payload),
     };

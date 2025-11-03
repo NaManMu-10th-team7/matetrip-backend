@@ -18,6 +18,12 @@ async function bootstrap() {
       enableImplicitConversion: true, // 타입 자동 변환 허용
     }),
   );
+  app.enableCors({
+    origin: 'http://localhost:3001', // 프론트엔드 주소
+    methods: 'GET, HEAD, PUT, PATCH, POST, DELETE', // 허용할 HTTP 메서드
+    credential: true, // 쿠키나 인증 헤더(Authorization)를 주고받을 때 필요
+  });
+
   await app.listen(process.env.PORT ?? 3000);
 }
 void bootstrap();
