@@ -55,27 +55,27 @@ export class ProfileController {
     return this.profileService.findOne(id);
   }
 
-  // @Patch(':id')
-  // @HttpCode(HttpStatus.OK)
-  // update(
-  //   @Param('id', new ParseUUIDPipe()) id: string,
-  //   @Body() updateProfileDto: UpdateProfileDto,
-  // ) {
-  //   return this.profileService.update(id, updateProfileDto);
-  // }
-
-  // //JWT 일때로 가정
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(RequireUserGuard)
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() updateProfileDto: UpdateProfileDto,
-    @Req() req: RequestWithUser,
   ) {
-    updateProfileDto.userId = req.user.id;
     return this.profileService.update(id, updateProfileDto);
   }
+
+  // // //JWT 일때로 가정
+  // @Patch(':id')
+  // @HttpCode(HttpStatus.OK)
+  // @UseGuards(RequireUserGuard)
+  // update(
+  //   @Param('id', new ParseUUIDPipe()) id: string,
+  //   @Body() updateProfileDto: UpdateProfileDto,
+  //   @Req() req: RequestWithUser,
+  // ) {
+  //   updateProfileDto.userId = req.user.id;
+  //   return this.profileService.update(id, updateProfileDto);
+  // }
 
   // //JWT 일때로 가정
   @Delete(':id')
