@@ -49,5 +49,5 @@ export class CreateProfileDto {
 
   @IsOptional()
   @IsUUID()
-  profileImageId?: string;
+  profileImageId?: string; //제거가 안됨(create이니까)
 }

@@ -13,6 +13,9 @@ import { GENDER } from './entities/gender.enum';
 import { TravelStyleType } from './entities/travel-style-type.enum';
 import { TendencyType } from './entities/tendency-type.enum';
 
+import { BinaryContentService } from '../binary-content/binary-content.service';
+import { BinaryContent } from '../binary-content/entities/binary-content.entity';
+
 /**
  * 클라이언트에 반환되는 프로필 정보 형태
  * - DB의 Profile 엔티티에서 필요한 필드만 선택적으로 포함합니다.
@@ -38,6 +41,10 @@ export class ProfileService {
     private readonly profileRepository: Repository<Profile>,
     @InjectRepository(Users)
     private readonly usersRepository: Repository<Users>,
+
+    private readonly binaryContentService: BinaryContentService,
+    @InjectRepository(BinaryContent)
+    private readonly binaryContentRepository: Repository<BinaryContent>,
   ) {}
 
   /**
@@ -173,16 +180,47 @@ export class ProfileService {
       );
     }
 
-    // 전달된 필드만 덮어쓰기
-    Object.assign(profile, updateProfileDto);
+    const { profileImageId, ...textData } = updateProfileDto;
 
-    // DB에 저장 (save는 update와 insert를 자동 구분)
+    // 전달된 필드만 덮어쓰기 🌟(사진 파일 제외)
+    Object.assign(profile, textData);
+
+    //사진 파일 따로 처리
+    const oldImageId = profile.profileImage?.id || null;
+    if (profileImageId !== undefined) {
+      // 이미지를 '제거'하라는 요청 (null)
+      if (profileImageId === null) {
+        profile.profileImage = null;
+      }
+      //  이미지를 '교체/추가'하라는 요청 (string ID)
+      else {
+        const newImage = await this.binaryContentRepository.findOneBy({
+          id: profileImageId,
+        });
+        if (!newImage) {
+          throw new NotFoundException(
+            `BinaryContent (Image) with ID ${profileImageId} not found`,
+          );
+        }
+        profile.profileImage = newImage;
+      }
+      // profileImageId가 undefined면 (DTO에 안 들어왔으면) 아무것도 안 함 (기존 유지)
+    }
+
+    // 프로필 DB에 저장 (텍스트 + 이미지 관계 변경 사항 적용)
     const updatedProfile = await this.profileRepository.save(profile);
 
-    // DTO로 변환하여 반환
+    // (핵심) '고아 파일' 삭제
+    //    - 옛날 이미지가 있었고 (oldImageId !== null)
+    //    - 그게 새 이미지 ID와 다르다면 (oldImageId !== updatedProfile.profileImage?.id)
+    if (oldImageId && oldImageId !== updatedProfile.profileImage?.id) {
+      // S3와 DB에서 '옛날 파일' 삭제
+      await this.binaryContentService.deleteFile(oldImageId);
+    }
+
+    // 11. DTO로 변환하여 반환
     return this.toResponseDto(updatedProfile);
   }
-
   /**
    * 프로필 삭제
    * 1. 해당 ID의 프로필이 존재하는지 확인합니다. (존재하지 않으면 404 예외)
@@ -210,8 +248,15 @@ export class ProfileService {
         `User ${userId} cannot delete another user's profile`,
       );
     }
+
+    const profileImageId = profile.profileImage?.id ?? null;
     // Repository의 remove() 메서드는 해당 엔티티를 삭제합니다.
     await this.profileRepository.remove(profile);
+
+    //실제 s3에서 파일 지우기
+    if (profileImageId) {
+      await this.binaryContentService.deleteFile(profileImageId);
+    }
 
     // 삭제 후 DTO로 변환하여 반환
     return {

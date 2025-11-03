@@ -76,9 +76,9 @@ export class Profile extends BaseTimestampEntity {
   })
   tendency: TendencyType[];
 
-  @ManyToOne(() => BinaryContent, { onDelete: 'SET NULL' })
+  @ManyToOne(() => BinaryContent, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn([{ name: 'profile_image_id', referencedColumnName: 'id' }])
-  profileImage: BinaryContent;
+  profileImage: BinaryContent | null;
 
   @OneToOne(() => Users, (users) => users.profile, { onDelete: 'CASCADE' })
   @JoinColumn([{ name: 'user_id', referencedColumnName: 'id' }])
