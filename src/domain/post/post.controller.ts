@@ -14,6 +14,7 @@ import {
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { PostResponseDto } from './dto/post-response.dto.js';
 
 @Controller('post')
 export class PostController {
@@ -23,9 +24,11 @@ export class PostController {
   // @UseGuards(A)
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createPostDto: CreatePostDto, @Req() req) {
+  async create(
+    @Body() createPostDto: CreatePostDto,
+    @Req() req,
+  ): Promise<PostResponseDto> {
     // const userId = req.user.id;
-    // 임시 mock user의 id
     return this.postService.create(createPostDto, this.mockUserId);
   }
 
@@ -36,21 +39,25 @@ export class PostController {
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  async getOne(@Param('id', new ParseUUIDPipe()) id: string) {
+  async getOne(
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ): Promise<PostResponseDto> {
     return this.postService.findOne(id);
   }
 
   @Patch()
   @HttpCode(HttpStatus.OK)
-  async update(@Body() updatePostDto: UpdatePostDto, @Req() req) {
+  async update(
+    @Body() updatePostDto: UpdatePostDto,
+    @Req() req,
+  ): Promise<PostResponseDto> {
     // 임시 mock user의 id
-    const userId = '33b9b8fe-0a49-4866-8618-74a351c656ad';
-    return this.postService.update(userId, updatePostDto);
+    return this.postService.update(this.mockUserId, updatePostDto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  async remove(@Param('id', new ParseUUIDPipe()) id: string) {
+  async remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<any> {
     await this.postService.remove(id, this.mockUserId);
     return {
       message: '성공적으로 삭제되었습니다',
