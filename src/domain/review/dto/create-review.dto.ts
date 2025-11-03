@@ -16,4 +16,7 @@ export class CreateReviewDto {
   @IsUUID()                          // 필수: 대상 유저 UUID
   revieweeId: string;                // 리뷰 대상자
 
+   @IsUUID()
+  reviewerId: string;
+
 }
