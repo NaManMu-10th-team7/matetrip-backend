@@ -10,6 +10,7 @@ import {
 import { WorkspaceService } from './workspace.service';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
+import { CreatePoiDto } from './dto/create-poi.dto.js';
 
 @Controller('workspace')
 export class WorkspaceController {
@@ -20,6 +21,11 @@ export class WorkspaceController {
     return this.workspaceService.create(createWorkspaceDto);
   }
 
+  @Post('workspace/:id/poi')
+  createPoi(@Param('id') workspaceId: string, @Body() dto: CreatePoiDto) {
+    return this.workspaceService.createPoi(workspaceId, dto);
+  }
+
   @Get()
   findAll() {
     return this.workspaceService.findAll();
@@ -27,7 +33,7 @@ export class WorkspaceController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.workspaceService.findOne(+id);
+    return this.workspaceService.findOne(id);
   }
 
   @Patch(':id')
@@ -35,11 +41,11 @@ export class WorkspaceController {
     @Param('id') id: string,
     @Body() updateWorkspaceDto: UpdateWorkspaceDto,
   ) {
-    return this.workspaceService.update(+id, updateWorkspaceDto);
+    return this.workspaceService.update(id, updateWorkspaceDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.workspaceService.remove(+id);
+    return this.workspaceService.remove(id);
   }
 }

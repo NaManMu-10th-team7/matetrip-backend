@@ -26,6 +26,7 @@ export class PostService {
     });
 
     const savedPost = await this.postRepository.save(post);
+    // todo : 워크스페이스 생성
     return this.toPostResponseDto(savedPost);
   }
 
@@ -38,6 +39,11 @@ export class PostService {
     const foundedPost = await this.postRepository.findOne({
       where: { id: id },
     });
+
+    if (!foundedPost) {
+      throw new NotFoundException('게시물의 id와 일치하는 게시물가 없습니다');
+    }
+
     return this.toPostResponseDto(foundedPost);
   }
 

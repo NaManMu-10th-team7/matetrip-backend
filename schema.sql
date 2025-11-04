@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS binary_content
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     file_name  TEXT        NOT NULL,
     file_type  TEXT        NOT NULL,
-    file_size  BIGINT      NOT NULL
+    file_size  BIGINT      NOT NULL,
 );
 
 CREATE TABLE IF NOT EXISTS users
