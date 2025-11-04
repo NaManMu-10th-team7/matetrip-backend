@@ -105,9 +105,10 @@ export class WorkspaceService {
     endDate?: string | null,
   ): PlanDay[] {
     if (!startDate && !endDate) return [];
+    if (!startDate || !endDate) return [];
 
-    const start = parseISO(startDate ?? endDate!);
-    const end = parseISO(endDate ?? startDate!);
+    const start = parseISO(startDate);
+    const end = parseISO(endDate);
 
     const days = eachDayOfInterval({ start, end });
 

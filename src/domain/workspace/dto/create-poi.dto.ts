@@ -10,9 +10,11 @@ export class CreatePoiDto {
   @IsUUID()
   userId: string;
 
+  @IsNotEmpty()
   @IsInt()
   x: number;
 
+  @IsNotEmpty()
   @IsInt()
   y: number;
 
@@ -20,5 +22,5 @@ export class CreatePoiDto {
   address: string;
 
   @IsOptional() // 장소가 api에서 100퍼 불러와졌었나?
-  place_name: string;
+  placeName?: string;
 }
