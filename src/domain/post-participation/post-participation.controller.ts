@@ -1,6 +1,7 @@
 import {
   Controller,
   HttpCode,
+  Get,
   HttpStatus,
   Param,
   ParseUUIDPipe,
@@ -31,5 +32,13 @@ export class PostParticipationController {
       postId,
       requesterId,
     );
+  }
+
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  getParticipationsForPost(
+    @Param('postId', ParseUUIDPipe) postId: string,
+  ): Promise<PostParticipationResponseDto[]> {
+    return this.postParticipationService.getParticipationsForPost(postId);
   }
 }

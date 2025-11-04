@@ -1,42 +1,26 @@
-import { Type } from 'class-transformer';
-import {
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  IsUUID,
-} from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
 
+// 임시 postman 용
 export class CreatePoiDto {
-  @IsUUID()
   @IsNotEmpty()
-  workspaceId: string;
-
-  @IsOptional()
   @IsUUID()
-  poiId?: string;
+  plan_day_id: string;
 
-  @IsUUID()
   @IsNotEmpty()
-  createdBy: string;
-
-  @IsOptional()
   @IsUUID()
-  planDayId?: string;
+  userId: string;
 
-  @Type(() => Number)
-  @IsNumber()
-  longitude: number;
+  @IsNotEmpty()
+  @IsInt()
+  x: number;
 
-  @Type(() => Number)
-  @IsNumber()
-  latitude: number;
+  @IsNotEmpty()
+  @IsInt()
+  y: number;
 
-  @IsString()
   @IsNotEmpty()
   address: string;
 
-  @IsOptional()
-  @IsString()
+  @IsOptional() // 장소가 api에서 100퍼 불러와졌었나?
   placeName?: string;
 }
