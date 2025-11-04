@@ -31,9 +31,14 @@ export class PostService {
     return this.toPostResponseDto(savedPost);
   }
 
-  // 아직 미정
-  findAll() {
-    return `This action returns all post`;
+  async findAll(): Promise<PostResponseDto[]> {
+    const posts = await this.postRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.writer', 'writer')
+      .orderBy('post.createdAt', 'DESC')
+      .getMany();
+
+    return posts.map((post) => this.toPostResponseDto(post));
   }
 
   async findOne(id: string) {

@@ -36,7 +36,8 @@ export class PostController {
   }
 
   @Get()
-  getAll() {
+  @HttpCode(HttpStatus.OK)
+  async getAll(): Promise<PostResponseDto[]> {
     return this.postService.findAll();
   }
 
