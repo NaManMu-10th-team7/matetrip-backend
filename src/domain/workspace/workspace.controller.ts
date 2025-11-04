@@ -21,7 +21,7 @@ export class WorkspaceController {
     return this.workspaceService.create(createWorkspaceDto);
   }
 
-  @Post(':id/poi')
+  @Post('workspace/:id/poi')
   createPoi(@Param('id') workspaceId: string, @Body() dto: CreatePoiDto) {
     return this.workspaceService.createPoi(workspaceId, dto);
   }
