@@ -30,6 +30,22 @@ export class ProfileController {
     return this.profileService.getProfileByUserId(req.user.id);
   }
 
+  /**
+   * 로그인 시 유저 정보를 가져와서 전역 상태로 관리하기 위함.
+   * @param req
+   */
+  @Get('my/info')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard('jwt'))
+  async getMyProfileWithUserId(@Req() req: RequestWithUser) {
+    const userId = req.user.id;
+    const profile = await this.profileService.getProfileByUserId(userId);
+    return {
+      userId,
+      profile,
+    };
+  }
+
   @Get()
   @HttpCode(HttpStatus.OK)
   findAll() {
