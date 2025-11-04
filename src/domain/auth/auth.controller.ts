@@ -26,7 +26,7 @@ export class AuthController {
   async login(
     @Request() req: { user: UserPayloadDto },
     @Res({ passthrough: true }) res: Response,
-  ) {
+  ): Promise<{ message: string; user: UserPayloadDto }> {
     const accessToken = await this.authService.login(req.user);
 
     res.cookie('accessToken', accessToken, {

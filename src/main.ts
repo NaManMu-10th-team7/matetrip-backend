@@ -32,7 +32,7 @@ async function bootstrap() {
     }),
   );
   app.enableCors({
-    origin: 'http://localhost:3001', // 프론트엔드 주소
+    origin: process.env.FRONTEND_URL || 'http://localhost:3001', // 프론트엔드 주소
     methods: 'GET, HEAD, PUT, PATCH, POST, DELETE', // 허용할 HTTP 메서드
     credentials: true, // 쿠키나 인증 헤더(Authorization)를 주고받을 때 필요
   });

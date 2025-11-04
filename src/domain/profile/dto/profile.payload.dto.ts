@@ -15,10 +15,10 @@ export class ProfilePayloadDto {
   gender: GENDER;
 
   @Expose()
-  description: string;
+  description: string | null;
 
   @Expose()
-  intro: string;
+  intro: string | null;
 
   @Expose()
   mbtiTypes: MBTI_TYPES;
