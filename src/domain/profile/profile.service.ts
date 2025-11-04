@@ -8,7 +8,7 @@ import { Repository } from 'typeorm';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Profile } from './entities/profile.entity';
 import { Users } from '../users/entities/users.entity';
-import { ProfilePayloadDto } from './dto/profile.payload.dto';
+import { ProfilePayloadDto } from './dto/profile.payload.dto'; // 변경된 DTO 임포트
 import { plainToInstance } from 'class-transformer';
 
 @Injectable()
@@ -147,10 +147,13 @@ export class ProfileService {
    * - user 객체 전체가 아니라 user.id만 포함시켜 외부 노출 범위를 제한
    */
   private toProfilePayloadDto(profile: Profile): ProfilePayloadDto {
-    const payload = plainToInstance(ProfilePayloadDto, profile, {
+    const profileWithEmail = {
+      ...profile,
+      email: profile.user.email, // User 엔티티에서 이메일 가져오기
+    };
+    const payload = plainToInstance(ProfilePayloadDto, profileWithEmail, {
       excludeExtraneousValues: true,
     });
-
     payload.profileImageId = profile.profileImage?.id ?? null;
 
     return payload;
