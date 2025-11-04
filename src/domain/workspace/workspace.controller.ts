@@ -10,6 +10,7 @@ import {
 import { WorkspaceService } from './workspace.service';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
+import { CreatePoiDto } from './dto/create-poi.dto.js';
 
 @Controller('workspace')
 export class WorkspaceController {
@@ -18,6 +19,11 @@ export class WorkspaceController {
   @Post()
   create(@Body() createWorkspaceDto: CreateWorkspaceDto) {
     return this.workspaceService.create(createWorkspaceDto);
+  }
+
+  @Post('workspace/:id/poi')
+  createPoi(@Param('id') workspaceId: string, @Body() dto: CreatePoiDto) {
+    return this.workspaceService.createPoi(workspaceId, dto);
   }
 
   @Get()

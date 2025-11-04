@@ -5,11 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {
-  DataSource,
-  QueryFailedError,
-  Repository,
-} from 'typeorm';
+import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { Review } from './entities/review.entity';
 import { Post } from '../post/entities/post.entity';
 import { Users } from '../users/entities/users.entity';
@@ -53,9 +49,9 @@ export class ReviewService {
     });
 
     // 저장 (트랜잭션으로 래핑)
-      const saved = await this.ds.transaction(async (manager) => {
-        return manager.getRepository(Review).save(entity);
-      });
-      return { id: saved.id };
+    const saved = await this.ds.transaction(async (manager) => {
+      return manager.getRepository(Review).save(entity);
+    });
+    return { id: saved.id };
   }
 }

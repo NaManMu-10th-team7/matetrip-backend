@@ -6,10 +6,16 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { PoiSocketDto } from './dto/poi-socket.dto.js';
-import { PoiMarkingDto } from './dto/poi-marking.dto.js';
+import { SocketPoiDto } from './dto/socket-poi.dto.js';
+import { CreatePoiDto } from './dto/create-poi.dto.js';
 
-@WebSocketGateway(3003, { cors: { origin: '*' } })
+@WebSocketGateway(3003, {
+  cors: {
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+      'http://localhost:3000',
+    ],
+  },
+})
 export class PoiGateway {
   @WebSocketServer()
   server: Server;
@@ -17,7 +23,7 @@ export class PoiGateway {
   @SubscribeMessage('poi-join')
   async handlePoiJoin(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: PoiSocketDto,
+    @MessageBody() data: SocketPoiDto,
   ) {
     console.log(data);
     await socket.join(data.workSpaceId);
@@ -27,7 +33,7 @@ export class PoiGateway {
   @SubscribeMessage('poi-leave')
   async handlePoiLeave(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: PoiSocketDto,
+    @MessageBody() data: SocketPoiDto,
   ) {
     await socket.leave(data.workSpaceId);
   }
@@ -35,8 +41,9 @@ export class PoiGateway {
   @SubscribeMessage('poi/marking')
   handlePoiUpdate(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: PoiMarkingDto,
+    @MessageBody() data: CreatePoiDto,
   ) {
-    this.server.to(data.workSpaceId).emit('poi/marking', data);
+    const mockWorkspaceId = 'mock-workspace-id';
+    this.server.to(mockWorkspaceId).emit('poi/marking', data);
   }
 }

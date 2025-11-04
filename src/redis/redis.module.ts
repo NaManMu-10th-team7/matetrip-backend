@@ -4,5 +4,6 @@ import { RedisIoAdapter } from './redis-io.adapter.js';
 
 @Module({
   providers: [RedisService, RedisIoAdapter],
+  exports: [RedisService, RedisIoAdapter],
 })
 export class RedisModule {}

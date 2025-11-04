@@ -1,4 +1,4 @@
-import { ConsoleLogger, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
 import { PostService } from '../post/post.service.js';
@@ -10,6 +10,7 @@ import { WorkspaceResponseDto } from './dto/workspace-response.dto.js';
 import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from './entities/plan-day.entity.js';
 import { eachDayOfInterval, format, parseISO } from 'date-fns';
+import { CreatePoiDto } from './dto/create-poi.dto.js';
 
 @Injectable()
 export class WorkspaceService {
@@ -66,6 +67,10 @@ export class WorkspaceService {
     return this.toWorkspaceResponseDto(savedWorkspace);
   }
 
+  createPoi(workspaceId: string, dto: CreatePoiDto) {
+    return '테스트';
+  }
+
   findAll() {
     return `This action returns all workspace`;
   }
@@ -86,7 +91,7 @@ export class WorkspaceService {
   }
   private toWorkspaceResponseDto(workspace: Workspace | null) {
     if (!workspace) {
-      throw new NotFoundException("Post doesn't exist");
+      throw new NotFoundException("Workspace doesn't exist");
     }
 
     return plainToInstance(WorkspaceResponseDto, workspace, {

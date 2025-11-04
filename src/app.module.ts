@@ -12,7 +12,6 @@ import { PostParticipationModule } from './domain/post-participation/post-partic
 import { ReviewModule } from './domain/review/review.module';
 import { WorkspaceModule } from './domain/workspace/workspace.module';
 import { ChatMessageModule } from './domain/chat-message/chat-message.module';
-import { PoiModule } from './domain/poi/poi.module';
 import { PoiConnectionModule } from './domain/poi-connection/poi-connection.module';
 import { AuthModule } from './domain/auth/auth.module';
 import { RedisModule } from './redis/redis.module';
@@ -33,7 +32,6 @@ import { RedisModule } from './redis/redis.module';
     ReviewModule,
     WorkspaceModule,
     ChatMessageModule,
-    PoiModule,
     PoiConnectionModule,
     AuthModule,
     RedisModule,

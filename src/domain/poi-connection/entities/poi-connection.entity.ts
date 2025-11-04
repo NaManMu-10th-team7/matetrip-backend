@@ -1,5 +1,5 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { Poi } from '../../poi/entities/poi.entity';
+import { Poi } from '../../workspace/entities/poi.entity';
 import { PlanDay } from '../../workspace/entities/plan-day.entity';
 import { BaseTimestampEntity } from '../../../base.entity';
 
