@@ -16,9 +16,9 @@ import {
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
-import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Request } from 'express';
+import { AuthGuard } from '@nestjs/passport';
 
 type RequestWithUser = Request & { user: { id: string } };
 
@@ -37,10 +37,13 @@ class RequireUserGuard implements CanActivate {
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  create(@Body() createProfileDto: CreateProfileDto) {
-    return this.profileService.create(createProfileDto);
+  @Get('my')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard('jwt'))
+  async getMyProfile(@Req() req: RequestWithUser) {
+    const userId = req.user.id;
+
+    return this.profileService.getProfileByUserId(userId);
   }
 
   @Get()
@@ -55,26 +58,19 @@ export class ProfileController {
     return this.profileService.findOne(id);
   }
 
-  // @Patch(':id')
-  // @HttpCode(HttpStatus.OK)
-  // update(
-  //   @Param('id', new ParseUUIDPipe()) id: string,
-  //   @Body() updateProfileDto: UpdateProfileDto,
-  // ) {
-  //   return this.profileService.update(id, updateProfileDto);
-  // }
+  @Get('user/:userId')
+  @HttpCode(HttpStatus.OK)
+  async findProfileByUserId(@Param('userId', ParseUUIDPipe) userId: string) {
+    return this.profileService.getProfileByUserId(userId);
+  }
 
   // //JWT 일때로 가정
-  @Patch(':id')
+  @Patch('my')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(RequireUserGuard)
-  update(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() updateProfileDto: UpdateProfileDto,
-    @Req() req: RequestWithUser,
-  ) {
-    updateProfileDto.userId = req.user.id;
-    return this.profileService.update(id, updateProfileDto);
+  @UseGuards(AuthGuard('jwt'))
+  async update(@Req() req, @Body() updateProfileDto: UpdateProfileDto) {
+    const userId = req.user.id;
+    return this.profileService.update(userId, updateProfileDto);
   }
 
   // //JWT 일때로 가정
@@ -87,10 +83,4 @@ export class ProfileController {
   ) {
     return this.profileService.remove(id, req.user.id);
   }
-
-  // @Delete(':id')
-  // @HttpCode(HttpStatus.OK)
-  // remove(@Param('id', new ParseUUIDPipe()) id: string) {
-  //   return this.profileService.remove(id);
-  // }
 }
