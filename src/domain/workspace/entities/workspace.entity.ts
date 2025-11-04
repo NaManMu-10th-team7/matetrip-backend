@@ -3,7 +3,7 @@ import { Post } from '../../post/entities/post.entity';
 import { BaseUuidEntity } from '../../../base.entity';
 
 @Entity('workspace', { schema: 'public' })
-@Unique(['post_id'])
+@Unique(['post'])
 export class Workspace extends BaseUuidEntity {
   @Column({ type: 'text', name: 'workspace_name' })
   workspaceName: string;
