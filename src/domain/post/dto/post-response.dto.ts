@@ -35,6 +35,11 @@ export class PostResponseDto {
   title: string;
 
   @Expose()
+  @IsString()
+  @IsNotEmpty()
+  content: string;
+
+  @Expose()
   @IsEnum(PostStatus)
   status: PostStatus;
 
