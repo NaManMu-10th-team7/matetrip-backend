@@ -1,4 +1,4 @@
-import { Expose } from 'class-transformer';
+import { Expose, Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
@@ -10,6 +10,7 @@ import {
 } from 'class-validator';
 import { PostStatus } from '../entities/post-status.enum';
 import { KeywordType } from '../entities/keywords-type.enum';
+import { ProfilePayloadDto } from '../../profile/dto/profile.payload.dto';
 
 export class PostResponseDto {
   @Expose()
@@ -19,6 +20,11 @@ export class PostResponseDto {
   @Expose()
   @IsUUID()
   writerId: string;
+
+  @Expose()
+  @Type(() => ProfilePayloadDto)
+  @IsOptional()
+  writerProfile?: ProfilePayloadDto;
 
   @Expose()
   createdAt: string;

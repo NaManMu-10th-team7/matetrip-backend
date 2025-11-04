@@ -35,6 +35,7 @@ export class PostService {
     const posts = await this.postRepository
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.writer', 'writer')
+      .leftJoinAndSelect('writer.profile', 'profile')
       .orderBy('post.createdAt', 'DESC')
       .getMany();
 
@@ -113,6 +114,7 @@ export class PostService {
     const postWithWriterId = {
       ...post,
       writerId: post.writer.id,
+      writerProfile: post.writer.profile,
     };
     return plainToInstance(PostResponseDto, postWithWriterId, {
       excludeExtraneousValues: true,
@@ -144,6 +146,7 @@ export class PostService {
 
     const posts = await queryBuilder
       .leftJoinAndSelect('post.writer', 'writer')
+      .leftJoinAndSelect('writer.profile', 'profile')
       .orderBy('post.createdAt', 'DESC')
       // .skip((page - 1) * limit)
       // .take(limit)
