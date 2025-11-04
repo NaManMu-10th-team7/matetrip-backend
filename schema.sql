@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS binary_content
     file_name  TEXT        NOT NULL,
     file_type  TEXT        NOT NULL,
     file_size  BIGINT      NOT NULL,
-    presigned_url TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS users
