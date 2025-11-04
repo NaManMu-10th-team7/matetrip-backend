@@ -1,11 +1,27 @@
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Post } from '../../post/entities/post.entity';
 import { Users } from '../../users/entities/users.entity';
-import { BaseTimestampEntity } from '../../../base.entity';
 import { PostParticipationStatus } from './post-participation-status.js';
 
 @Entity('post_participation', { schema: 'public' })
-export class PostParticipation extends BaseTimestampEntity {
+export class PostParticipation {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @CreateDateColumn({
+    name: 'requested_at',
+    type: 'timestamptz',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  requestedAt: Date;
+
   @Column({
     type: 'enum',
     name: 'status',

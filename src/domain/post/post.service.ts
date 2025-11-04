@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -27,15 +31,23 @@ export class PostService {
     return this.toPostResponseDto(savedPost);
   }
 
-  // 아직 미정
-  findAll() {
-    return `This action returns all post`;
+  async findAll(): Promise<PostResponseDto[]> {
+    const posts = await this.postRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.writer', 'writer')
+      .leftJoinAndSelect('writer.profile', 'profile')
+      .orderBy('post.createdAt', 'DESC')
+      .getMany();
+
+    return posts.map((post) => this.toPostResponseDto(post));
   }
 
   async findOne(id: string) {
     const foundedPost = await this.postRepository.findOne({
-      where: { id: id },
-      relations: ['writer'],
+      where: { id },
+      relations: {
+        writer: { profile: true },
+      },
     });
 
     if (!foundedPost) {
@@ -93,8 +105,20 @@ export class PostService {
     if (!post) {
       throw new NotFoundException("Post doesn't exist");
     }
-
-    return plainToInstance(PostResponseDto, post, {
+    // `post.writer`가 로드되지 않았을 경우를 대비한 방어 코드
+    if (!post.writer || !post.writer.id) {
+      // 실제 운영 환경에서는 로깅을 통해 이런 케이스를 추적하는 것이 좋습니다.
+      throw new BadRequestException(
+        'Writer information is missing for the post.',
+      );
+    }
+    // DTO로 변환하기 전에 필요한 데이터를 명시적으로 매핑합니다.
+    const postWithWriterId = {
+      ...post,
+      writerId: post.writer.id,
+      writerProfile: post.writer.profile,
+    };
+    return plainToInstance(PostResponseDto, postWithWriterId, {
       excludeExtraneousValues: true,
     });
   }
@@ -124,6 +148,7 @@ export class PostService {
 
     const posts = await queryBuilder
       .leftJoinAndSelect('post.writer', 'writer')
+      .leftJoinAndSelect('writer.profile', 'profile')
       .orderBy('post.createdAt', 'DESC')
       // .skip((page - 1) * limit)
       // .take(limit)
