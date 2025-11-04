@@ -49,6 +49,17 @@ export class AuthController {
   async signUp(@Body() createUserDto: CreateUserDto) {
     return this.authService.signUp(createUserDto);
   }
+
+  // 로그아웃 API POST /auth/logout
+  @UseGuards(AuthGuard('jwt'))
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  logout(@Res({ passthrough: true }) res: Response): { message: string } {
+    res.clearCookie('accessToken', { path: '/' });
+    return {
+      message: 'Logout successful',
+    };
+  }
 }
 
 /**

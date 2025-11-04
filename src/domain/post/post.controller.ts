@@ -11,31 +11,33 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostResponseDto } from './dto/post-response.dto.js';
 import { SearchPostDto } from './dto/search-post.dto';
-
+import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
 @Controller('post')
 export class PostController {
   constructor(private readonly postService: PostService) {}
-  private readonly mockUserId = '33b9b8fe-0a49-4866-8618-74a351c656ad';
 
-  // @UseGuards(A)
   @Post()
+  @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Body() createPostDto: CreatePostDto,
-    @Req() req,
+    @Req() req: Request & { user: { id: string } },
   ): Promise<PostResponseDto> {
-    // const userId = req.user.id;
-    return this.postService.create(createPostDto, this.mockUserId);
+    const userId = req.user.id;
+    return this.postService.create(createPostDto, userId);
   }
 
   @Get()
-  getAll() {
+  @HttpCode(HttpStatus.OK)
+  async getAll(): Promise<PostResponseDto[]> {
     return this.postService.findAll();
   }
 
@@ -53,20 +55,26 @@ export class PostController {
   }
 
   @Patch(':id')
+  @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
   async update(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() updatePostDto: UpdatePostDto,
-    @Req() req,
+    @Req() req: Request & { user: { id: string } },
   ): Promise<PostResponseDto> {
-    // 임시 mock user의 id
-    return this.postService.update(id, this.mockUserId, updatePostDto);
+    const userId = req.user.id;
+    return this.postService.update(id, userId, updatePostDto);
   }
 
   @Delete(':id')
+  @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
-  async remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<any> {
-    await this.postService.remove(id, this.mockUserId);
+  async remove(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Req() req: Request & { user: { id: string } },
+  ): Promise<any> {
+    const userId = req.user.id;
+    await this.postService.remove(id, userId);
     return {
       message: '성공적으로 삭제되었습니다',
     };

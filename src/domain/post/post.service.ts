@@ -31,15 +31,23 @@ export class PostService {
     return this.toPostResponseDto(savedPost);
   }
 
-  // 아직 미정
-  findAll() {
-    return `This action returns all post`;
+  async findAll(): Promise<PostResponseDto[]> {
+    const posts = await this.postRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.writer', 'writer')
+      .leftJoinAndSelect('writer.profile', 'profile')
+      .orderBy('post.createdAt', 'DESC')
+      .getMany();
+
+    return posts.map((post) => this.toPostResponseDto(post));
   }
 
   async findOne(id: string) {
     const foundedPost = await this.postRepository.findOne({
-      where: { id: id },
-      relations: ['writer'],
+      where: { id },
+      relations: {
+        writer: { profile: true },
+      },
     });
 
     if (!foundedPost) {
@@ -108,6 +116,7 @@ export class PostService {
     const postWithWriterId = {
       ...post,
       writerId: post.writer.id,
+      writerProfile: post.writer.profile,
     };
     return plainToInstance(PostResponseDto, postWithWriterId, {
       excludeExtraneousValues: true,
@@ -139,6 +148,7 @@ export class PostService {
 
     const posts = await queryBuilder
       .leftJoinAndSelect('post.writer', 'writer')
+      .leftJoinAndSelect('writer.profile', 'profile')
       .orderBy('post.createdAt', 'DESC')
       // .skip((page - 1) * limit)
       // .take(limit)
