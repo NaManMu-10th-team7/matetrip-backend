@@ -44,8 +44,10 @@ export class PostService {
 
   async findOne(id: string) {
     const foundedPost = await this.postRepository.findOne({
-      where: { id: id },
-      relations: ['writer'],
+      where: { id },
+      relations: {
+        writer: { profile: true },
+      },
     });
 
     if (!foundedPost) {
