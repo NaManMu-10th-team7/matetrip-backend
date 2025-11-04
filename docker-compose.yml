@@ -1,5 +1,4 @@
 # 임시 redis 세팅
-
 services:
   redis_container:
     image: redis:latest

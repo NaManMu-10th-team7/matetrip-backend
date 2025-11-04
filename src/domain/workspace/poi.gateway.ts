@@ -8,8 +8,26 @@ import {
 import { Server, Socket } from 'socket.io';
 import { SocketPoiDto } from './dto/socket-poi.dto.js';
 import { CreatePoiDto } from './dto/create-poi.dto.js';
+import { WorkspaceService } from './workspace.service.js';
+import { RemovePoiDto } from './dto/remove-poi.dto.js';
+import { PoiService } from './poi.service.js';
+
+const PoiSocketEvent = {
+  JOIN: 'join',
+  JOINED: 'joined',
+  SYNC: 'sync',
+  LEAVE: 'leave',
+  LEFT: 'left',
+  MARK: 'mark',
+  MARKED: 'marked',
+  UNMARK: 'unmark',
+  UNMARKED: 'unmarked',
+  FLUSH: 'flush',
+  FLUSHED: 'flushed',
+} as const;
 
 @WebSocketGateway(3003, {
+  namespace: 'poi',
   cors: {
     origin: process.env.ALLOWED_ORIGINS?.split(',') || [
       'http://localhost:3000',
