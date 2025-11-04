@@ -1,59 +1,77 @@
 import {
+  Body,
   Controller,
-  Post,
+  Get,
   Delete,
-  Param,
-  UploadedFile,
-  UseInterceptors,
-  ParseFilePipe,
-  MaxFileSizeValidator,
   HttpCode,
   HttpStatus,
+  Param,
   ParseUUIDPipe,
+  Post,
+  Req,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Request } from 'express';
 import { BinaryContentService } from './binary-content.service';
+import { CreatePresignedUrlDto } from './dto/create.presigned.url.dto';
+import { RegisterUploadDto } from './dto/registed.upload.dto';
+import { Users } from '../users/entities/users.entity';
+
+type RequestWithUser = Request & { user: { id: string } };
 
 @Controller('binary-content')
 export class BinaryContentController {
-  constructor(private readonly binaryContentService: BinaryContentService) {}
+  constructor(private readonly service: BinaryContentService) {}
 
   /**
-   *  파일 업로드
-   * - 'file'이라는 key로 multipart/form-data 요청을 받습니다.
-   * - S3에 업로드하고 DB에 메타데이터를 저장합니다.
+   * ① presigned URL 발급
+   * 클라이언트가 파일을 업로드하기 전에 이 엔드포인트를 호출해
+   * S3에 직접 PUT 요청을 보낼 수 있는 임시 URL을 발급받는다.
+   *
+   * binary_context로 직접 넣음(db)
    */
-  @Post('upload')
-  @UseInterceptors(FileInterceptor('file')) // 'file'은 form-data의 key
-  async uploadFile(
-    @UploadedFile(
-      // 유효성 검사 1. 파일 존재 여부 → 2. 용량 검사
-      new ParseFilePipe({
-        // 파일이 없으면 400 에러 (필수가 아니라면 이 validators 배열을 비워도 됨)
-        validators: [
-          // 용량 큰 거는 여기서 검사!
-          new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 30 }), // 30MB 제한
-        ],
-        fileIsRequired: false, // 안 올릴 수도 있음 (선택 사항)
-      }),
-    )
-    file: Express.Multer.File, //검수 완료된 file
+  @Post('presigned-url')
+  async createPresignedUrl(
+    @Body() dto: CreatePresignedUrlDto,
+    @Req() req: RequestWithUser,
   ) {
-    // 서비스 로직으로 파일 전달
-    return this.binaryContentService.uploadAndSaveFile(file);
+    // const user = { id: dto.userId } as Users;
+    const user = { id: req.user.id } as Users;
+    return this.service.createPresignedUrl(user, dto);
+  }
+
+  // @Post('presigned-url')
+  // async createPresignedUrl(
+  //   @Body() dto: CreatePresignedUrlDto & { userId: string },
+  // ) {
+  //   const user = { id: dto.userId } as Users;
+  //   return this.service.createPresignedUrl(user, dto);
+  // }
+
+  /**
+   * ② 업로드 완료 후 메타데이터 등록
+   * presigned URL로 S3 업로드를 마친 뒤, 해당 파일 정보를 DB에 기록한다.
+   * 이때 BinaryContent ID가 생성되어 이후 프로필 이미지로 연결할 수 있다.
+   */
+  // @Post()
+  // async registerUploadedFile(@Body() dto: RegisterUploadDto) {
+  //   return this.service.createPresignedUploadUrl(dto);
+  // }
+
+  /**
+   * ④ 파일 접근용 presigned GET URL 발급
+   */
+  @Get(':id/presigned-url')
+  async getPresignedGetUrl(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.service.createPresignedGetUrl(id);
   }
 
   /**
-   *  파일 삭제
-   * - BinaryContent의 ID (UUID)를 받습니다.
-   * - S3와 DB에서 모두 삭제합니다.
+   * ③ 파일 삭제
+   * 본인이 업로드한 파일인지 확인한 후 S3와 DB에서 모두 제거한다.
    */
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT) // 삭제 성공 시 204 No Content 반환
-  async deleteFile(
-    @Param('id', new ParseUUIDPipe()) id: string, // ID가 UUID 형식인지 검사
-  ) {
-    await this.binaryContentService.deleteFile(id);
-    // 성공 시 반환값 없음
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteFile(@Param('id', new ParseUUIDPipe()) id: string) {
+    await this.service.deleteFile(id);
   }
 }
