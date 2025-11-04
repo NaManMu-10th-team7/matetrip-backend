@@ -18,6 +18,8 @@ async function bootstrap() {
   await redisIoAdapter.connectToRedis();
   app.useWebSocketAdapter(redisIoAdapter);
 
+  app.enableCors();
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true, // DTO 클래스로 자동 타입 변환

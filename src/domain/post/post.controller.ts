@@ -10,11 +10,13 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostResponseDto } from './dto/post-response.dto.js';
+import { SearchPostDto } from './dto/search-post.dto';
 
 @Controller('post')
 export class PostController {
@@ -37,6 +39,11 @@ export class PostController {
     return this.postService.findAll();
   }
 
+  @Get('search')
+  searchPosts(@Query() searchPostDto: SearchPostDto) {
+    return this.postService.searchPosts(searchPostDto);
+  }
+
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async getOne(
@@ -45,14 +52,15 @@ export class PostController {
     return this.postService.findOne(id);
   }
 
-  @Patch()
+  @Patch(':id')
   @HttpCode(HttpStatus.OK)
   async update(
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() updatePostDto: UpdatePostDto,
     @Req() req,
   ): Promise<PostResponseDto> {
     // 임시 mock user의 id
-    return this.postService.update(this.mockUserId, updatePostDto);
+    return this.postService.update(id, this.mockUserId, updatePostDto);
   }
 
   @Delete(':id')

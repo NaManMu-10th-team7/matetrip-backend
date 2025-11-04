@@ -29,7 +29,7 @@ export class CreatePostDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  max_participants: number = 2;
+  maxParticipants: number = 2;
 
   @IsOptional()
   @IsDateString({}, { message: '시작일은 YYYY-MM-DD 형식으로 입력해주세요' })

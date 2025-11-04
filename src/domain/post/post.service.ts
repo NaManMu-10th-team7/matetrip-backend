@@ -11,6 +11,7 @@ import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto.js';
 import { PostsPageQueryDto } from './dto/list-posts-query.dto.js';
+import { SearchPostDto } from './dto/search-post.dto';
 
 @Injectable()
 export class PostService {
@@ -38,6 +39,7 @@ export class PostService {
   async findOne(id: string) {
     const foundedPost = await this.postRepository.findOne({
       where: { id: id },
+      relations: ['writer'],
     });
 
     if (!foundedPost) {
@@ -64,17 +66,20 @@ export class PostService {
     return result.map((post) => this.toPostResponseDto(post));
   }
 
-  async update(userId: string, dto: UpdatePostDto) {
-    const entity = await this.postRepository.findOne({
-      where: { id: dto.id, writer: { id: userId } },
+  async update(id: string, userId: string, dto: UpdatePostDto) {
+    const post = await this.postRepository.findOne({
+      where: { id: id, writer: { id: userId } },
     });
-    if (!entity) {
+    if (!post) {
       throw new NotFoundException('Post update failed');
     }
 
-    const merged = this.postRepository.merge(entity, dto);
-    const savedPost = await this.postRepository.save(merged);
-    return this.toPostResponseDto(savedPost);
+    // dto의 내용을 post 엔티티에 병합합니다.
+    this.postRepository.merge(post, dto);
+    // 변경된 엔티티를 저장합니다.
+    await this.postRepository.save(post);
+    // writer 정보를 포함하여 다시 조회한 후 DTO로 변환하여 반환합니다.
+    return this.findOne(id);
   }
 
   async remove(id: string, userId: string) {
@@ -92,9 +97,53 @@ export class PostService {
     if (!post) {
       throw new NotFoundException("Post doesn't exist");
     }
-
-    return plainToInstance(PostResponseDto, post, {
+    // `post.writer`가 로드되지 않았을 경우를 대비한 방어 코드
+    if (!post.writer || !post.writer.id) {
+      // 실제 운영 환경에서는 로깅을 통해 이런 케이스를 추적하는 것이 좋습니다.
+      throw new BadRequestException(
+        'Writer information is missing for the post.',
+      );
+    }
+    // DTO로 변환하기 전에 필요한 데이터를 명시적으로 매핑합니다.
+    const postWithWriterId = {
+      ...post,
+      writerId: post.writer.id,
+    };
+    return plainToInstance(PostResponseDto, postWithWriterId, {
       excludeExtraneousValues: true,
     });
+  }
+
+  async searchPosts(searchPostDto: SearchPostDto): Promise<PostResponseDto[]> {
+    const { startDate, endDate, title, location } = searchPostDto;
+
+    const queryBuilder = this.postRepository.createQueryBuilder('post');
+
+    if (title) {
+      queryBuilder.andWhere('post.title ILIKE :title', { title: `%${title}%` });
+    }
+
+    if (location) {
+      queryBuilder.andWhere('post.location ILIKE :location', {
+        location: `%${location}%`,
+      });
+    }
+
+    if (startDate) {
+      queryBuilder.andWhere('post.start_date >= :startDate', { startDate });
+    }
+
+    if (endDate) {
+      queryBuilder.andWhere('post.end_date <= :endDate', { endDate });
+    }
+
+    const posts = await queryBuilder
+      .leftJoinAndSelect('post.writer', 'writer')
+      .orderBy('post.createdAt', 'DESC')
+      // .skip((page - 1) * limit)
+      // .take(limit)
+      .getMany();
+
+    return posts.map((post) => this.toPostResponseDto(post));
   }
 }
