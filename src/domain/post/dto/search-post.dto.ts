@@ -7,12 +7,12 @@ import {
 
 export class SearchPostDto {
   @IsOptional()
-  @ValidateIf((o) => o.startDate != '')
+  @ValidateIf((o: SearchPostDto) => o.startDate != '')
   @IsDateString({}, { message: '시작일은 YYYY-MM-DD 형식으로 입력해주세요' })
   startDate?: string;
 
   @IsOptional()
-  @ValidateIf((o) => o.endDate != '')
+  @ValidateIf((o: SearchPostDto) => o.endDate != '')
   @IsDateString({}, { message: '종료일은 YYYY-MM-DD 형식으로 입력해주세요' })
   endDate?: string;
 
