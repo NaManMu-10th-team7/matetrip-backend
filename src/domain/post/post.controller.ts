@@ -20,13 +20,12 @@ import { PostResponseDto } from './dto/post-response.dto.js';
 import { SearchPostDto } from './dto/search-post.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
-
-@UseGuards(AuthGuard('jwt'))
 @Controller('post')
 export class PostController {
   constructor(private readonly postService: PostService) {}
 
   @Post()
+  @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Body() createPostDto: CreatePostDto,
@@ -55,6 +54,7 @@ export class PostController {
   }
 
   @Patch(':id')
+  @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
   async update(
     @Param('id', new ParseUUIDPipe()) id: string,
@@ -66,6 +66,7 @@ export class PostController {
   }
 
   @Delete(':id')
+  @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
   async remove(
     @Param('id', new ParseUUIDPipe()) id: string,
