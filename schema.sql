@@ -135,6 +135,15 @@ CREATE TABLE IF NOT EXISTS review
     CHECK (rating >= 0 AND rating <= 5)
 );
 
+CREATE  TABLE IF NOT EXISTS Notification
+(
+    id UUID PRIMARY KEY  DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    content TEXT NOT NULL,
+    confirmed BOOLEAN NOT NULL DEFAULT FALSE
+);
+
 -- ========= 2) ALTER TABLE: UNIQUE  =========
 ALTER TABLE users
     ADD CONSTRAINT uq_users_email UNIQUE (email);
@@ -192,6 +201,9 @@ ALTER TABLE review
     ADD CONSTRAINT fk_review_post FOREIGN KEY (post_id) REFERENCES post (id) ON DELETE SET NULL,
     ADD CONSTRAINT fk_review_reviewer FOREIGN KEY (reviewer_id) REFERENCES users (id) ON DELETE RESTRICT,
     ADD CONSTRAINT fk_review_reviewee FOREIGN KEY (reviewee_id) REFERENCES users (id) ON DELETE RESTRICT;
+
+ALTER TABLE Notification
+    ADD CONSTRAINT fk_notification_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE;
 
 -- ========= 인덱스 =========
 -- CREATE INDEX idx_post_writer               ON post(writer_id);
