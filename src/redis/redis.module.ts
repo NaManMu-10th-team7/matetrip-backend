@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { RedisService } from './redis.service';
-import { RedisIoAdapter } from './redis-io.adapter.js';
+import { RedisIoAdapter } from './redis-io.adapter';
 
 @Module({
   providers: [RedisService, RedisIoAdapter],

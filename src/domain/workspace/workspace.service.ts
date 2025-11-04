@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
 import { PostService } from '../post/post.service.js';
@@ -9,8 +13,12 @@ import { plainToInstance } from 'class-transformer';
 import { WorkspaceResponseDto } from './dto/workspace-response.dto.js';
 import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from './entities/plan-day.entity.js';
-import { eachDayOfInterval, format, parseISO } from 'date-fns';
+import { Poi } from './entities/poi.entity.js';
 import { CreatePoiDto } from './dto/create-poi.dto.js';
+import { PoiCacheService } from './poi-cache.service.js';
+import { CachedPoi, buildCachedPoi } from './types/cached-poi.js';
+import { Users } from '../users/entities/users.entity.js';
+import { PlanDayService } from './plan-day.service.js';
 
 @Injectable()
 export class WorkspaceService {
@@ -20,6 +28,10 @@ export class WorkspaceService {
     private readonly workspaceRepository: Repository<Workspace>,
     @InjectRepository(PlanDay)
     private readonly planDayRepository: Repository<PlanDay>,
+    @InjectRepository(Poi)
+    private readonly poiRepository: Repository<Poi>,
+    private readonly poiCacheService: PoiCacheService,
+    private readonly planDayService: PlanDayService,
   ) {}
 
   @Transactional()
@@ -52,12 +64,13 @@ export class WorkspaceService {
     });
 
     const savedWorkspace = await this.workspaceRepository.save(workspace);
-    // plan_day 생성
-    const planDays: PlanDay[] = this.createPlanDays(
+
+    const planDays: PlanDay[] = this.planDayService.createPlanDays(
       savedWorkspace,
       postDto.startDate,
       postDto.endDate,
     );
+    // plan_day 생성
 
     if (planDays.length > 0) {
       await this.planDayRepository.save(planDays);
@@ -67,8 +80,57 @@ export class WorkspaceService {
     return this.toWorkspaceResponseDto(savedWorkspace);
   }
 
-  createPoi(workspaceId: string, dto: CreatePoiDto) {
-    return '테스트';
+  async createPoi(workspaceId: string, dto: CreatePoiDto) {
+    return this.cachePoi(workspaceId, dto);
+  }
+
+  async cachePoi(workspaceId: string, dto: CreatePoiDto): Promise<CachedPoi> {
+    const cachedPoi = buildCachedPoi(workspaceId, dto);
+    await this.poiCacheService.upsertPoi(workspaceId, cachedPoi);
+    return cachedPoi;
+  }
+
+  async flushWorkspacePois(
+    workspaceId: string,
+  ): Promise<{ persistedPois: CachedPoi[]; newlyPersistedCount: number }> {
+    const cachedPois = await this.poiCacheService.getWorkspacePois(workspaceId);
+    if (cachedPois.length === 0) {
+      return { persistedPois: [], newlyPersistedCount: 0 };
+    }
+
+    const poisToPersist = cachedPois.filter((poi) => !poi.persisted);
+    const newlyPersistedCount = poisToPersist.length;
+    if (poisToPersist.length > 0) {
+      const missingPlanDay = poisToPersist.filter((poi) => !poi.planDayId);
+      if (missingPlanDay.length > 0) {
+        throw new BadRequestException(
+          '[POI Persist 실패] : 누락된 PlanDay ID가 있습니다',
+        );
+      }
+
+      // 순회하면서 entity 만드록 한번에 save
+      const entities = poisToPersist.map((poi) =>
+        this.poiRepository.create({
+          longitude: poi.longitude,
+          latitude: poi.latitude,
+          address: poi.address,
+          placeName: poi.placeName ?? '',
+          createdBy: { id: poi.createdBy } as Users,
+          planDay: { id: poi.planDayId as string } as PlanDay,
+        }),
+      );
+
+      if (entities.length > 0) {
+        await this.poiRepository.save(entities);
+      }
+    }
+
+    await this.poiCacheService.clearWorkspacePois(workspaceId);
+    // todo : DTO 형식 바꾸기
+    return {
+      persistedPois: cachedPois.map((poi) => ({ ...poi, persisted: true })),
+      newlyPersistedCount,
+    };
   }
 
   findAll() {
@@ -89,6 +151,7 @@ export class WorkspaceService {
   remove(id: string) {
     return `This action removes a #${id} workspace`;
   }
+
   private toWorkspaceResponseDto(workspace: Workspace | null) {
     if (!workspace) {
       throw new NotFoundException("Workspace doesn't exist");
@@ -97,27 +160,5 @@ export class WorkspaceService {
     return plainToInstance(WorkspaceResponseDto, workspace, {
       excludeExtraneousValues: true,
     });
-  }
-
-  private createPlanDays(
-    workspace: Workspace,
-    startDate?: string,
-    endDate?: string | null,
-  ): PlanDay[] {
-    if (!startDate && !endDate) return [];
-    if (!startDate || !endDate) return [];
-
-    const start = parseISO(startDate);
-    const end = parseISO(endDate);
-
-    const days = eachDayOfInterval({ start, end });
-
-    return days.map((date, i) =>
-      this.planDayRepository.create({
-        dayNo: i + 1,
-        planDate: format(date, 'yyyy-MM-dd'),
-        workspace,
-      }),
-    );
   }
 }
