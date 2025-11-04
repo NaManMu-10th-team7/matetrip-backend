@@ -14,9 +14,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   addTransactionalDataSource(app.get(DataSource));
 
-  const redisIoAdapter = new RedisIoAdapter(app);
-  await redisIoAdapter.connectToRedis();
-  app.useWebSocketAdapter(redisIoAdapter);
+  // const redisIoAdapter = new RedisIoAdapter(app);
+  // await redisIoAdapter.connectToRedis();
+  // app.useWebSocketAdapter(redisIoAdapter);
 
   app.useGlobalPipes(
     new ValidationPipe({
