@@ -14,9 +14,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   addTransactionalDataSource(app.get(DataSource));
 
-  const redisIoAdapter = new RedisIoAdapter(app);
-  await redisIoAdapter.connectToRedis();
-  app.useWebSocketAdapter(redisIoAdapter);
+  // const redisIoAdapter = new RedisIoAdapter(app);
+  // await redisIoAdapter.connectToRedis();
+  // app.useWebSocketAdapter(redisIoAdapter);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -33,8 +33,12 @@ async function bootstrap() {
   );
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3001', // 프론트엔드 주소
-    methods: 'GET, HEAD, PUT, PATCH, POST, DELETE', // 허용할 HTTP 메서드
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'], // 허용할 HTTP 메서드 (OPTIONS 명시)
     credentials: true, // 쿠키나 인증 헤더(Authorization)를 주고받을 때 필요
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'], // 허용할 헤더
+    exposedHeaders: ['Set-Cookie'], // 클라이언트에서 접근 가능한 헤더
+    preflightContinue: false, // preflight 요청을 자동으로 처리
+    optionsSuccessStatus: 204, // OPTIONS 요청 성공 시 상태 코드
   });
 
   app.use(cookieParser());
