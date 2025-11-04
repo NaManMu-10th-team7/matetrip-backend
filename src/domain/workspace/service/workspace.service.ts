@@ -3,22 +3,28 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateWorkspaceDto } from './dto/create-workspace.dto';
-import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
-import { PostService } from '../post/post.service.js';
+import { CreateWorkspaceDto } from '../dto/create-workspace.dto';
+import { UpdateWorkspaceDto } from '../dto/update-workspace.dto';
+import { PostService } from '../../post/post.service.js';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Workspace } from './entities/workspace.entity.js';
+import { Workspace } from '../entities/workspace.entity.js';
 import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
-import { WorkspaceResponseDto } from './dto/workspace-response.dto.js';
+import { WorkspaceResponseDto } from '../dto/workspace-response.dto.js';
 import { Transactional } from 'typeorm-transactional';
-import { PlanDay } from './entities/plan-day.entity.js';
-import { Poi } from './entities/poi.entity.js';
-import { CreatePoiDto } from './dto/create-poi.dto.js';
+import { PlanDay } from '../entities/plan-day.entity.js';
+import { Poi } from '../entities/poi.entity.js';
+import { CreatePoiDto } from '../dto/create-poi.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
-import { CachedPoi, buildCachedPoi } from './types/cached-poi.js';
-import { Users } from '../users/entities/users.entity.js';
+import { CachedPoi, buildCachedPoi } from '../types/cached-poi.js';
+import { Users } from '../../users/entities/users.entity.js';
 import { PlanDayService } from './plan-day.service.js';
+import { CreatePoiConnectionDto } from '../dto/create-poi-connection.dto.js';
+import {
+  buildCachedPoiConnection,
+  CachePoiConnection,
+} from '../types/cached-poi-connection.js';
+import { PoiConnectionCacheService } from './poi-connection-cache.service.js';
 
 @Injectable()
 export class WorkspaceService {
@@ -31,6 +37,7 @@ export class WorkspaceService {
     @InjectRepository(Poi)
     private readonly poiRepository: Repository<Poi>,
     private readonly poiCacheService: PoiCacheService,
+    private readonly poiConnectionCacheService: PoiConnectionCacheService,
     private readonly planDayService: PlanDayService,
   ) {}
 
@@ -88,6 +95,16 @@ export class WorkspaceService {
     const cachedPoi = buildCachedPoi(workspaceId, dto);
     await this.poiCacheService.upsertPoi(workspaceId, cachedPoi);
     return cachedPoi;
+  }
+
+  async cachePoiConnection(
+    dto: CreatePoiConnectionDto,
+  ): Promise<CachePoiConnection> {
+    const cachedPoiConnection = buildCachedPoiConnection(dto);
+    await this.poiConnectionCacheService.upsertPoiConnection(
+      cachedPoiConnection,
+    );
+    return cachedPoiConnection;
   }
 
   async flushWorkspacePois(

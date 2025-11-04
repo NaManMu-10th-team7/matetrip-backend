@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisService } from '../../redis/redis.service';
-import { CachedPoi } from './types/cached-poi.js';
+import { RedisService } from '../../../redis/redis.service';
+import { CachedPoi } from '../types/cached-poi.js';
 import { isUUID } from 'class-validator';
 
 @Injectable()

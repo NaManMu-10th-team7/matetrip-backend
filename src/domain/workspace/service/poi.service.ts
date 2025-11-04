@@ -4,17 +4,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Poi } from './entities/poi.entity.js';
+import { Poi } from '../entities/poi.entity.js';
 import { In, Repository } from 'typeorm';
-import { CreatePoiDto } from './dto/create-poi.dto.js';
+import { CreatePoiDto } from '../dto/create-poi.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
 import {
   buildCachedPoi,
   buildCachedPoiFromEntity,
   CachedPoi,
-} from './types/cached-poi.js';
-import { Users } from '../users/entities/users.entity.js';
-import { PlanDay } from './entities/plan-day.entity.js';
+} from '../types/cached-poi.js';
+import { Users } from '../../users/entities/users.entity.js';
+import { PlanDay } from '../entities/plan-day.entity.js';
 import { PlanDayService } from './plan-day.service.js';
 
 @Injectable()

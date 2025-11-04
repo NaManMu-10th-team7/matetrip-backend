@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Workspace } from './entities/workspace.entity.js';
-import { PlanDay } from './entities/plan-day.entity.js';
+import { Workspace } from '../entities/workspace.entity.js';
+import { PlanDay } from '../entities/plan-day.entity.js';
 import { eachDayOfInterval, format, parseISO } from 'date-fns';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';

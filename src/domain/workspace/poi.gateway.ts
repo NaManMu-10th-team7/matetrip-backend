@@ -9,9 +9,12 @@ import {
 import { Server, Socket } from 'socket.io';
 import { SocketPoiDto } from './dto/socket-poi.dto.js';
 import { CreatePoiDto } from './dto/create-poi.dto.js';
-import { WorkspaceService } from './workspace.service.js';
+import { WorkspaceService } from './service/workspace.service.js';
 import { RemovePoiDto } from './dto/remove-poi.dto.js';
-import { PoiService } from './poi.service.js';
+import { PoiService } from './service/poi.service.js';
+import { CreatePoiConnectionDto } from './dto/create-poi-connection.dto.js';
+import { RemovePoiConnectionDto } from './dto/remove-poi-connection.dto.js';
+import { PoiConnectionService } from './service/poi-connection.service.js';
 
 const PoiSocketEvent = {
   JOIN: 'join',
@@ -25,6 +28,10 @@ const PoiSocketEvent = {
   UNMARKED: 'unmarked',
   FLUSH: 'flush',
   FLUSHED: 'flushed',
+  CONNECT: 'connect',
+  CONNECTED: 'connected',
+  DISCONNECT: 'disconnect',
+  DISCONNECTED: 'disconnected',
 } as const;
 
 @WebSocketGateway(3003, {
@@ -44,6 +51,7 @@ export class PoiGateway {
   constructor(
     private readonly workspaceService: WorkspaceService,
     private readonly poiService: PoiService,
+    private readonly poiConnectionService: PoiConnectionService,
   ) {}
 
   @SubscribeMessage(PoiSocketEvent.JOIN)
@@ -166,6 +174,49 @@ export class PoiGateway {
     } catch {
       this.logger.error(
         `Socket ${socket.id} failed to flush workspace ${data.workspaceId}`,
+      );
+    }
+  }
+
+  @SubscribeMessage(PoiSocketEvent.CONNECT)
+  async handlePoiConnection(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: CreatePoiConnectionDto,
+  ) {
+    try {
+      const cachedPoiConnection =
+        await this.workspaceService.cachePoiConnection(data);
+
+      socket.emit(PoiSocketEvent.CONNECTED, cachedPoiConnection);
+      socket.broadcast
+        .to(data.planDayId)
+        .emit(PoiSocketEvent.CONNECTED, cachedPoiConnection);
+
+      this.logger.debug(
+        `Socket ${socket.id} connected to POI connection ${cachedPoiConnection.id}`,
+      );
+    } catch {
+      this.logger.error(
+        `Socket ${socket.id} failed to connect to POI connection`,
+      );
+    }
+  }
+
+  @SubscribeMessage(PoiSocketEvent.DISCONNECT)
+  async handlePoiDisConnection(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: RemovePoiConnectionDto,
+  ) {
+    try {
+      await this.poiConnectionService.removePoiConnection(data.id);
+
+      socket.emit(PoiSocketEvent.DISCONNECTED, data.id);
+      socket.broadcast
+        .to(data.planDayId)
+        .emit(PoiSocketEvent.DISCONNECTED, data.id);
+    } catch {
+      this.logger.error(
+        `Socket ${socket.id} failed to disconnect from POI connection`,
       );
     }
   }
