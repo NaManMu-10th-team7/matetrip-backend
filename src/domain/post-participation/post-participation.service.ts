@@ -1,26 +1,73 @@
-import { Injectable } from '@nestjs/common';
-import { CreatePostParticipationDto } from './dto/create-post-participation.dto';
-import { UpdatePostParticipationDto } from './dto/update-post-participation.dto';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { PostParticipation } from './entities/post-participation.entity';
+import { Repository } from 'typeorm';
+import { Post } from '../post/entities/post.entity';
+import { PostParticipationResponseDto } from './dto/post-participation-response.dto';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class PostParticipationService {
-  create(createPostParticipationDto: CreatePostParticipationDto) {
-    return 'This action adds a new postParticipation';
-  }
+  constructor(
+    @InjectRepository(PostParticipation)
+    private readonly postParticipationRepository: Repository<PostParticipation>,
+    @InjectRepository(Post)
+    private readonly postRepository: Repository<Post>,
+  ) {}
 
-  findAll() {
-    return `This action returns all postParticipation`;
-  }
+  async requestParticipation(
+    postId: string,
+    requesterId: string,
+  ): Promise<PostParticipationResponseDto> {
+    const post = await this.postRepository.findOneBy({ id: postId });
 
-  findOne(id: number) {
-    return `This action returns a #${id} postParticipation`;
-  }
+    if (!post) {
+      throw new NotFoundException('게시글을 찾을 수 없습니다.');
+    }
 
-  update(id: number, updatePostParticipationDto: UpdatePostParticipationDto) {
-    return `This action updates a #${id} postParticipation`;
-  }
+    console.log(post);
 
-  remove(id: number) {
-    return `This action removes a #${id} postParticipation`;
+    if (post.writer.id === requesterId) {
+      throw new ForbiddenException(
+        '자신이 작성한 게시글에는 참여 신청할 수 없습니다.',
+      );
+    }
+
+    const existingParticipation =
+      await this.postParticipationRepository.findOne({
+        where: {
+          post: { id: postId },
+          requester: { id: requesterId },
+        },
+      });
+
+    if (existingParticipation) {
+      throw new ConflictException('이미 참여 신청한 게시글입니다.');
+    }
+
+    const participation = this.postParticipationRepository.create({
+      post: { id: postId },
+      requester: { id: requesterId },
+    });
+
+    const savedParticipation =
+      await this.postParticipationRepository.save(participation);
+
+    return plainToInstance(
+      PostParticipationResponseDto,
+      {
+        ...savedParticipation,
+        postId: savedParticipation.post.id,
+        requesterId: savedParticipation.requester.id,
+      },
+      {
+        excludeExtraneousValues: true,
+      },
+    );
   }
 }
