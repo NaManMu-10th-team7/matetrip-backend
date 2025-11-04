@@ -59,8 +59,8 @@ export class ReviewService {
       return { id: saved.id };
     } catch (e) {
       if (e instanceof QueryFailedError) {
-        const err: any = e;
-        if (err.code === '23505') {
+          const driverError = e.driverError as { code?: string };
+        if (driverError?.code === '23505')  {
           // 유니크 인덱스가 있다면(중복 리뷰 방지)
           throw new BadRequestException('이미 해당 사용자에 대한 리뷰가 존재합니다.');
         }
