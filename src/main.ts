@@ -8,15 +8,16 @@ import {
   addTransactionalDataSource,
 } from 'typeorm-transactional';
 import { DataSource } from 'typeorm';
+import { RedisService } from './redis/redis.service.js';
 
 async function bootstrap() {
   initializeTransactionalContext();
   const app = await NestFactory.create(AppModule);
   addTransactionalDataSource(app.get(DataSource));
 
-  // const redisIoAdapter = new RedisIoAdapter(app);
-  // await redisIoAdapter.connectToRedis();
-  // app.useWebSocketAdapter(redisIoAdapter);
+  const redisIoAdapter = new RedisIoAdapter(app, app.get(RedisService));
+  redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   app.useGlobalPipes(
     new ValidationPipe({
