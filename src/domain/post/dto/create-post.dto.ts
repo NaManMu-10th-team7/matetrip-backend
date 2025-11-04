@@ -6,19 +6,19 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  Max,
   MaxLength,
   Min,
 } from 'class-validator';
 import { KeywordType } from '../entities/keywords-type.enum.js';
 
 export class CreatePostDto {
+  @IsNotEmpty()
+  @IsString()
   @MaxLength(50)
   title: string;
 
   @IsNotEmpty()
   @IsString()
-  @MaxLength(5000)
   content: string;
 
   @IsNotEmpty()

@@ -15,7 +15,7 @@ export class CreateUserDto {
   email: string;
 
   @IsString()
-  @Matches(/^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]{8,25}$/, {
+  @Matches(/^(?=.*[a-zA-Z])(?=.*[0-9]).{8,25}$/, {
     message: '비밀번호는 영문, 숫자 조합으로 8자 이상이어야 합니다.',
   })
   password: string;

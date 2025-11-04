@@ -32,14 +32,6 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
-  @Get(':id/posts')
-  findUserPosts(
-    @Param('id') id: string,
-    @Query() listPostsQueryDto: PostsPageQueryDto,
-  ): Promise<PostResponseDto[]> {
-    return this.postService.findAllByUserId(id, listPostsQueryDto);
-  }
-
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
@@ -53,5 +45,13 @@ export class UsersController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.usersService.remove(+id);
+  }
+
+  @Get(':id/posts')
+  findUserPosts(
+    @Param('id') id: string,
+    @Query() listPostsQueryDto: PostsPageQueryDto,
+  ): Promise<PostResponseDto[]> {
+    return this.postService.findAllByUserId(id, listPostsQueryDto);
   }
 }
