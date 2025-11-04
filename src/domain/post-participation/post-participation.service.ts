@@ -76,4 +76,19 @@ export class PostParticipationService {
       },
     );
   }
+
+  async getParticipationsForPost(
+    postId: string,
+  ): Promise<PostParticipationResponseDto[]> {
+    const participations = await this.postParticipationRepository.find({
+      where: { post: { id: postId } },
+      relations: {
+        requester: {
+          profile: true, // 작성자의 프로필 정보까지 함께 조회합니다.
+        },
+      },
+    });
+
+    return plainToInstance(PostParticipationResponseDto, participations);
+  }
 }
