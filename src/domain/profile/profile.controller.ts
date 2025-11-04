@@ -1,20 +1,21 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
-  Delete,
-  Req,
+  Param,
   ParseUUIDPipe,
+  Patch,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
-import { ProfileService } from './profile.service';
-import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
+
+import { ProfileService } from './profile.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 type RequestWithUser = Request & { user: { id: string } };
 
@@ -26,9 +27,7 @@ export class ProfileController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard('jwt'))
   async getMyProfile(@Req() req: RequestWithUser) {
-    const userId = req.user.id;
-
-    return this.profileService.getProfileByUserId(userId);
+    return this.profileService.getProfileByUserId(req.user.id);
   }
 
   @Get()
@@ -49,18 +48,19 @@ export class ProfileController {
     return this.profileService.getProfileByUserId(userId);
   }
 
-  // //JWT 일때로 가정
   @Patch('my')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard('jwt'))
-  async update(@Req() req, @Body() updateProfileDto: UpdateProfileDto) {
-    const userId = req.user.id;
-    return this.profileService.update(userId, updateProfileDto);
+  async update(
+    @Req() req: RequestWithUser,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ) {
+    return this.profileService.update(req.user.id, updateProfileDto);
   }
 
-  // //JWT 일때로 가정
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard('jwt'))
   remove(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Req() req: RequestWithUser,

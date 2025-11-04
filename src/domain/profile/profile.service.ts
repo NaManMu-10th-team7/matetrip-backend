@@ -4,14 +4,36 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not } from 'typeorm';
+import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Profile } from './entities/profile.entity';
 import { Users } from '../users/entities/users.entity';
+import { GENDER } from './entities/gender.enum';
+import { TravelStyleType } from './entities/travel-style-type.enum';
+import { TendencyType } from './entities/tendency-type.enum';
 import { ProfilePayloadDto } from './dto/profile.payload.dto'; // 변경된 DTO 임포트
 import { plainToInstance } from 'class-transformer';
 import { BinaryContentService } from '../binary-content/binary-content.service';
 import { BinaryContent } from '../binary-content/entities/binary-content.entity';
+
+/**
+ * 클라이언트에 반환되는 프로필 정보 형태
+ * - DB의 Profile 엔티티에서 필요한 필드만 선택적으로 포함합니다.
+ * - user, profileImage 관계를 id 형태로 단순화시켜 외부 노출을 최소화합니다.
+ */
+export interface ProfileResponseDto {
+  id: string; // Profile ID
+  nickname: string;
+  gender: GENDER;
+  description: string;
+  travelStyles: TravelStyleType[];
+  tendency: TendencyType[];
+  userId: string;
+  profileImageId: string | null;
+  createdAt: Date;
+  updatedAt: Date | null;
+}
 
 @Injectable()
 export class ProfileService {
@@ -45,7 +67,7 @@ export class ProfileService {
       gender: profile.gender,
       description: profile.description,
       travelStyles: profile.travelStyles,
-      tendency: profile.tendency,
+      tendency: profile.travelTendency,
       userId,
       profileImageId: profile.profileImage?.id ?? null,
       createdAt: profile.createdAt,
@@ -53,72 +75,72 @@ export class ProfileService {
     };
   }
 
-  /**
-   * 프로필 생성
-   *  DTO 데이터를 기반으로 새로운 Profile 엔티티 인스턴스를 생성합니다.
-   *    (profileData는 createProfileDto에서 userId만 빼고 나머지 필드들을 모은 객체입니다.)
-   *  생성된 프로필을 DB에 저장하고, DTO 형태로 반환합니다.
-   */
-  async create(
-    createProfileDto: CreateProfileDto,
-  ): Promise<ProfileResponseDto> {
-    const { userId, profileImageId, ...profileData } = createProfileDto;
+  // /**
+  //  * 프로필 생성
+  //  *  DTO 데이터를 기반으로 새로운 Profile 엔티티 인스턴스를 생성합니다.
+  //  *    (profileData는 createProfileDto에서 userId만 빼고 나머지 필드들을 모은 객체입니다.)
+  //  *  생성된 프로필을 DB에 저장하고, DTO 형태로 반환합니다.
+  //  */
+  // async create(
+  //   createProfileDto: CreateProfileDto,
+  // ): Promise<ProfileResponseDto> {
+  //   const { userId, profileImageId, ...profileData } = createProfileDto;
 
-    // userId로 유저 조회
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
-    }
+  //   // userId로 유저 조회
+  //   const user = await this.usersRepository.findOne({ where: { id: userId } });
+  //   if (!user) {
+  //     throw new NotFoundException(`User with ID ${userId} not found`);
+  //   }
 
-    // 🔒 동일 유저가 이미 프로필을 가진 경우 오류
-    const existingProfile = await this.profileRepository.findOne({
-      where: { user: { id: userId } },
-      relations: ['user'],
-    });
-    if (existingProfile) {
-      throw new ForbiddenException(
-        `User with ID ${userId} already has a profile`,
-      );
-    }
-    //🔒 무결성 검증 imageId 가 있는데 이상한 경우
-    let profileImage: BinaryContent | null = null;
-    if (typeof profileImageId === 'string') {
-      //만약 실제 값이 있다면(null/ undefined 가 아니라면),
-      const binary = await this.binaryContentRepository.findOneBy({
-        id: profileImageId,
-      });
-      if (!binary) {
-        throw new NotFoundException(
-          `BinaryContent (Image) with ID ${profileImageId} not found`,
-        );
-      }
+  //   // 🔒 동일 유저가 이미 프로필을 가진 경우 오류
+  //   const existingProfile = await this.profileRepository.findOne({
+  //     where: { user: { id: userId } },
+  //     relations: ['user'],
+  //   });
+  //   if (existingProfile) {
+  //     throw new ForbiddenException(
+  //       `User with ID ${userId} already has a profile`,
+  //     );
+  //   }
+  //   //🔒 무결성 검증 imageId 가 있는데 이상한 경우
+  //   let profileImage: BinaryContent | null = null;
+  //   if (typeof profileImageId === 'string') {
+  //     //만약 실제 값이 있다면(null/ undefined 가 아니라면),
+  //     const binary = await this.binaryContentRepository.findOneBy({
+  //       id: profileImageId,
+  //     });
+  //     if (!binary) {
+  //       throw new NotFoundException(
+  //         `BinaryContent (Image) with ID ${profileImageId} not found`,
+  //       );
+  //     }
 
-      const existingOwner = await this.profileRepository.findOne({
-        where: { profileImage: { id: profileImageId } },
-        relations: ['user'],
-      });
-      if (existingOwner && existingOwner.user.id !== userId) {
-        throw new ForbiddenException(
-          `BinaryContent (Image) with ID ${profileImageId} is already in use by another profile`,
-        );
-      }
+  //     const existingOwner = await this.profileRepository.findOne({
+  //       where: { profileImage: { id: profileImageId } },
+  //       relations: ['user'],
+  //     });
+  //     if (existingOwner && existingOwner.user.id !== userId) {
+  //       throw new ForbiddenException(
+  //         `BinaryContent (Image) with ID ${profileImageId} is already in use by another profile`,
+  //       );
+  //     }
 
-      profileImage = binary;
-    }
+  //     profileImage = binary;
+  //   }
 
-    // 새로운 프로필 생성
-    const newProfile = this.profileRepository.create({
-      ...profileData,
-      user,
-      profileImage,
-    });
+  //   // 새로운 프로필 생성
+  //   const newProfile = this.profileRepository.create({
+  //     ...profileData,
+  //     user,
+  //     profileImage,
+  //   });
 
-    // 데이터베이스에 저장 (INSERT)
-    const savedProfile = await this.profileRepository.save(newProfile);
+  //   // 데이터베이스에 저장 (INSERT)
+  //   const savedProfile = await this.profileRepository.save(newProfile);
 
-    // 저장된 프로필을 DTO로 변환하여 반환
-    return this.toResponseDto(savedProfile);
-  }
+  //   // 저장된 프로필을 DTO로 변환하여 반환
+  //   return this.toResponseDto(savedProfile);
+  // }
 
   /**
    * 전체 프로필 조회
@@ -239,8 +261,7 @@ export class ProfileService {
       }
     }
 
-    // 11. DTO로 변환하여 반환
-    return this.toResponseDto(updatedProfile);
+    //return this.toResponseDto(updatedProfile);
     // DTO로 변환하여 반환
     return this.toProfilePayloadDto(updatedProfile);
   }
