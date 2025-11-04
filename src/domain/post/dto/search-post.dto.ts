@@ -1,12 +1,19 @@
-import { IsOptional, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsOptional,
+  IsString,
+  ValidateIf,
+} from 'class-validator';
 
 export class SearchPostDto {
   @IsOptional()
-  @IsString()
+  @ValidateIf((o) => o.startDate != '')
+  @IsDateString({}, { message: '시작일은 YYYY-MM-DD 형식으로 입력해주세요' })
   startDate?: string;
 
   @IsOptional()
-  @IsString()
+  @ValidateIf((o) => o.endDate != '')
+  @IsDateString({}, { message: '종료일은 YYYY-MM-DD 형식으로 입력해주세요' })
   endDate?: string;
 
   @IsOptional()
