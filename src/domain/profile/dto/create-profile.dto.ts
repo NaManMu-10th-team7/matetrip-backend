@@ -33,7 +33,7 @@ export class CreateProfileDto {
   @IsArray()
   // @ArrayNotEmpty()
   @IsEnum(TravelStyleType, { each: true })
-  travelStyles: TravelStyleType[] = [];
+  travelStyles: TravelStyleType[];
 
   @IsArray()
   // @ArrayNotEmpty()

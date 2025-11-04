@@ -51,7 +51,7 @@ export class PostService {
     });
 
     if (!foundedPost) {
-      throw new NotFoundException('게시물의 id와 일치하는 게시물이 없습니다');
+      throw new NotFoundException('게시물의 id와 일치하는 게시물가 없습니다');
     }
 
     return this.toPostResponseDto(foundedPost);

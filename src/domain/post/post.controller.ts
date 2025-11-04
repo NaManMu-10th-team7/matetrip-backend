@@ -68,7 +68,7 @@ export class PostController {
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'))
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   async remove(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Req() req: Request & { user: { id: string } },
