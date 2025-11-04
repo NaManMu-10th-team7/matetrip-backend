@@ -2,7 +2,6 @@ import {
   Column,
   Entity,
   JoinColumn,
-  ManyToOne,
   OneToOne,
   Unique,
   UpdateDateColumn,
@@ -23,6 +22,7 @@ export class Profile extends BaseTimestampEntity {
   /*updated_at*/
   @UpdateDateColumn({ type: 'timestamp with time zone', name: 'updated_at' })
   updatedAt: Date | null;
+
   /*nickname*/
   @Column({ type: 'text', name: 'nickname' })
   nickname: string;
@@ -38,21 +38,13 @@ export class Profile extends BaseTimestampEntity {
   })
   gender: GENDER;
 
-  /*description*/
-  @Column({ type: 'text', name: 'description' })
-  description: string;
-
   /*intro*/
-  @Column({ type: 'text', name: 'intro' })
+  @Column({ type: 'text', name: 'intro', nullable: true })
   intro: string;
 
-  @Column({
-    type: 'enum',
-    name: 'mbti',
-    enum: MBTI_TYPES,
-    enumName: 'mbti_type',
-  })
-  mbtiTypes: MBTI_TYPES;
+  /*description*/
+  @Column({ type: 'text', name: 'description', nullable: true })
+  description: string;
 
   /*travel_style*/
   @Column({
@@ -65,18 +57,26 @@ export class Profile extends BaseTimestampEntity {
   })
   travelStyles: TravelStyleType[];
 
-  /*tendency*/
+  /*travel_tendency*/
   @Column({
     type: 'enum',
     name: 'travel_tendency',
     enum: TendencyType,
-    enumName: 'tendency_type',
+    enumName: 'travel_tendency_type',
     array: true,
-    default: () => "'{}'::tendency_type[]",
+    default: () => "'{}'::travel_tendency_type[]",
   })
-  tendency: TendencyType[];
+  travelTendency: TendencyType[];
 
-  @ManyToOne(() => BinaryContent, { onDelete: 'SET NULL', nullable: true })
+  @Column({
+    type: 'enum',
+    name: 'mbti',
+    enum: MBTI_TYPES,
+    enumName: 'mbti_type',
+  })
+  mbtiTypes: MBTI_TYPES;
+
+  @OneToOne(() => BinaryContent, { onDelete: 'SET NULL' })
   @JoinColumn([{ name: 'profile_image_id', referencedColumnName: 'id' }])
   profileImage: BinaryContent | null;
 

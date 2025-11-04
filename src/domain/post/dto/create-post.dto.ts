@@ -28,8 +28,8 @@ export class CreatePostDto {
 
   @IsOptional()
   @IsInt()
-  @Min(1)
-  max_participants: number = 2;
+  @Min(2, { message: '최대 참여 인원은 2명 이상이어야 합니다.' })
+  maxParticipants?: number;
 
   @IsOptional()
   @IsDateString({}, { message: '시작일은 YYYY-MM-DD 형식으로 입력해주세요' })
@@ -39,8 +39,8 @@ export class CreatePostDto {
   @IsDateString({}, { message: '종료일은 YYYY-MM-DD 형식으로 입력해주세요' })
   endDate?: string;
 
-  @IsArray()
   @IsOptional()
+  @IsArray()
   @IsEnum(KeywordType, { each: true })
-  keywords?: KeywordType[] = [];
+  keywords?: KeywordType[];
 }

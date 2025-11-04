@@ -4,35 +4,14 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not } from 'typeorm';
-import { CreateProfileDto } from './dto/create-profile.dto';
+import { Repository } from 'typeorm';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Profile } from './entities/profile.entity';
 import { Users } from '../users/entities/users.entity';
-import { GENDER } from './entities/gender.enum';
-import { TravelStyleType } from './entities/travel-style-type.enum';
-import { TendencyType } from './entities/tendency-type.enum';
-
+import { ProfilePayloadDto } from './dto/profile.payload.dto'; // 변경된 DTO 임포트
+import { plainToInstance } from 'class-transformer';
 import { BinaryContentService } from '../binary-content/binary-content.service';
 import { BinaryContent } from '../binary-content/entities/binary-content.entity';
-
-/**
- * 클라이언트에 반환되는 프로필 정보 형태
- * - DB의 Profile 엔티티에서 필요한 필드만 선택적으로 포함합니다.
- * - user, profileImage 관계를 id 형태로 단순화시켜 외부 노출을 최소화합니다.
- */
-export interface ProfileResponseDto {
-  id: string; // Profile ID
-  nickname: string;
-  gender: GENDER;
-  description: string;
-  travelStyles: TravelStyleType[];
-  tendency: TendencyType[];
-  userId: string;
-  profileImageId: string | null;
-  createdAt: Date;
-  updatedAt: Date | null;
-}
 
 @Injectable()
 export class ProfileService {
@@ -147,13 +126,13 @@ export class ProfileService {
    * relations 옵션을 사용해 user, profileImage 관계를 함께 로드합니다.
    * 조회된 엔티티 리스트를 모두 DTO 형태로 변환하여 반환합니다.
    */
-  async findAll(): Promise<ProfileResponseDto[]> {
+  async findAll(): Promise<ProfilePayloadDto[]> {
     const profiles = await this.profileRepository.find({
       relations: ['user', 'profileImage'],
     });
 
     // 모든 엔티티를 DTO로 변환하여 반환
-    return profiles.map((profile) => this.toResponseDto(profile));
+    return profiles.map((profile) => this.toProfilePayloadDto(profile));
   }
 
   /**
@@ -162,7 +141,7 @@ export class ProfileService {
    * 해당 ID의 프로필이 존재하지 않으면 404 예외를 발생시킵니다.
    * 조회된 엔티티를 DTO로 변환하여 반환합니다.
    */
-  async findOne(id: string): Promise<ProfileResponseDto> {
+  async findOne(id: string): Promise<ProfilePayloadDto> {
     const profile = await this.profileRepository.findOne({
       where: { id },
       relations: ['user', 'profileImage'],
@@ -173,7 +152,7 @@ export class ProfileService {
     }
 
     // DTO 변환 후 반환
-    return this.toResponseDto(profile);
+    return this.toProfilePayloadDto(profile);
   }
 
   /**
@@ -186,24 +165,17 @@ export class ProfileService {
    * 4. save() 메서드를 통해 변경된 엔티티를 DB에 저장하고, DTO 형태로 반환합니다.
    */
   async update(
-    id: string,
+    userId: string,
     updateProfileDto: UpdateProfileDto,
-  ): Promise<ProfileResponseDto> {
+  ): Promise<ProfilePayloadDto> {
     // 기존 프로필 조회
     const profile = await this.profileRepository.findOne({
-      where: { id },
+      where: { user: { id: userId } },
       relations: ['user', 'profileImage'],
     });
 
     if (!profile) {
-      throw new NotFoundException(`Profile with ID ${id} not found`);
-    }
-
-    // //🔒 무결성 검증 - 다른 user가 남의 프로필을 수정하지 못하도록 방지
-    if (updateProfileDto.userId !== profile.user.id) {
-      throw new ForbiddenException(
-        `User ${updateProfileDto.userId} cannot modify another user's profile`,
-      );
+      throw new NotFoundException(`프로필을 찾을 수 없습니다.`);
     }
 
     const { profileImageId, ...textData } = updateProfileDto;
@@ -269,6 +241,8 @@ export class ProfileService {
 
     // 11. DTO로 변환하여 반환
     return this.toResponseDto(updatedProfile);
+    // DTO로 변환하여 반환
+    return this.toProfilePayloadDto(updatedProfile);
   }
   /**
    * 프로필 삭제
@@ -280,7 +254,7 @@ export class ProfileService {
   async remove(
     id: string,
     userId: string,
-  ): Promise<{ message: string; deletedProfile: ProfileResponseDto }> {
+  ): Promise<{ message: string; deletedProfile: ProfilePayloadDto }> {
     // 해당 ID의 프로필이 존재하는지 확인
     //user나 profileImage만 다른 테이블과의 관계이기 때문에, 이 둘은 relations에 명시해야 실제 엔티티가 함께 로드
     const profile = await this.profileRepository.findOne({
@@ -321,7 +295,42 @@ export class ProfileService {
     // 삭제 후 DTO로 변환하여 반환
     return {
       message: `Profile #${id} has been removed successfully`,
-      deletedProfile: this.toResponseDto(profile),
+      deletedProfile: this.toProfilePayloadDto(profile),
     };
+  }
+
+  async getProfileByUserId(userId: string): Promise<ProfilePayloadDto> {
+    const profile = await this.profileRepository.findOne({
+      where: {
+        user: {
+          id: userId,
+        },
+      },
+      relations: ['user', 'profileImage'],
+    });
+
+    if (!profile) {
+      throw new NotFoundException('해당 유저의 프로필을 찾을 수 없습니다.');
+    }
+
+    return this.toProfilePayloadDto(profile);
+  }
+
+  /**
+   * Entity → DTO 변환 함수
+   * - Profile 엔티티를 클라이언트에 반환 가능한 ProfilePayloadDto 형태로 변환합니다.
+   * - user 객체 전체가 아니라 user.id만 포함시켜 외부 노출 범위를 제한
+   */
+  private toProfilePayloadDto(profile: Profile): ProfilePayloadDto {
+    const profileWithEmail = {
+      ...profile,
+      email: profile.user.email, // User 엔티티에서 이메일 가져오기
+    };
+    const payload = plainToInstance(ProfilePayloadDto, profileWithEmail, {
+      excludeExtraneousValues: true,
+    });
+    payload.profileImageId = profile.profileImage?.id ?? null;
+
+    return payload;
   }
 }

@@ -11,13 +11,10 @@ import { TravelStyleType } from '../entities/travel-style-type.enum';
 import { TendencyType } from '../entities/tendency-type.enum';
 import { GENDER } from '../entities/gender.enum';
 import { MBTI_TYPES } from '../entities/mbti.enum';
+import { MBTI_TYPES } from '../entities/mbti.enum';
 
 export class CreateProfileDto {
   /*시간이나 Id db에 자동 생성 / 유저가 서버에게 보내는 내용 */
-  @IsUUID()
-  @IsNotEmpty()
-  userId: string;
-
   @IsString()
   @IsNotEmpty()
   nickname: string;
@@ -26,16 +23,13 @@ export class CreateProfileDto {
   @IsNotEmpty()
   gender: GENDER;
 
-  @IsEnum(MBTI_TYPES)
-  mbtiTypes: MBTI_TYPES;
-
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  intro: string;
+  intro: string = '';
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  description: string;
+  description: string = '';
 
   @IsArray()
   // @ArrayNotEmpty()
@@ -45,7 +39,10 @@ export class CreateProfileDto {
   @IsArray()
   // @ArrayNotEmpty()
   @IsEnum(TendencyType, { each: true })
-  travel_tendency: TendencyType[];
+  travelTendency: TendencyType[];
+
+  @IsEnum(MBTI_TYPES)
+  mbtiTypes: MBTI_TYPES;
 
   @IsOptional()
   @IsUUID()

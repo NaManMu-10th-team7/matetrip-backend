@@ -39,13 +39,13 @@ export class AuthService {
   }
 
   // 검증된 사용자를 기반으로 JWT 토큰 생성
-  async login(user: UserPayloadDto) {
+  async login(user: UserPayloadDto): Promise<string> {
     // 토큰에 담길 정보 (payload)
     const payload = { email: user.email, sub: user.id };
 
-    return {
-      accessToken: this.jwtService.sign(payload),
-    };
+    const accessToken = this.jwtService.sign(payload);
+
+    return accessToken;
   }
 
   // 회원가입

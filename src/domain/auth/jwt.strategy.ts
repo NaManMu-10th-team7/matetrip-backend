@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { Users } from '../users/entities/users.entity';
+import { Request } from 'express';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -18,8 +18,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // 4. secret 값이 존재함이 확인됐으므로, 안전하게 super()에 전달
     super({
-      // 5. 요청 헤더에서 'Bearer ' 타입으로 토큰 추출
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // 5. 요청의 쿠키에서 'accessToken' 토큰 추출
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        (request: Request) => {
+          return request?.cookies?.accessToken;
+        },
+      ]),
 
       // 6. 토큰 만료 시간 검사
       ignoreExpiration: false,

@@ -1,9 +1,24 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
+import { RedisIoAdapter } from './redis/redis-io.adapter.js';
+import {
+  initializeTransactionalContext,
+  addTransactionalDataSource,
+} from 'typeorm-transactional';
+import { DataSource } from 'typeorm';
 
 async function bootstrap() {
+  initializeTransactionalContext();
   const app = await NestFactory.create(AppModule);
+  addTransactionalDataSource(app.get(DataSource));
+
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
+
+  app.enableCors();
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -18,6 +33,14 @@ async function bootstrap() {
       enableImplicitConversion: true, // 타입 자동 변환 허용
     }),
   );
+  app.enableCors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:3001', // 프론트엔드 주소
+    methods: 'GET, HEAD, PUT, PATCH, POST, DELETE', // 허용할 HTTP 메서드
+    credentials: true, // 쿠키나 인증 헤더(Authorization)를 주고받을 때 필요
+  });
+
+  app.use(cookieParser());
+
   await app.listen(process.env.PORT ?? 3000);
 }
 void bootstrap();

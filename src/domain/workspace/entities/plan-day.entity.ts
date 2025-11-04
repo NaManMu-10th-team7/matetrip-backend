@@ -1,5 +1,5 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { Workspace } from '../../workspace/entities/workspace.entity';
+import { Workspace } from './workspace.entity';
 import { BaseTimestampEntity } from '../../../base.entity';
 
 @Entity('plan_day', { schema: 'public' })
