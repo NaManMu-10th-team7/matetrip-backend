@@ -23,5 +23,5 @@ export class Poi extends BaseTimestampEntity {
 
   @ManyToOne(() => PlanDay, { onDelete: 'CASCADE' })
   @JoinColumn([{ name: 'plan_day_id', referencedColumnName: 'id' }])
-  planDay: PlanDay;
+  planDay?: PlanDay;
 }

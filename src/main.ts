@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { RedisIoAdapter } from './redis/redis-io.adapter.js';
+import { RedisService } from './redis/redis.service.js';
 import {
   initializeTransactionalContext,
   addTransactionalDataSource,
@@ -14,8 +15,8 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   addTransactionalDataSource(app.get(DataSource));
 
-  const redisIoAdapter = new RedisIoAdapter(app);
-  await redisIoAdapter.connectToRedis();
+  const redisIoAdapter = new RedisIoAdapter(app, app.get(RedisService));
+  redisIoAdapter.connectToRedis();
   app.useWebSocketAdapter(redisIoAdapter);
 
   app.useGlobalPipes(
