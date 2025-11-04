@@ -1,23 +1,38 @@
 import {
-  Body,
   Controller,
-  Delete,
   Get,
+  Post,
+  Body,
+  Patch,
+  Param,
   HttpCode,
   HttpStatus,
-  Param,
-  ParseUUIDPipe,
-  Patch,
+  Delete,
   Req,
   UseGuards,
+  UnauthorizedException,
+  CanActivate,
+  ExecutionContext,
+  ParseUUIDPipe,
+  Logger,
 } from '@nestjs/common';
+import { ProfileService } from './profile.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 
-import { ProfileService } from './profile.service';
-import { UpdateProfileDto } from './dto/update-profile.dto';
-
 type RequestWithUser = Request & { user: { id: string } };
+
+// 인증된 요청인지 확인하고 user id가 없으면 요청을 거절하는 가드
+class RequireUserGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const req = context.switchToHttp().getRequest<RequestWithUser>();
+    if (!req.user?.id) {
+      throw new UnauthorizedException('Authentication required');
+    }
+    return true;
+  }
+}
 
 @Controller('profile')
 export class ProfileController {
@@ -27,7 +42,9 @@ export class ProfileController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard('jwt'))
   async getMyProfile(@Req() req: RequestWithUser) {
-    return this.profileService.getProfileByUserId(req.user.id);
+    const userId = req.user.id;
+
+    return this.profileService.getProfileByUserId(userId);
   }
 
   /**
@@ -71,16 +88,17 @@ export class ProfileController {
     @Req() req: RequestWithUser,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
+    Logger.log(updateProfileDto, 'ProfileController');
     return this.profileService.update(req.user.id, updateProfileDto);
   }
-
-  @Delete(':id')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(AuthGuard('jwt'))
-  remove(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Req() req: RequestWithUser,
-  ) {
-    return this.profileService.remove(id, req.user.id);
-  }
+  // // //JWT 일때로 가정
+  // @Delete(':id')
+  // @HttpCode(HttpStatus.OK)
+  // @UseGuards(RequireUserGuard)
+  // remove(
+  //   @Param('id', new ParseUUIDPipe()) id: string,
+  //   @Req() req: RequestWithUser,
+  // ) {
+  //   return this.profileService.remove(id, req.user.id);
+  // }
 }
