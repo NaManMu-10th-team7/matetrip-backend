@@ -14,7 +14,7 @@ import { RemovePoiDto } from './dto/remove-poi.dto.js';
 import { PoiService } from './poi.service.js';
 
 const PoiSocketEvent = {
-  JOIN: 'workspa,ce.poi.join',
+  JOIN: 'workspace.poi.join',
   JOINED: 'workspace.poi.joined',
   SYNC: 'workspace.poi.sync',
   LEAVE: 'workspace.poi.leave',

@@ -52,12 +52,18 @@ export class PoiCacheService {
     workspaceId: string,
     pois: CachedPoi[],
   ): Promise<void> {
+    if (!isUUID(workspaceId)) {
+      throw new Error('Invalid workspaceId');
+    }
+
     const client = this.redisService.getClient();
 
     // key 생성하고 만약 이미 존재하면 삭제
     const key = this.buildKey(workspaceId);
-    await client.del(key);
+    const pipeline = client.multi();
+    pipeline.del(key);
     if (pois.length === 0) {
+      await pipeline.exec();
       return;
     }
 
@@ -65,10 +71,11 @@ export class PoiCacheService {
     const hashObject = Object.fromEntries(
       pois.map((poi) => [poi.id, JSON.stringify(poi)] as const),
     );
-    await client.hSet(key, hashObject);
 
+    pipeline.hSet(key, hashObject);
+    pipeline.expire(key, this.ttlSeconds);
+    await pipeline.exec();
     // todo : 이거 삭제하고 나중에 어케할지 고르기
-    await client.expire(key, this.ttlSeconds);
   }
 
   // DB에 배치 처리는 이거 호출한 Poi Service에서 ㄱㄱ

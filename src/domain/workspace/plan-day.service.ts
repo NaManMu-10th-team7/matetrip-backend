@@ -17,7 +17,6 @@ export class PlanDayService {
     startDate?: string,
     endDate?: string | null,
   ): PlanDay[] {
-    if (!startDate && !endDate) return [];
     if (!startDate || !endDate) return [];
 
     const start = parseISO(startDate);

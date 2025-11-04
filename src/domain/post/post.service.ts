@@ -43,7 +43,7 @@ export class PostService {
     });
 
     if (!foundedPost) {
-      throw new NotFoundException('게시물의 id와 일치하는 게시물가 없습니다');
+      throw new NotFoundException('게시물의 id와 일치하는 게시물이 없습니다');
     }
 
     return this.toPostResponseDto(foundedPost);
@@ -97,19 +97,8 @@ export class PostService {
     if (!post) {
       throw new NotFoundException("Post doesn't exist");
     }
-    // `post.writer`가 로드되지 않았을 경우를 대비한 방어 코드
-    if (!post.writer || !post.writer.id) {
-      // 실제 운영 환경에서는 로깅을 통해 이런 케이스를 추적하는 것이 좋습니다.
-      throw new BadRequestException(
-        'Writer information is missing for the post.',
-      );
-    }
-    // DTO로 변환하기 전에 필요한 데이터를 명시적으로 매핑합니다.
-    const postWithWriterId = {
-      ...post,
-      writerId: post.writer.id,
-    };
-    return plainToInstance(PostResponseDto, postWithWriterId, {
+
+    return plainToInstance(PostResponseDto, post, {
       excludeExtraneousValues: true,
     });
   }

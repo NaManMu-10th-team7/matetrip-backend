@@ -28,12 +28,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
-    await Promise.all([
-      this.client.isOpen ? Promise.resolve() : this.client.connect(),
-      this.pubClient.isOpen ? Promise.resolve() : this.pubClient.connect(),
-      this.subClient.isOpen ? Promise.resolve() : this.subClient.connect(),
-    ]);
-    this.logger.log('Redis clients connected');
+    try {
+      await Promise.all([
+        this.client.isOpen ? Promise.resolve() : this.client.connect(),
+        this.pubClient.isOpen ? Promise.resolve() : this.pubClient.connect(),
+        this.subClient.isOpen ? Promise.resolve() : this.subClient.connect(),
+      ]);
+      this.logger.log('Redis clients connected');
+    } catch (error) {
+      this.logger.error('Failed to connect Redis clients', error);
+      throw error;
+    }
   }
 
   getClient(): RedisClientType {

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Poi } from './entities/poi.entity.js';
 import { In, Repository } from 'typeorm';
@@ -70,12 +74,18 @@ export class PoiService {
     workspaceId: string,
     poiId: string,
   ): Promise<string> {
-    await this.poiCacheService.removePoi(workspaceId, poiId);
-    await this.poiRepository.delete({
+    // DB에서 먼저 삭제 시도
+    const deleteResult = await this.poiRepository.delete({
       id: poiId,
     });
-    // TODO : 어떻게 반환할지는 나중에 고치기
-    return '성공 : 반환값은 나중에 수정';
+
+    if (deleteResult.affected === 0) {
+      throw new NotFoundException(`POI with id ${poiId} not found`);
+    }
+
+    // DB 삭제 성공 후 캐시 제거
+    await this.poiCacheService.removePoi(workspaceId, poiId);
+    return poiId;
   }
 
   // Redis캐시에 쌓여 있는 POI들을 DB에 반영하고 캐시를 비우는 플러시
@@ -114,9 +124,7 @@ export class PoiService {
         }),
       );
 
-      if (entities.length > 0) {
-        await this.poiRepository.save(entities);
-      }
+      await this.poiRepository.save(entities);
     }
 
     await this.poiCacheService.clearWorkspacePois(workspaceId);
