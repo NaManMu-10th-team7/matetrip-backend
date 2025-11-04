@@ -14,20 +14,21 @@ import { RemovePoiDto } from './dto/remove-poi.dto.js';
 import { PoiService } from './poi.service.js';
 
 const PoiSocketEvent = {
-  JOIN: 'workspace.poi.join',
-  JOINED: 'workspace.poi.joined',
-  SYNC: 'workspace.poi.sync',
-  LEAVE: 'workspace.poi.leave',
-  LEFT: 'workspace.poi.left',
-  MARK: 'workspace.poi.mark',
-  MARKED: 'workspace.poi.marked',
-  UNMARK: 'workspace.poi.unmark',
-  UNMARKED: 'workspace.poi.unmarked',
-  FLUSH: 'workspace.poi.flush',
-  FLUSHED: 'workspace.poi.flushed',
+  JOIN: 'join',
+  JOINED: 'joined',
+  SYNC: 'sync',
+  LEAVE: 'leave',
+  LEFT: 'left',
+  MARK: 'mark',
+  MARKED: 'marked',
+  UNMARK: 'unmark',
+  UNMARKED: 'unmarked',
+  FLUSH: 'flush',
+  FLUSHED: 'flushed',
 } as const;
 
 @WebSocketGateway(3003, {
+  namespace: 'poi',
   cors: {
     origin: process.env.ALLOWED_ORIGINS?.split(',') || [
       'http://localhost:3000',
