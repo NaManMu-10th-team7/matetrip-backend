@@ -160,7 +160,6 @@ export class PoiGateway {
         await this.workspaceService.flushWorkspacePois(data.workspaceId);
 
       this.logger.log(`Flushed Counter:  + ${newlyPersistedCount}`);
-      this.logger.log(`Persisted POIs: ${JSON.stringify(persistedPois)}`);
       this.logger.log(
         `Workspace ${data.workspaceId} flushed POIs (newly persisted: ${newlyPersistedCount})`,
       );
