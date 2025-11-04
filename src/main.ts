@@ -1,9 +1,21 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import { RedisIoAdapter } from './redis/redis-io.adapter.js';
+import {
+  initializeTransactionalContext,
+  addTransactionalDataSource,
+} from 'typeorm-transactional';
+import { DataSource } from 'typeorm';
 
 async function bootstrap() {
+  initializeTransactionalContext();
   const app = await NestFactory.create(AppModule);
+  addTransactionalDataSource(app.get(DataSource));
+
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   app.useGlobalPipes(
     new ValidationPipe({

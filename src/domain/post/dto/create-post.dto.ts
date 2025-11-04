@@ -39,8 +39,8 @@ export class CreatePostDto {
   @IsDateString({}, { message: '종료일은 YYYY-MM-DD 형식으로 입력해주세요' })
   endDate?: string;
 
-  @IsArray()
   @IsOptional()
+  @IsArray()
   @IsEnum(KeywordType, { each: true })
   keywords?: KeywordType[] = [];
 }
