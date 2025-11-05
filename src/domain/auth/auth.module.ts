@@ -7,6 +7,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './jwt.strategy';
 import { LocalStrategy } from './local.strategy';
+import { LocalAuthGuard } from './local_auth.guard';
+import { JwtAuthGuard } from './jwt_auth.guard';
 
 @Module({
   imports: [
@@ -42,7 +44,7 @@ import { LocalStrategy } from './local.strategy';
   ],
 
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy],
+  providers: [AuthService, JwtStrategy, LocalStrategy, LocalAuthGuard, JwtAuthGuard],
   // 다른 모듈에서도 사용할 수 있게
   exports: [AuthService, PassportModule],
 })

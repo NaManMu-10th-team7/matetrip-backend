@@ -11,7 +11,7 @@ import { ReviewController } from './review.controller';
     // TypeORM 리포지토리를 DI로 사용하기 위해 forFeature 등록
     TypeOrmModule.forFeature([Review, Post, Users]),
   ],
-  providers: [ReviewService],      // 서비스 프로바이더 등록
+  providers: [ReviewService], // 서비스 프로바이더 등록
   controllers: [ReviewController], // 라우팅 담당 컨트롤러 등록
 })
 export class ReviewModule {}

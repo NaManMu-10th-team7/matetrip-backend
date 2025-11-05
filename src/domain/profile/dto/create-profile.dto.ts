@@ -33,17 +33,17 @@ export class CreateProfileDto {
   @IsArray()
   // @ArrayNotEmpty()
   @IsEnum(TravelStyleType, { each: true })
-  travelStyles: TravelStyleType[];
+  travelStyles?: TravelStyleType[];
 
   @IsArray()
-  // @ArrayNotEmpty()
   @IsEnum(TendencyType, { each: true })
-  travelTendency: TendencyType[];
+  @IsOptional()
+  travelTendency?: TendencyType[];
 
   @IsEnum(MBTI_TYPES)
   mbtiTypes: MBTI_TYPES;
 
   @IsOptional()
   @IsUUID()
-  profileImageId?: string;
+  profileImageId?: string | null; //제거가 안됨(create이니까)
 }

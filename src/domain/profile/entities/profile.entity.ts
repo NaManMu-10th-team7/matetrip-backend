@@ -78,7 +78,7 @@ export class Profile extends BaseTimestampEntity {
 
   @OneToOne(() => BinaryContent, { onDelete: 'SET NULL' })
   @JoinColumn([{ name: 'profile_image_id', referencedColumnName: 'id' }])
-  profileImage: BinaryContent;
+  profileImage: BinaryContent | null;
 
   @OneToOne(() => Users, (users) => users.profile, { onDelete: 'CASCADE' })
   @JoinColumn([{ name: 'user_id', referencedColumnName: 'id' }])

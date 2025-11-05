@@ -14,6 +14,7 @@ import {
   CanActivate,
   ExecutionContext,
   ParseUUIDPipe,
+  Logger,
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -80,23 +81,24 @@ export class ProfileController {
     return this.profileService.getProfileByUserId(userId);
   }
 
-  // //JWT 일때로 가정
   @Patch('my')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard('jwt'))
-  async update(@Req() req, @Body() updateProfileDto: UpdateProfileDto) {
-    const userId = req.user.id;
-    return this.profileService.update(userId, updateProfileDto);
-  }
-
-  // //JWT 일때로 가정
-  @Delete(':id')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(RequireUserGuard)
-  remove(
-    @Param('id', new ParseUUIDPipe()) id: string,
+  async update(
     @Req() req: RequestWithUser,
+    @Body() updateProfileDto: UpdateProfileDto,
   ) {
-    return this.profileService.remove(id, req.user.id);
+    Logger.log(updateProfileDto, 'ProfileController');
+    return this.profileService.update(req.user.id, updateProfileDto);
   }
+  // // //JWT 일때로 가정
+  // @Delete(':id')
+  // @HttpCode(HttpStatus.OK)
+  // @UseGuards(RequireUserGuard)
+  // remove(
+  //   @Param('id', new ParseUUIDPipe()) id: string,
+  //   @Req() req: RequestWithUser,
+  // ) {
+  //   return this.profileService.remove(id, req.user.id);
+  // }
 }
