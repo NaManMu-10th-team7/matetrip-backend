@@ -9,14 +9,16 @@ import {
   ParseUUIDPipe,
   Post,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { BinaryContentService } from './binary-content.service';
 import { CreatePresignedUrlDto } from './dto/create.presigned.url.dto';
-import { RegisterUploadDto } from './dto/registed.upload.dto';
-import { Users } from '../users/entities/users.entity';
+// import { RegisterUploadDto } from './dto/registed.upload.dto';
+// import { Users } from '../users/entities/users.entity';
+import { AuthGuard } from '@nestjs/passport';
 
-type RequestWithUser = Request & { user: { id: string } };
+//type RequestWithUser = Request & { user: { id: string } };
 
 @Controller('binary-content')
 export class BinaryContentController {
@@ -30,13 +32,9 @@ export class BinaryContentController {
    * binary_context로 직접 넣음(db)
    */
   @Post('presigned-url')
-  async createPresignedUrl(
-    @Body() dto: CreatePresignedUrlDto,
-    @Req() req: RequestWithUser,
-  ) {
-    // const user = { id: dto.userId } as Users;
-    const user = { id: req.user.id } as Users;
-    return this.service.createPresignedUrl(user, dto);
+  @UseGuards(AuthGuard('jwt'))
+  async createPresignedUrl(@Body() dto: CreatePresignedUrlDto) {
+    return this.service.createPresignedUrlDB(dto);
   }
 
   // @Post('presigned-url')
@@ -61,8 +59,8 @@ export class BinaryContentController {
    * ④ 파일 접근용 presigned GET URL 발급
    */
   @Get(':id/presigned-url')
-  async getPresignedGetUrl(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.service.createPresignedGetUrl(id);
+  async GetImageFromS3(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.service.SendUrlToS3(id);
   }
 
   /**

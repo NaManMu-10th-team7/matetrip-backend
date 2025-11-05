@@ -14,7 +14,7 @@ import { S3Service } from '../../aws/s3.service';
 import { Users } from '../users/entities/users.entity';
 
 export interface PresignedUrlResponse {
-  id: string;
+  binaryContentId: string;
   uploadUrl: string; // presigned PUT URL
   s3Key: string; // 나중에 등록/삭제할 때 사용할 S3 키
   fileUrl: string; // 업로드 완료 후 접근할 정적 URL
@@ -43,8 +43,7 @@ export class BinaryContentService {
    * - user, dto 정보를 바탕으로 저장할 S3 Key를 결정.
    * - presigned URL, 추후 이미지 접근 URL, 만료 시간 등을 묶어서 프런트로 반환.
    */
-  async createPresignedUrl(
-    user: Users,
+  async createPresignedUrlDB(
     dto: CreatePresignedUrlDto,
   ): Promise<PresignedUrlResponse> {
     const MAX_UPLOAD_SIZE = 50 * 1024 * 1024; // 50MB 초과시 오류
@@ -84,7 +83,7 @@ export class BinaryContentService {
     );
 
     return {
-      id: saved.id,
+      binaryContentId: saved.id,
       uploadUrl,
       s3Key,
       fileUrl: this.s3Service.buildPublicUrl(s3Key), // 업로드 후 미리보기용 URL
@@ -119,7 +118,7 @@ export class BinaryContentService {
   //   }
   // }
 
-  async createPresignedGetUrl(id: string): Promise<{ url: string }> {
+  async SendUrlToS3(id: string): Promise<{ url: string }> {
     const file = await this.binaryContentRepository.findOne({ where: { id } });
     if (!file) {
       throw new NotFoundException(`File with ID ${id} not found`);

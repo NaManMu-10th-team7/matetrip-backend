@@ -100,7 +100,7 @@ export class S3Service {
     expiresIn = 3600, // 조회는 1시간 등 더 길게 설정 가능
   ): Promise<string> {
     this.validateKey(key);
-
+    //GetObjectCommand
     const command = new GetObjectCommand({
       Bucket: this.bucketName,
       Key: key,

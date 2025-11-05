@@ -38,7 +38,7 @@ export class CreateProfileDto {
   @IsArray()
   @IsEnum(TendencyType, { each: true })
   @IsOptional()
-  tendency?: TendencyType[];
+  travelTendency?: TendencyType[];
 
   @IsEnum(MBTI_TYPES)
   mbtiTypes: MBTI_TYPES;
