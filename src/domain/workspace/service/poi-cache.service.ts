@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisService } from '../../redis/redis.service';
-import { CachedPoi } from './types/cached-poi.js';
+import { RedisService } from '../../../redis/redis.service';
+import { CachedPoi } from '../types/cached-poi.js';
 import { isUUID } from 'class-validator';
 
 @Injectable()
@@ -10,20 +10,20 @@ export class PoiCacheService {
 
   constructor(private readonly redisService: RedisService) {}
 
-  private buildKey(workspaceId: string): string {
+  private buildPoisKey(workspaceId: string): string {
     return `workspace:${workspaceId}:pois`;
   }
 
   async getWorkspacePois(workspaceId: string): Promise<CachedPoi[]> {
     const client = this.redisService.getClient();
-    const key = this.buildKey(workspaceId);
+    const key = this.buildPoisKey(workspaceId);
     const rawPois = await client.hVals(key);
     return rawPois.map((poi) => JSON.parse(poi) as CachedPoi);
   }
 
   async upsertPoi(workspaceId: string, poi: CachedPoi): Promise<void> {
     const client = this.redisService.getClient();
-    const key = this.buildKey(workspaceId);
+    const key = this.buildPoisKey(workspaceId);
     await client.hSet(key, poi.id, JSON.stringify(poi));
 
     // todo : 삭제할 것
@@ -38,7 +38,7 @@ export class PoiCacheService {
     poiId: string,
   ): Promise<CachedPoi | undefined> {
     const client = this.redisService.getClient();
-    const key = this.buildKey(workspaceId);
+    const key = this.buildPoisKey(workspaceId);
     const raw = await client.hGet(key, poiId);
     if (!raw) {
       return undefined;
@@ -59,7 +59,7 @@ export class PoiCacheService {
     const client = this.redisService.getClient();
 
     // key 생성하고 만약 이미 존재하면 삭제
-    const key = this.buildKey(workspaceId);
+    const key = this.buildPoisKey(workspaceId);
     const pipeline = client.multi();
     pipeline.del(key);
     if (pois.length === 0) {
@@ -86,6 +86,6 @@ export class PoiCacheService {
     }
 
     const client = this.redisService.getClient();
-    await client.del(this.buildKey(workspaceId));
+    await client.del(this.buildPoisKey(workspaceId));
   }
 }
