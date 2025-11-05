@@ -1,9 +1,11 @@
 import {
+  Body,
   Controller,
   HttpCode,
   Get,
   HttpStatus,
   Param,
+  Patch,
   ParseUUIDPipe,
   Post,
   Req,
@@ -13,6 +15,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { PostParticipationService } from './post-participation.service';
 import { PostParticipationResponseDto } from './dto/post-participation-response.dto';
+import { UpdatePostParticipationDto } from './dto/update-post-participation.dto';
 
 @Controller('posts/:postId/participations')
 export class PostParticipationController {
@@ -40,5 +43,23 @@ export class PostParticipationController {
     @Param('postId', ParseUUIDPipe) postId: string,
   ): Promise<PostParticipationResponseDto[]> {
     return this.postParticipationService.getParticipationsForPost(postId);
+  }
+
+  @Patch(':participationId')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  updateParticipationStatus(
+    @Param('postId', ParseUUIDPipe) postId: string,
+    @Param('participationId', ParseUUIDPipe) participationId: string,
+    @Req() req: Request & { user: { id: string } },
+    @Body() updatePostParticipationDto: UpdatePostParticipationDto,
+  ): Promise<PostParticipationResponseDto> {
+    const authorId = req.user.id;
+    return this.postParticipationService.updateParticipationStatus(
+      postId,
+      participationId,
+      authorId,
+      updatePostParticipationDto,
+    );
   }
 }

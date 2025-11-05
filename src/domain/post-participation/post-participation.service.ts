@@ -10,6 +10,8 @@ import { Repository } from 'typeorm';
 import { Post } from '../post/entities/post.entity';
 import { PostParticipationResponseDto } from './dto/post-participation-response.dto';
 import { plainToInstance } from 'class-transformer';
+import { UpdatePostParticipationDto } from './dto/update-post-participation.dto';
+import { Users } from '../users/entities/users.entity';
 
 @Injectable()
 export class PostParticipationService {
@@ -18,6 +20,8 @@ export class PostParticipationService {
     private readonly postParticipationRepository: Repository<PostParticipation>,
     @InjectRepository(Post)
     private readonly postRepository: Repository<Post>,
+    // @InjectRepository(Users)
+    // private readonly userRepository: Repository<Users>,
   ) {}
 
   async requestParticipation(
@@ -90,5 +94,60 @@ export class PostParticipationService {
     });
 
     return plainToInstance(PostParticipationResponseDto, participations);
+  }
+
+  /**
+   * 동행 신청 상태를 '승인' 또는 '거절'로 변경한다.
+   * 게시글 작성자만 이 작업을 수행할 수 있다.
+   * @param postId
+   * @param participationId
+   * @param authorId
+   * @param updatePostParticipationDto
+   */
+  async updateParticipationStatus(
+    postId: string,
+    participationId: string,
+    authorId: string,
+    updatePostParticipationDto: UpdatePostParticipationDto,
+  ): Promise<PostParticipationResponseDto> {
+    // 1. 게시물을 찾아 작성자가 맞는지 확인한다.
+    const post = await this.postRepository.findOne({
+      where: { id: postId },
+      relations: {
+        writer: true,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException(
+        `ID가 "${postId}"인 게시물을 찾을 수 없습니다.`,
+      );
+    }
+
+    if (post.writer.id !== authorId) {
+      throw new ForbiddenException(
+        '해당 게시물의 동행 신청을 관리할 권한이 없습니다.',
+      );
+    }
+
+    const participation = await this.postParticipationRepository.findOne({
+      where: { id: participationId, post: { id: postId } },
+      relations: {
+        requester: true,
+        post: true,
+      },
+    });
+
+    if (!participation) {
+      throw new NotFoundException(
+        `ID가 "${participationId}"인 동행 신청을 찾을 수 없습니다.`,
+      );
+    }
+
+    participation.status = updatePostParticipationDto.status;
+    const updatedParticipation =
+      await this.postParticipationRepository.save(participation);
+
+    return plainToInstance(PostParticipationResponseDto, updatedParticipation);
   }
 }
