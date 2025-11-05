@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Workspace } from '../entities/workspace.entity.js';
 import { PlanDay } from '../entities/plan-day.entity.js';
 import { eachDayOfInterval, format, parseISO } from 'date-fns';
@@ -41,5 +41,18 @@ export class PlanDayService {
         } as Workspace,
       },
     });
+  }
+
+  async getPlanDayWithWorkspace(planDayId: string): Promise<PlanDay> {
+    const planDay = await this.planDayRepository.findOne({
+      where: { id: planDayId },
+      relations: ['workspace'],
+    });
+
+    if (!planDay) {
+      throw new NotFoundException(`PlanDay with id ${planDayId} not found`);
+    }
+
+    return planDay;
   }
 }

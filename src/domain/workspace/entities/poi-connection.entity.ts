@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, OneToOne, RelationId } from 'typeorm';
 import { Poi } from './poi.entity';
 import { PlanDay } from './plan-day.entity';
 import { BaseTimestampEntity } from '../../../base.entity';
@@ -15,6 +15,9 @@ export class PoiConnection extends BaseTimestampEntity {
   @JoinColumn([{ name: 'next_poi_id', referencedColumnName: 'id' }])
   nextPoi: Poi;
 
+  @RelationId((poiConnection: PoiConnection) => poiConnection.nextPoi)
+  nextPoiId: string;
+
   @OneToOne(() => PlanDay, { onDelete: 'CASCADE' })
   @JoinColumn([{ name: 'plan_day_id', referencedColumnName: 'id' }])
   planDay: PlanDay;
@@ -22,4 +25,7 @@ export class PoiConnection extends BaseTimestampEntity {
   @OneToOne(() => Poi, { onDelete: 'CASCADE' })
   @JoinColumn([{ name: 'prev_poi_id', referencedColumnName: 'id' }])
   prevPoi: Poi;
+
+  @RelationId((poiConnection: PoiConnection) => poiConnection.prevPoi)
+  prevPoiId: string;
 }

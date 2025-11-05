@@ -193,7 +193,8 @@ export class PoiGateway {
 
       socket.emit(PoiSocketEvent.CONNECTED, cachedPoiConnection);
       socket.broadcast
-        .to(data.planDayId)
+        .to(cachedPoiConnection.workspaceId)
+        // todo : 이거 일단은 전체로 넘겨서 client에서 알아서 day 구분하라고 한거라 최적화 안됨
         .emit(PoiSocketEvent.CONNECTED, cachedPoiConnection);
 
       this.logger.debug(
@@ -212,12 +213,12 @@ export class PoiGateway {
     @MessageBody() data: RemovePoiConnectionDto,
   ) {
     try {
-      await this.poiConnectionService.removePoiConnection(data.id);
+      const removed = await this.poiConnectionService.removePoiConnection(data);
 
-      socket.emit(PoiSocketEvent.DISCONNECTED, data.id);
+      socket.emit(PoiSocketEvent.DISCONNECTED, removed.id);
       socket.broadcast
-        .to(data.planDayId)
-        .emit(PoiSocketEvent.DISCONNECTED, data.id);
+        .to(removed.workspaceId)
+        .emit(PoiSocketEvent.DISCONNECTED, removed.id);
     } catch {
       this.logger.error(
         `Socket ${socket.id} failed to disconnect from POI connection`,

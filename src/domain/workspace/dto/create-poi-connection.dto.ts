@@ -2,6 +2,9 @@ import { IsInt, IsOptional, IsUUID } from 'class-validator';
 
 export class CreatePoiConnectionDto {
   @IsUUID()
+  workspaceId: string;
+
+  @IsUUID()
   prevPoiId: string;
 
   @IsUUID()

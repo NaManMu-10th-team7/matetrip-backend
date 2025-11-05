@@ -8,4 +8,8 @@ export class RemovePoiConnectionDto {
   @IsNotEmpty()
   @IsUUID()
   planDayId: string;
+
+  @IsNotEmpty()
+  @IsUUID()
+  workspaceId: string;
 }

@@ -4,7 +4,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CreateWorkspaceDto } from '../dto/create-workspace.dto';
-import { UpdateWorkspaceDto } from '../dto/update-workspace.dto';
 import { PostService } from '../../post/post.service.js';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Workspace } from '../entities/workspace.entity.js';
@@ -96,8 +95,11 @@ export class WorkspaceService {
   async cachePoiConnection(
     dto: CreatePoiConnectionDto,
   ): Promise<CachePoiConnection> {
-    const cachedPoiConnection: CachePoiConnection =
-      buildCachedPoiConnection(dto);
+    const cachedPoiConnection: CachePoiConnection = buildCachedPoiConnection(
+      dto,
+      dto.workspaceId,
+    );
+
     // 일단 update도 한번에 처리
     await this.poiConnectionCacheService.upsertPoiConnection(
       cachedPoiConnection,

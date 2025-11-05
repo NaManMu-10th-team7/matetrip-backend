@@ -6,13 +6,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Poi } from '../entities/poi.entity.js';
 import { In, Repository } from 'typeorm';
-import { CreatePoiDto } from '../dto/create-poi.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
-import {
-  buildCachedPoi,
-  buildCachedPoiFromEntity,
-  CachedPoi,
-} from '../types/cached-poi.js';
+import { buildCachedPoiFromEntity, CachedPoi } from '../types/cached-poi.js';
 import { Users } from '../../users/entities/users.entity.js';
 import { PlanDay } from '../entities/plan-day.entity.js';
 import { PlanDayService } from './plan-day.service.js';
@@ -129,17 +124,5 @@ export class PoiService {
       persistedPois: cachedPois.map((poi) => ({ ...poi, persisted: true })),
       newlyPersistedCount,
     };
-  }
-
-  private async cachePoi(
-    workspaceId: string,
-    dto: CreatePoiDto,
-  ): Promise<CachedPoi> {
-    // cachedPoi 전용 DTO 변환
-    const cachedPoi = buildCachedPoi(workspaceId, dto);
-
-    // Redis에 저장
-    await this.poiCacheService.upsertPoi(workspaceId, cachedPoi);
-    return cachedPoi;
   }
 }
