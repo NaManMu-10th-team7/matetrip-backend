@@ -10,8 +10,8 @@ import {
 } from '../types/cached-poi-connection.js';
 import { RemovePoiConnectionDto } from '../dto/remove-poi-connection.dto.js';
 import {
-  buildGroupedPoiConncetionsDto,
-  GroupedPoiConncetionsDto,
+  buildGroupedPoiConnectionsDto,
+  GroupedPoiConnectionsDto,
 } from '../types/grouped-poi-conncetions.dto.js';
 import { PlanDay } from '../entities/plan-day.entity.js';
 import { Poi } from '../entities/poi.entity.js';
@@ -50,7 +50,7 @@ export class PoiConnectionService {
   // 이게 문제다... ㅅㅂ
   async getAllPoiConnections(
     workspaceId: string,
-  ): Promise<GroupedPoiConncetionsDto> {
+  ): Promise<GroupedPoiConnectionsDto> {
     /**
      * 일단 workspaceId에 맞는 planDay들을 찾고
      * planDay에 맞는 poiConnection들을 찾고
@@ -90,7 +90,7 @@ export class PoiConnectionService {
       await this.poiConnectionCacheService.setPoiConnections(connection);
     }
 
-    return buildGroupedPoiConncetionsDto(planDayIds, persistedConnections);
+    return buildGroupedPoiConnectionsDto(planDayIds, persistedConnections);
   }
 
   async removePoiConnection(dto: RemovePoiConnectionDto): Promise<string> {

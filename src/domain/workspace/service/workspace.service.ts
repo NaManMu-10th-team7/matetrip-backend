@@ -124,7 +124,7 @@ export class WorkspaceService {
     const connectionToPersist = connections.filter((c) => !c.isPersisted);
 
     // todo : 이거 배치 처리하는 거 알아보기
-    if (connectionToPersist) {
+    if (connectionToPersist.length > 0) {
       await Promise.all(
         connectionToPersist.map((connection) =>
           this.poiConnectionService.persistPoiConnection(connection),
@@ -146,10 +146,15 @@ export class WorkspaceService {
       (poi) => !poi.isPersisted,
     );
 
-    if (poisToPersist) {
-      await Promise.all(
-        poisToPersist.map((poi) => this.poiService.persistPoi(poi)),
-      );
+    if (poisToPersist.length > 0) {
+      try {
+        await Promise.all(
+          poisToPersist.map((poi) => this.poiService.persistPoi(poi)),
+        );
+      } catch (e) {
+        console.log('poi persist error', e);
+        throw e;
+      }
     }
 
     // 다 저장했으면 clear

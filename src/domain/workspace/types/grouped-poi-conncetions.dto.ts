@@ -1,14 +1,14 @@
 import { PoiConnectionResponseDto } from '../dto/poi-connection-response.dto.js';
 
-export type GroupedPoiConncetionsDto = Record<
+export type GroupedPoiConnectionsDto = Record<
   string,
   PoiConnectionResponseDto[]
 >;
-export const buildGroupedPoiConncetionsDto = (
+export const buildGroupedPoiConnectionsDto = (
   planDayIds: string[],
   connections: PoiConnectionResponseDto[],
-): GroupedPoiConncetionsDto => {
-  const result: GroupedPoiConncetionsDto = {};
+): GroupedPoiConnectionsDto => {
+  const result: GroupedPoiConnectionsDto = {};
 
   for (const planDayId of planDayIds) {
     result[planDayId] = [];

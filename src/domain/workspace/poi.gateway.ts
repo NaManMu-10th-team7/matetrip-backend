@@ -16,7 +16,7 @@ import { CreatePoiConnectionDto } from './dto/create-poi-connection.dto.js';
 import { RemovePoiConnectionDto } from './dto/remove-poi-connection.dto.js';
 import { PoiConnectionService } from './service/poi-connection.service.js';
 import { CachedPoi } from './types/cached-poi.js';
-import { GroupedPoiConncetionsDto } from './types/grouped-poi-conncetions.dto.js';
+import { GroupedPoiConnectionsDto } from './types/grouped-poi-conncetions.dto.js';
 
 const PoiSocketEvent = {
   JOIN: 'join',
@@ -61,6 +61,7 @@ export class PoiGateway {
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: SocketPoiDto,
   ) {
+    // todo : 인증좀 하고
     try {
       await socket.join(data.workspaceId);
       socket.emit(PoiSocketEvent.JOINED, {
@@ -70,7 +71,7 @@ export class PoiGateway {
       const pois: CachedPoi[] = await this.poiService.getWorkspacePois(
         data.workspaceId,
       );
-      const connections: GroupedPoiConncetionsDto =
+      const connections: GroupedPoiConnectionsDto =
         await this.poiConnectionService.getAllPoiConnections(data.workspaceId);
       // todo: 나중에 DTO로
       socket.emit(PoiSocketEvent.SYNC, { pois, connections });
@@ -194,6 +195,13 @@ export class PoiGateway {
     @MessageBody() data: CreatePoiConnectionDto,
   ) {
     try {
+      if (!socket.rooms.has(data.workspaceId)) {
+        this.logger.warn(
+          `Socket ${socket.id} tried to connect without joining ${data.workspaceId}`,
+        );
+        return;
+      }
+
       const cachedPoiConnection =
         await this.workspaceService.cachePoiConnection(data);
 
