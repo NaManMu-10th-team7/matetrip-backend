@@ -28,7 +28,7 @@ export interface ProfileResponseDto {
   gender: GENDER;
   description: string;
   travelStyles: TravelStyleType[];
-  tendency: TendencyType[];
+  travelTendency: TendencyType[];
   userId: string;
   profileImageId: string | null;
   createdAt: Date;
@@ -67,7 +67,7 @@ export class ProfileService {
       gender: profile.gender,
       description: profile.description,
       travelStyles: profile.travelStyles,
-      tendency: profile.travelTendency,
+      travelTendency: profile.travelTendency,
       userId,
       profileImageId: profile.profileImage?.id ?? null,
       createdAt: profile.createdAt,
@@ -211,6 +211,9 @@ export class ProfileService {
       // 이미지를 '제거'하라는 요청 (null)
       if (profileImageId === null) {
         profile.profileImage = null;
+      } else if (profileImageId === oldImageId) {
+        // 동일한 이미지를 다시 설정하려면 아무 작업도 하지 않는다.
+        // 텍스트 데이터 변경은 그대로 진행된다.
       }
       //  이미지를 '교체/추가'하라는 요청 (string ID)
       else {
