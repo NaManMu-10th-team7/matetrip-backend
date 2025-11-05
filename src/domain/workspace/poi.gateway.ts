@@ -61,7 +61,7 @@ export class PoiGateway {
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: SocketPoiDto,
   ) {
-    // todo : 인증좀 하고
+    // todo : 보안 체크
     try {
       await socket.join(data.workspaceId);
       socket.emit(PoiSocketEvent.JOINED, {

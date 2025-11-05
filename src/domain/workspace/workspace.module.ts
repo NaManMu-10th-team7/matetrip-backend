@@ -14,10 +14,17 @@ import { PlanDayService } from './service/plan-day.service.js';
 import { PoiConnectionCacheService } from './service/poi-connection-cache.service.js';
 import { PoiConnectionService } from './service/poi-connection.service.js';
 import { PoiConnection } from './entities/poi-connection.entity.js';
+import { PostParticipation } from '../post-participation/entities/post-participation.entity.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Workspace, PlanDay, Poi, PoiConnection]),
+    TypeOrmModule.forFeature([
+      Workspace,
+      PlanDay,
+      Poi,
+      PoiConnection,
+      PostParticipation,
+    ]),
     PostModule,
     RedisModule,
   ],

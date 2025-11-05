@@ -24,6 +24,7 @@ import {
 import { PoiConnectionCacheService } from './poi-connection-cache.service.js';
 import { PoiConnectionService } from './poi-connection.service.js';
 import { PoiService } from './poi.service.js';
+import { PostParticipation } from '../../post-participation/entities/post-participation.entity.js';
 
 @Injectable()
 export class WorkspaceService {
@@ -33,6 +34,8 @@ export class WorkspaceService {
     private readonly workspaceRepository: Repository<Workspace>,
     @InjectRepository(PlanDay)
     private readonly planDayRepository: Repository<PlanDay>,
+    @InjectRepository(PostParticipation)
+    private readonly postParticipationRepository: Repository<PostParticipation>,
     private readonly poiCacheService: PoiCacheService,
     private readonly poiConnectionCacheService: PoiConnectionCacheService,
     private readonly poiConnectionService: PoiConnectionService,
@@ -125,11 +128,16 @@ export class WorkspaceService {
 
     // todo : 이거 배치 처리하는 거 알아보기
     if (connectionToPersist.length > 0) {
-      await Promise.all(
-        connectionToPersist.map((connection) =>
-          this.poiConnectionService.persistPoiConnection(connection),
-        ),
-      );
+      try {
+        await Promise.all(
+          connectionToPersist.map((connection) =>
+            this.poiConnectionService.persistPoiConnection(connection),
+          ),
+        );
+      } catch (e) {
+        console.log('connection persist error', e);
+        throw e;
+      }
     }
     await this.poiConnectionCacheService.clearWorkspacePoiConnections(
       workspaceId,
