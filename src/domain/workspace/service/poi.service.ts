@@ -26,10 +26,6 @@ export class PoiService {
     private readonly poiCacheService: PoiCacheService,
   ) {}
 
-  async createPoi(workspaceId: string, dto: CreatePoiDto) {
-    return this.cachePoi(workspaceId, dto);
-  }
-
   // workspace의 저장된 poi들 전부 반환
   // 캐시에 있다면 그대로 반환
   // 캐시에 없다면 DB에서 반환 후 캐시

@@ -87,12 +87,8 @@ export class WorkspaceService {
     return this.toWorkspaceResponseDto(savedWorkspace);
   }
 
-  async createPoi(workspaceId: string, dto: CreatePoiDto) {
-    return this.cachePoi(workspaceId, dto);
-  }
-
   async cachePoi(workspaceId: string, dto: CreatePoiDto): Promise<CachedPoi> {
-    const cachedPoi = buildCachedPoi(workspaceId, dto);
+    const cachedPoi: CachedPoi = buildCachedPoi(workspaceId, dto);
     await this.poiCacheService.upsertPoi(workspaceId, cachedPoi);
     return cachedPoi;
   }
@@ -100,7 +96,9 @@ export class WorkspaceService {
   async cachePoiConnection(
     dto: CreatePoiConnectionDto,
   ): Promise<CachePoiConnection> {
-    const cachedPoiConnection = buildCachedPoiConnection(dto);
+    const cachedPoiConnection: CachePoiConnection =
+      buildCachedPoiConnection(dto);
+    // 일단 update도 한번에 처리
     await this.poiConnectionCacheService.upsertPoiConnection(
       cachedPoiConnection,
     );
@@ -150,8 +148,8 @@ export class WorkspaceService {
     };
   }
 
-  findAll() {
-    return `This action returns all workspace`;
+  async remove(id: string) {
+    await this.workspaceRepository.delete(id);
   }
 
   async findOne(id: string) {
@@ -159,14 +157,6 @@ export class WorkspaceService {
       where: { id },
     });
     return this.toWorkspaceResponseDto(workspace);
-  }
-
-  update(id: string, updateWorkspaceDto: UpdateWorkspaceDto) {
-    return `This action updates a #${id} workspace`;
-  }
-
-  remove(id: string) {
-    return `This action removes a #${id} workspace`;
   }
 
   private toWorkspaceResponseDto(workspace: Workspace | null) {

@@ -13,10 +13,18 @@ export class PoiConnectionCacheService {
     return `poi-connection:${planDayId}`;
   }
 
+  async getPoiConnections(planDayId: string): Promise<CachePoiConnection[]> {
+    const client = this.redisService.getClient();
+    const key = this.buildKey(planDayId);
+    const rawPoiConnections = await client.hVals(key);
+    return rawPoiConnections.map(
+      (poiConnection) => JSON.parse(poiConnection) as CachePoiConnection,
+    );
+  }
+
   async upsertPoiConnection(poiConnection: CachePoiConnection) {
     const client = this.redisService.getClient();
     const key = this.buildKey(poiConnection.planDayId);
-    // todo : 원자성 보장
     const pipeline = client.multi();
     pipeline.hSet(key, poiConnection.prevPoiId, JSON.stringify(poiConnection));
     pipeline.hSet(key, poiConnection.nextPoiId, JSON.stringify(poiConnection));

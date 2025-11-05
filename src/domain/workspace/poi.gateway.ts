@@ -66,9 +66,13 @@ export class PoiGateway {
       });
 
       const pois = await this.poiService.getWorkspacePois(data.workspaceId);
+      const connections = await this.poiConnectionService.getAllPoiConnections(
+        data.workspaceId,
+      );
 
       if (pois.length > 0) {
-        socket.emit(PoiSocketEvent.SYNC, pois);
+        // todo: 나중에 DTO로
+        socket.emit(PoiSocketEvent.SYNC, { pois, connections });
       }
 
       this.logger.log(
