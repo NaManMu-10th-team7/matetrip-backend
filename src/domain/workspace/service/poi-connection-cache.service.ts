@@ -10,17 +10,26 @@ export class PoiConnectionCacheService {
 
   constructor(private readonly redisService: RedisService) {}
 
-  private buildKey(planDayId: string): string {
+  private buildConnectionKey(planDayId: string): string {
     return `poi-connection:${planDayId}`;
   }
 
   async getPoiConnections(planDayId: string): Promise<CachePoiConnection[]> {
     const client = this.redisService.getClient();
-    const key = this.buildKey(planDayId);
-    const rawPoiConnections = await client.hVals(key);
-    return rawPoiConnections.map(
-      (poiConnection) => JSON.parse(poiConnection) as CachePoiConnection,
-    );
+    const key = this.buildConnectionKey(planDayId);
+    const rawConnections = await client.hVals(key);
+
+    try {
+      return rawConnections.map(
+        (value) => JSON.parse(value) as CachePoiConnection,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to parse cached POI connections for planDay ${planDayId}`,
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      throw error;
+    }
   }
 
   async getPoiConnection(
@@ -28,47 +37,30 @@ export class PoiConnectionCacheService {
     poiConnectionId: string,
   ): Promise<CachePoiConnection | null> {
     const client = this.redisService.getClient();
-    const key = this.buildKey(planDayId);
-    const rawPoiConnection = await client.hGet(key, poiConnectionId);
-    if (!rawPoiConnection) {
+    const key = this.buildConnectionKey(planDayId);
+    const raw = await client.hGet(key, poiConnectionId);
+    if (!raw) {
       return null;
     }
 
-    return JSON.parse(rawPoiConnection) as CachePoiConnection;
+    return JSON.parse(raw) as CachePoiConnection;
   }
 
-  async setPoiConnections(
-    workspaceId: string,
-    poiConnections: CachePoiConnection[],
-  ) {
-    if (!isUUID(workspaceId)) {
-      throw new Error('Invalid workspaceId');
-    }
-
+  async setPoiConnections(connection: CachePoiConnection): Promise<void> {
+    // Todo : connections의 모든 planDayId가 같아야 함
     const client = this.redisService.getClient();
-    const key = this.buildKey(workspaceId);
+    const key = this.buildConnectionKey(connection.planDayId);
     const pipeline = client.multi();
     pipeline.del(key);
-    if (poiConnections.length === 0) {
-      await pipeline.exec();
-      return;
-    }
-
-    const hashObject = Object.fromEntries(
-      poiConnections.map(
-        (poiConnection) =>
-          [poiConnection.id, JSON.stringify(poiConnection)] as const,
-      ),
-    );
-
-    pipeline.hSet(key, hashObject);
+    pipeline.hSet(key, connection.id, JSON.stringify(connection));
     pipeline.expire(key, this.ttlSeconds);
-    // todo : 이거하고 나중에 어케할지 고르기
+
+    await pipeline.exec();
   }
 
-  async upsertPoiConnection(poiConnection: CachePoiConnection) {
+  async upsertPoiConnection(poiConnection: CachePoiConnection): Promise<void> {
     const client = this.redisService.getClient();
-    const key = this.buildKey(poiConnection.planDayId);
+    const key = this.buildConnectionKey(poiConnection.planDayId);
     const pipeline = client.multi();
     pipeline.hSet(key, poiConnection.id, JSON.stringify(poiConnection));
     pipeline.expire(key, this.ttlSeconds);
@@ -82,15 +74,19 @@ export class PoiConnectionCacheService {
   async removePoiConnection(
     planDayId: string,
     poiConnectionId: string,
-  ): Promise<CachePoiConnection | undefined> {
+  ): Promise<void> {
     const client = this.redisService.getClient();
-    const key = this.buildKey(planDayId);
-    const rawPoiConnection = await client.hGet(key, poiConnectionId);
-    if (!rawPoiConnection) {
-      return undefined;
+    const key = this.buildConnectionKey(planDayId);
+    await client.hDel(key, poiConnectionId);
+  }
+
+  // todo
+  async clearWorkspacePoiConnections(workspaceId: string) {
+    if (!isUUID(workspaceId)) {
+      return;
     }
 
-    await client.hDel(key, poiConnectionId);
-    return JSON.parse(rawPoiConnection) as CachePoiConnection;
+    const client = this.redisService.getClient();
+    await client.del(this.buildConnectionKey(workspaceId));
   }
 }

@@ -43,6 +43,11 @@ export class PlanDayService {
     });
   }
 
+  async getWorkspacePlanDayIds(workSpaceId: string): Promise<string[]> {
+    const planDays = await this.getWorkspacePlanDays(workSpaceId);
+    return planDays.map((planDay) => planDay.id);
+  }
+
   async getPlanDayWithWorkspace(planDayId: string): Promise<PlanDay> {
     const planDay = await this.planDayRepository.findOne({
       where: { id: planDayId },

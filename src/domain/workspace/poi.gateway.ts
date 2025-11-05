@@ -15,6 +15,8 @@ import { PoiService } from './service/poi.service.js';
 import { CreatePoiConnectionDto } from './dto/create-poi-connection.dto.js';
 import { RemovePoiConnectionDto } from './dto/remove-poi-connection.dto.js';
 import { PoiConnectionService } from './service/poi-connection.service.js';
+import { CachedPoi } from './types/cached-poi.js';
+import { GroupedPoiConncetionsDto } from './types/grouped-poi-conncetions.dto.js';
 
 const PoiSocketEvent = {
   JOIN: 'join',
@@ -65,15 +67,13 @@ export class PoiGateway {
         workspaceId: data.workspaceId,
       });
 
-      const pois = await this.poiService.getWorkspacePois(data.workspaceId);
-      const connections = await this.poiConnectionService.getAllPoiConnections(
+      const pois: CachedPoi[] = await this.poiService.getWorkspacePois(
         data.workspaceId,
       );
-
-      if (pois.length > 0) {
-        // todo: 나중에 DTO로
-        socket.emit(PoiSocketEvent.SYNC, { pois, connections });
-      }
+      const connections: GroupedPoiConncetionsDto =
+        await this.poiConnectionService.getAllPoiConnections(data.workspaceId);
+      // todo: 나중에 DTO로
+      socket.emit(PoiSocketEvent.SYNC, { pois, connections });
 
       this.logger.log(
         `Socket ${socket.id} joined workspace ${data.workspaceId}`,
@@ -109,6 +109,12 @@ export class PoiGateway {
     @MessageBody() data: CreatePoiDto,
   ) {
     try {
+      if (!socket.rooms.has(data.workspaceId)) {
+        this.logger.warn(
+          `Socket ${socket.id} tried to mark without joining ${data.workspaceId}`,
+        );
+        return;
+      }
       const cachedPoi = await this.workspaceService.cachePoi(
         data.workspaceId,
         data,
@@ -168,9 +174,12 @@ export class PoiGateway {
     @MessageBody() data: SocketPoiDto,
   ) {
     try {
+      // todo : flushPoiConnections
       const { persistedPois, newlyPersistedCount } =
-        await this.workspaceService.flushWorkspacePois(data.workspaceId);
+        await this.workspaceService.flushPois(data.workspaceId);
+      await this.workspaceService.flushConnections(data.workspaceId);
 
+      // 일단은 log는 Poi만
       this.logger.log(`Flushed Counter:  + ${newlyPersistedCount}`);
       this.logger.log(
         `Workspace ${data.workspaceId} flushed POIs (newly persisted: ${newlyPersistedCount})`,
@@ -193,7 +202,7 @@ export class PoiGateway {
 
       socket.emit(PoiSocketEvent.CONNECTED, cachedPoiConnection);
       socket.broadcast
-        .to(cachedPoiConnection.workspaceId)
+        .to(data.workspaceId)
         // todo : 이거 일단은 전체로 넘겨서 client에서 알아서 day 구분하라고 한거라 최적화 안됨
         .emit(PoiSocketEvent.CONNECTED, cachedPoiConnection);
 
@@ -219,7 +228,7 @@ export class PoiGateway {
       socket.emit(PoiSocketEvent.DISCONNECTED, removedId);
       socket.broadcast
         .to(data.workspaceId)
-        .emit(PoiSocketEvent.DISCONNECTED, `removed connection ${removedId}`);
+        .emit(PoiSocketEvent.DISCONNECTED, removedId);
     } catch {
       this.logger.error(
         `Socket ${socket.id} failed to disconnect from POI connection`,

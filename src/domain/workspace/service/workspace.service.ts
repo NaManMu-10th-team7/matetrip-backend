@@ -12,11 +12,9 @@ import { plainToInstance } from 'class-transformer';
 import { WorkspaceResponseDto } from '../dto/workspace-response.dto.js';
 import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from '../entities/plan-day.entity.js';
-import { Poi } from '../entities/poi.entity.js';
 import { CreatePoiDto } from '../dto/create-poi.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
 import { CachedPoi, buildCachedPoi } from '../types/cached-poi.js';
-import { Users } from '../../users/entities/users.entity.js';
 import { PlanDayService } from './plan-day.service.js';
 import { CreatePoiConnectionDto } from '../dto/create-poi-connection.dto.js';
 import {
@@ -24,6 +22,8 @@ import {
   CachePoiConnection,
 } from '../types/cached-poi-connection.js';
 import { PoiConnectionCacheService } from './poi-connection-cache.service.js';
+import { PoiConnectionService } from './poi-connection.service.js';
+import { PoiService } from './poi.service.js';
 
 @Injectable()
 export class WorkspaceService {
@@ -33,10 +33,10 @@ export class WorkspaceService {
     private readonly workspaceRepository: Repository<Workspace>,
     @InjectRepository(PlanDay)
     private readonly planDayRepository: Repository<PlanDay>,
-    @InjectRepository(Poi)
-    private readonly poiRepository: Repository<Poi>,
     private readonly poiCacheService: PoiCacheService,
     private readonly poiConnectionCacheService: PoiConnectionCacheService,
+    private readonly poiConnectionService: PoiConnectionService,
+    private readonly poiService: PoiService,
     private readonly planDayService: PlanDayService,
   ) {}
 
@@ -95,10 +95,18 @@ export class WorkspaceService {
   async cachePoiConnection(
     dto: CreatePoiConnectionDto,
   ): Promise<CachePoiConnection> {
-    const cachedPoiConnection: CachePoiConnection = buildCachedPoiConnection(
-      dto,
-      dto.workspaceId,
+    const planDay = await this.planDayService.getPlanDayWithWorkspace(
+      dto.planDayId,
     );
+
+    if (dto.workspaceId !== planDay.workspace.id) {
+      throw new BadRequestException(
+        'Plan day does not belong to the provided workspace',
+      );
+    }
+
+    const cachedPoiConnection: CachePoiConnection =
+      buildCachedPoiConnection(dto);
 
     // 일단 update도 한번에 처리
     await this.poiConnectionCacheService.upsertPoiConnection(
@@ -107,47 +115,45 @@ export class WorkspaceService {
     return cachedPoiConnection;
   }
 
-  async flushWorkspacePois(
-    workspaceId: string,
-  ): Promise<{ persistedPois: CachedPoi[]; newlyPersistedCount: number }> {
-    const cachedPois = await this.poiCacheService.getWorkspacePois(workspaceId);
-    if (cachedPois.length === 0) {
-      return { persistedPois: [], newlyPersistedCount: 0 };
-    }
+  async flushConnections(workspaceId: string) {
+    const connections: CachePoiConnection[] =
+      await this.poiConnectionCacheService.getPoiConnections(workspaceId);
 
-    const poisToPersist = cachedPois.filter((poi) => !poi.persisted);
-    const newlyPersistedCount = poisToPersist.length;
-    if (poisToPersist.length > 0) {
-      const missingPlanDay = poisToPersist.filter((poi) => !poi.planDayId);
-      if (missingPlanDay.length > 0) {
-        throw new BadRequestException(
-          '[POI Persist 실패] : 누락된 PlanDay ID가 있습니다',
-        );
-      }
+    if (connections.length === 0) return;
 
-      // 순회하면서 entity 만드록 한번에 save
-      const entities = poisToPersist.map((poi) =>
-        this.poiRepository.create({
-          longitude: poi.longitude,
-          latitude: poi.latitude,
-          address: poi.address,
-          placeName: poi.placeName ?? '',
-          createdBy: { id: poi.createdBy } as Users,
-          planDay: { id: poi.planDayId as string } as PlanDay,
-        }),
+    const connectionToPersist = connections.filter((c) => !c.isPersisted);
+
+    // todo : 이거 배치 처리하는 거 알아보기
+    if (connectionToPersist) {
+      await Promise.all(
+        connectionToPersist.map((connection) =>
+          this.poiConnectionService.persistPoiConnection(connection),
+        ),
       );
+    }
+    await this.poiConnectionCacheService.clearWorkspacePoiConnections(
+      workspaceId,
+    );
+  }
 
-      if (entities.length > 0) {
-        await this.poiRepository.save(entities);
-      }
+  async flushPois(workspaceId: string) {
+    const cachedPois: CachedPoi[] =
+      await this.poiCacheService.getWorkspacePois(workspaceId);
+
+    if (cachedPois.length === 0) return;
+
+    const poisToPersist: CachedPoi[] = cachedPois.filter(
+      (poi) => !poi.isPersisted,
+    );
+
+    if (poisToPersist) {
+      await Promise.all(
+        poisToPersist.map((poi) => this.poiService.persistPoi(poi)),
+      );
     }
 
+    // 다 저장했으면 clear
     await this.poiCacheService.clearWorkspacePois(workspaceId);
-    // todo : DTO 형식 바꾸기
-    return {
-      persistedPois: cachedPois.map((poi) => ({ ...poi, persisted: true })),
-      newlyPersistedCount,
-    };
   }
 
   async remove(id: string) {

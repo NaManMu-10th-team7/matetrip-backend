@@ -11,6 +11,7 @@ import { RedisModule } from '../../redis/redis.module.js';
 import { Poi } from './entities/poi.entity.js';
 import { PoiService } from './service/poi.service.js';
 import { PlanDayService } from './service/plan-day.service.js';
+import { PoiConnectionCacheService } from './service/poi-connection-cache.service.js';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { PlanDayService } from './service/plan-day.service.js';
     WorkspaceService,
     PoiGateway,
     PoiCacheService,
+    PoiConnectionCacheService,
     PoiService,
     PlanDayService,
   ],

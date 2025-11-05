@@ -21,6 +21,18 @@ export class PoiService {
     private readonly poiCacheService: PoiCacheService,
   ) {}
 
+  async persistPoi(cachedPoi: CachedPoi): Promise<Poi> {
+    const poi = this.poiRepository.create({
+      placeName: cachedPoi.placeName,
+      longitude: cachedPoi.longitude,
+      latitude: cachedPoi.latitude,
+      address: cachedPoi.address,
+      createdBy: { id: cachedPoi.createdBy } as Users,
+      planDay: { id: cachedPoi.planDayId as string } as PlanDay,
+    });
+    return this.poiRepository.save(poi);
+  }
+
   // workspace의 저장된 poi들 전부 반환
   // 캐시에 있다면 그대로 반환
   // 캐시에 없다면 DB에서 반환 후 캐시
@@ -48,9 +60,6 @@ export class PoiService {
         },
       },
       relations: ['createdBy', 'planDay'],
-      order: {
-        createdAt: 'ASC',
-      },
     });
 
     const cachedPois = pois.map((poi) =>
@@ -94,7 +103,7 @@ export class PoiService {
      * - 일단 persisted가 false인 애들 고르기
      * -
      */
-    const poisToPersist = cachedPois.filter((poi) => !poi.persisted);
+    const poisToPersist = cachedPois.filter((poi) => !poi.isPersisted);
     const newlyPersistedCount = poisToPersist.length;
     if (poisToPersist.length > 0) {
       const missingPlanDay = poisToPersist.filter((poi) => !poi.planDayId);

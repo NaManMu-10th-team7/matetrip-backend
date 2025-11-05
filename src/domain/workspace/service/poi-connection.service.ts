@@ -4,12 +4,17 @@ import { In, Repository } from 'typeorm';
 import { PoiConnection } from '../entities/poi-connection.entity.js';
 import { PoiConnectionCacheService } from './poi-connection-cache.service.js';
 import { PlanDayService } from './plan-day.service.js';
-import { PlanDay } from '../entities/plan-day.entity.js';
 import {
   CachePoiConnection,
   buildCachedPoiConnectionFromEntity,
 } from '../types/cached-poi-connection.js';
 import { RemovePoiConnectionDto } from '../dto/remove-poi-connection.dto.js';
+import {
+  buildGroupedPoiConncetionsDto,
+  GroupedPoiConncetionsDto,
+} from '../types/grouped-poi-conncetions.dto.js';
+import { PlanDay } from '../entities/plan-day.entity.js';
+import { Poi } from '../entities/poi.entity.js';
 
 @Injectable()
 export class PoiConnectionService {
@@ -20,48 +25,94 @@ export class PoiConnectionService {
     private readonly planDayService: PlanDayService,
   ) {}
 
+  async persistPoiConnection(
+    cachedPoiConnection: CachePoiConnection,
+  ): Promise<PoiConnection> {
+    const entity = this.poiConnectionRepository.create({
+      id: cachedPoiConnection.id,
+      distance: cachedPoiConnection.distance ?? 0,
+      duration: cachedPoiConnection.duration ?? 0,
+      prevPoi: { id: cachedPoiConnection.prevPoiId } as Poi,
+      nextPoi: { id: cachedPoiConnection.nextPoiId } as Poi,
+      planDay: { id: cachedPoiConnection.planDayId } as PlanDay,
+    });
+
+    const persisted = await this.poiConnectionRepository.save(entity);
+
+    await this.poiConnectionCacheService.upsertPoiConnection({
+      ...cachedPoiConnection,
+      isPersisted: true,
+    });
+
+    return persisted;
+  }
+
+  // 이게 문제다... ㅅㅂ
   async getAllPoiConnections(
     workspaceId: string,
-  ): Promise<CachePoiConnection[]> {
-    const planDays: PlanDay[] =
-      await this.planDayService.getWorkspacePlanDays(workspaceId);
+  ): Promise<GroupedPoiConncetionsDto> {
+    /**
+     * 일단 workspaceId에 맞는 planDay들을 찾고
+     * planDay에 맞는 poiConnection들을 찾고
+     * persistedConnections: planDay에 맞는 poiConnection들
+     */
+    // Todo : 캐시에 찾고 없으면 load
+    // const cached =
+    //   await this.poiConnectionCacheService.getAllPoiConnections(workspaceId);
+    // if (cached.length > 0) {
+    //   return cached;
+    // }
 
-    const planDayIds = planDays.map((planDay) => planDay.id);
+    // const planDays: PlanDay[] =
+    //   await this.planDayService.getWorkspacePlanDays(workspaceId);
+    //const planDayIds = planDays.map((planDay) => planDay.id);
+
+    const planDayIds =
+      await this.planDayService.getWorkspacePlanDayIds(workspaceId);
 
     if (planDayIds.length === 0) {
-      return [];
+      return {};
     }
 
-    const persistedConnections: PoiConnection[] =
+    // Todo: 성능 이슈 보임 => 나중에 최적화 시키기
+    const poiConnections: PoiConnection[] =
       await this.poiConnectionRepository.find({
         where: { planDay: { id: In(planDayIds) } },
-        relations: ['planDay'],
-        loadRelationIds: { relations: ['prevPoi', 'nextPoi'] },
+        relations: ['prevPoi', 'nextPoi', 'planDay'],
       });
 
-    const cachedPoiConnections = persistedConnections.map((connecttion) =>
-      buildCachedPoiConnectionFromEntity(connecttion),
+    const persistedConnections: CachePoiConnection[] = poiConnections.map(
+      (connection) => buildCachedPoiConnectionFromEntity(connection),
     );
 
-    await this.poiConnectionCacheService.setPoiConnections(
-      workspaceId,
-      cachedPoiConnections,
-    );
-    return cachedPoiConnections;
+    // 캐시에 저장
+    for (const connection of persistedConnections) {
+      await this.poiConnectionCacheService.setPoiConnections(connection);
+    }
+
+    return buildGroupedPoiConncetionsDto(planDayIds, persistedConnections);
   }
 
   async removePoiConnection(dto: RemovePoiConnectionDto): Promise<string> {
-    const { id, planDayId, workspaceId } = dto;
+    const { id, planDayId } = dto;
 
-    const deleteResult = await this.poiConnectionRepository.delete({
-      id: id,
+    const existing = await this.poiConnectionRepository.findOne({
+      where: { id },
     });
 
-    if (deleteResult.affected === 0) {
+    const cached = await this.poiConnectionCacheService.getPoiConnection(
+      planDayId,
+      id,
+    );
+
+    if (!existing && !cached) {
       throw new NotFoundException(`POI Connection with id ${id} not found`);
     }
 
-    // Cache 삭제
+    if (existing) {
+      await this.poiConnectionRepository.remove(existing);
+    }
+
     await this.poiConnectionCacheService.removePoiConnection(planDayId, id);
 
     return id;

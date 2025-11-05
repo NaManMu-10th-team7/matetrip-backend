@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsUUID } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
 
 export class CreatePoiConnectionDto {
   @IsUUID()
@@ -10,6 +10,7 @@ export class CreatePoiConnectionDto {
   @IsUUID()
   nextPoiId: string;
 
+  @IsNotEmpty()
   @IsUUID()
   planDayId: string;
 
