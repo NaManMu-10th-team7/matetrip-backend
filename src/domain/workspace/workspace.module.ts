@@ -12,10 +12,12 @@ import { Poi } from './entities/poi.entity.js';
 import { PoiService } from './service/poi.service.js';
 import { PlanDayService } from './service/plan-day.service.js';
 import { PoiConnectionCacheService } from './service/poi-connection-cache.service.js';
+import { PoiConnectionService } from './service/poi-connection.service.js';
+import { PoiConnection } from './entities/poi-connection.entity.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Workspace, PlanDay, Poi]),
+    TypeOrmModule.forFeature([Workspace, PlanDay, Poi, PoiConnection]),
     PostModule,
     RedisModule,
   ],
@@ -27,6 +29,7 @@ import { PoiConnectionCacheService } from './service/poi-connection-cache.servic
     PoiConnectionCacheService,
     PoiService,
     PlanDayService,
+    PoiConnectionService,
   ],
 })
 export class WorkspaceModule {}

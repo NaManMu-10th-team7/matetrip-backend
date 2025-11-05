@@ -175,15 +175,12 @@ export class PoiGateway {
   ) {
     try {
       // todo : flushPoiConnections
-      const { persistedPois, newlyPersistedCount } =
-        await this.workspaceService.flushPois(data.workspaceId);
+      await this.workspaceService.flushPois(data.workspaceId);
       await this.workspaceService.flushConnections(data.workspaceId);
 
       // 일단은 log는 Poi만
-      this.logger.log(`Flushed Counter:  + ${newlyPersistedCount}`);
-      this.logger.log(
-        `Workspace ${data.workspaceId} flushed POIs (newly persisted: ${newlyPersistedCount})`,
-      );
+      this.logger.log(`Workspace ${data.workspaceId} flushed POIs `);
+      this.logger.log(`Workspace ${data.workspaceId} flushed POIConnections `);
     } catch {
       this.logger.error(
         `Socket ${socket.id} failed to flush workspace ${data.workspaceId}`,
