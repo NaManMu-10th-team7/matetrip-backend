@@ -213,12 +213,13 @@ export class PoiGateway {
     @MessageBody() data: RemovePoiConnectionDto,
   ) {
     try {
-      const removed = await this.poiConnectionService.removePoiConnection(data);
+      const removedId =
+        await this.poiConnectionService.removePoiConnection(data);
 
-      socket.emit(PoiSocketEvent.DISCONNECTED, removed.id);
+      socket.emit(PoiSocketEvent.DISCONNECTED, removedId);
       socket.broadcast
-        .to(removed.workspaceId)
-        .emit(PoiSocketEvent.DISCONNECTED, removed.id);
+        .to(data.workspaceId)
+        .emit(PoiSocketEvent.DISCONNECTED, `removed connection ${removedId}`);
     } catch {
       this.logger.error(
         `Socket ${socket.id} failed to disconnect from POI connection`,

@@ -50,9 +50,7 @@ export class PoiConnectionService {
     return cachedPoiConnections;
   }
 
-  async removePoiConnection(
-    dto: RemovePoiConnectionDto,
-  ): Promise<{ id: string; planDayId: string; workspaceId: string }> {
+  async removePoiConnection(dto: RemovePoiConnectionDto): Promise<string> {
     const { id, planDayId, workspaceId } = dto;
 
     const deleteResult = await this.poiConnectionRepository.delete({
@@ -64,9 +62,8 @@ export class PoiConnectionService {
     }
 
     // Cache 삭제
+    await this.poiConnectionCacheService.removePoiConnection(planDayId, id);
 
-    return {
-      id,
-    };
+    return id;
   }
 }
