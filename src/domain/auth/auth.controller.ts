@@ -9,18 +9,19 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { AuthGuard } from '@nestjs/passport';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UserPayloadDto } from '../users/dto/user.payload.dto';
 import { type Response } from 'express';
+import { LocalAuthGuard } from './local_auth.guard';
+import { JwtAuthGuard } from './jwt_auth.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   // 로그인 API POST /auth/login
-  // 'local' 전략 가드 적용
-  @UseGuards(AuthGuard('local'))
+  // LocalAuthGuard 적용 (OPTIONS 요청 허용)
+  @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK) // 로그인 성공 시 200 OK 상태 코드 반환
   async login(
@@ -51,7 +52,7 @@ export class AuthController {
   }
 
   // 로그아웃 API POST /auth/logout
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   logout(@Res({ passthrough: true }) res: Response): { message: string } {
