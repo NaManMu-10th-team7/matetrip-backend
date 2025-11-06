@@ -14,25 +14,25 @@ export class PlanDayService {
     private readonly planDayRepository: Repository<PlanDay>,
   ) {}
 
-  createPlanDays(
+  async createPlanDays(
     workspace: Workspace,
     startDate?: string,
     endDate?: string | null,
-  ): PlanDayResDto[] {
+  ): Promise<PlanDayResDto[]> {
     if (!startDate || !endDate) return [];
 
     const start = parseISO(startDate);
     const end = parseISO(endDate);
 
     const days = eachDayOfInterval({ start, end });
-
     const plandays: PlanDay[] = days.map((date, i) =>
       this.planDayRepository.create({
         dayNo: i + 1,
         planDate: format(date, 'yyyy-MM-dd'),
-        workspace,
+        workspace: { id: workspace.id } as Workspace,
       }),
     );
+    await this.planDayRepository.insert(plandays);
 
     return plandays.map((planday) => this.toPlanDayResDto(planday));
   }
