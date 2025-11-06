@@ -1,4 +1,4 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { CreatePoiDto } from './create-poi.dto';
+import { CreatePoiReqDto } from './create-poi-req.dto';
 
-export class UpdatePoiDto extends PartialType(CreatePoiDto) {}
+export class UpdatePoiDto extends PartialType(CreatePoiReqDto) {}

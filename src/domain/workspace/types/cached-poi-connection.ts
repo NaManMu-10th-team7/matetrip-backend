@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { CreatePoiConnectionDto } from '../dto/poi/create-poi-connection.dto.js';
+import { CreatePoiConnectionReqDto } from '../dto/poi/create-poi-connection-req.dto.js';
 import { PoiConnection } from '../entities/poi-connection.entity.js';
 
 export interface CachePoiConnection {
@@ -13,7 +13,7 @@ export interface CachePoiConnection {
 }
 
 export const buildCachedPoiConnection = (
-  dto: CreatePoiConnectionDto,
+  dto: CreatePoiConnectionReqDto,
 ): CachePoiConnection => ({
   id: randomUUID(),
   prevPoiId: dto.prevPoiId,

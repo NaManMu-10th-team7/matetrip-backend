@@ -7,10 +7,10 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { JoinChatDto } from '../dto/chat/join-chat.dto.js';
+import { JoinChatReqDto } from '../dto/chat/join-chat-req.dto.js';
 import { CreateMessageReqDto } from '../dto/chat/create-message-req.dto.js';
 import { WorkspaceService } from '../service/workspace.service.js';
-import { LeaveChatDto } from '../dto/chat/leave-chat.dto.js';
+import { LeaveChatReqDto } from '../dto/chat/leave-chat-req.dto.js';
 
 const ChatEvent = {
   JOIN: 'join',
@@ -47,7 +47,7 @@ export class ChatGateway {
   @SubscribeMessage(ChatEvent.JOIN)
   async handleJoin(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: JoinChatDto,
+    @MessageBody() data: JoinChatReqDto,
   ) {
     console.log(`join 요청 받었습니다`);
     const isExist = await this.workspaceService.isExist(data.workspaceId);
@@ -75,7 +75,7 @@ export class ChatGateway {
   @SubscribeMessage(ChatEvent.LEAVE)
   async handleLeave(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: LeaveChatDto,
+    @MessageBody() data: LeaveChatReqDto,
   ) {
     try {
       await socket.leave(this.getChatRoomName(data.workspaceId));

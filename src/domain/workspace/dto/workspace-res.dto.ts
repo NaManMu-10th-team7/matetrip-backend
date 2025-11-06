@@ -1,6 +1,6 @@
 import { Expose } from 'class-transformer';
 
-export class WorkspaceResponseDto {
+export class WorkspaceResDto {
   @Expose()
   id: string;
   @Expose()

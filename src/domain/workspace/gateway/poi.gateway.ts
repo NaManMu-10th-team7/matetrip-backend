@@ -8,12 +8,12 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { SocketPoiDto } from '../dto/poi/socket-poi.dto.js';
-import { CreatePoiDto } from '../dto/poi/create-poi.dto.js';
+import { CreatePoiReqDto } from '../dto/poi/create-poi-req.dto.js';
 import { WorkspaceService } from '../service/workspace.service.js';
-import { RemovePoiDto } from '../dto/poi/remove-poi.dto.js';
+import { RemovePoiReqDto } from '../dto/poi/remove-poi.dto.js';
 import { PoiService } from '../service/poi.service.js';
-import { CreatePoiConnectionDto } from '../dto/poi/create-poi-connection.dto.js';
-import { RemovePoiConnectionDto } from '../dto/poi/remove-poi-connection.dto.js';
+import { CreatePoiConnectionReqDto } from '../dto/poi/create-poi-connection-req.dto.js';
+import { RemovePoiConnectionReqDto } from '../dto/poi/remove-poi-connection-req.dto.js';
 import { PoiConnectionService } from '../service/poi-connection.service.js';
 import { CachedPoi } from '../types/cached-poi.js';
 import { GroupedPoiConnectionsDto } from '../types/grouped-poi-conncetions.dto.js';
@@ -108,7 +108,7 @@ export class PoiGateway {
   @SubscribeMessage(PoiSocketEvent.MARK)
   async handlePoiMark(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: CreatePoiDto,
+    @MessageBody() data: CreatePoiReqDto,
   ) {
     try {
       if (!socket.rooms.has(data.workspaceId)) {
@@ -140,7 +140,7 @@ export class PoiGateway {
   @SubscribeMessage(PoiSocketEvent.UNMARK)
   async handlePoiUnmark(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: RemovePoiDto,
+    @MessageBody() data: RemovePoiReqDto,
   ) {
     try {
       const removedPoi = await this.poiService.removeWorkspacePoi(
@@ -193,7 +193,7 @@ export class PoiGateway {
   @SubscribeMessage(PoiSocketEvent.CONNECT)
   async handlePoiConnection(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: CreatePoiConnectionDto,
+    @MessageBody() data: CreatePoiConnectionReqDto,
   ) {
     try {
       if (!socket.rooms.has(data.workspaceId)) {
@@ -225,7 +225,7 @@ export class PoiGateway {
   @SubscribeMessage(PoiSocketEvent.DISCONNECT)
   async handlePoiDisConnection(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: RemovePoiConnectionDto,
+    @MessageBody() data: RemovePoiConnectionReqDto,
   ) {
     try {
       const removedId =

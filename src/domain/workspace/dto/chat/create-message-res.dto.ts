@@ -1,4 +1,4 @@
-export class ChatMessageResDto {
+export class CreateMessageResDto {
   username: string;
   message: string;
 }

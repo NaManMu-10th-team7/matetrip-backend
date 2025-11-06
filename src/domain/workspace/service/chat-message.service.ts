@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { CreateChatMessageDto } from '../chat-message/dto/create-chat-message.dto';
-import { UpdateChatMessageDto } from '../dto/chat/update-chat-message.dto';
+import { UpdateChatMessageReqDto } from '../dto/chat/update-chat-message-req.dto';
+import { CreateMessageReqDto } from '../dto/chat/create-message-req.dto.js';
 
 @Injectable()
 export class ChatMessageService {
-  create(createChatMessageDto: CreateChatMessageDto) {
+  create(createChatMessageDto: CreateMessageReqDto) {
     return 'This action adds a new chatMessage';
   }
 
@@ -16,7 +16,7 @@ export class ChatMessageService {
     return `This action returns a #${id} chatMessage`;
   }
 
-  update(id: number, updateChatMessageDto: UpdateChatMessageDto) {
+  update(id: number, updateChatMessageDto: UpdateChatMessageReqDto) {
     return `This action updates a #${id} chatMessage`;
   }
 

@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
 
-export class LeaveChatDto {
+export class JoinChatReqDto {
   @IsNotEmpty()
   @IsUUID()
   workspaceId: string;

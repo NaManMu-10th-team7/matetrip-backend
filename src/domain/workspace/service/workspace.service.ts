@@ -3,20 +3,20 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateWorkspaceDto } from '../dto/create-workspace.dto';
+import { CreateWorkspaceReqDto } from '../dto/create-workspace-req.dto';
 import { PostService } from '../../post/post.service.js';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Workspace } from '../entities/workspace.entity.js';
 import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
-import { WorkspaceResponseDto } from '../dto/workspace-response.dto.js';
+import { WorkspaceResDto } from '../dto/workspace-res.dto.js';
 import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from '../entities/plan-day.entity.js';
-import { CreatePoiDto } from '../dto/poi/create-poi.dto.js';
+import { CreatePoiReqDto } from '../dto/poi/create-poi-req.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
 import { CachedPoi, buildCachedPoi } from '../types/cached-poi.js';
 import { PlanDayService } from './plan-day.service.js';
-import { CreatePoiConnectionDto } from '../dto/poi/create-poi-connection.dto.js';
+import { CreatePoiConnectionReqDto } from '../dto/poi/create-poi-connection-req.dto.js';
 import {
   buildCachedPoiConnection,
   CachePoiConnection,
@@ -44,7 +44,7 @@ export class WorkspaceService {
   ) {}
 
   @Transactional()
-  async create(createWorkspaceDto: CreateWorkspaceDto) {
+  async create(createWorkspaceDto: CreateWorkspaceReqDto) {
     /**
      * 1. postId에 맞는 workSpace가 있는지 확인
      * 2. 있으면 그에 맞는 workSpace 그대로 반환
@@ -89,14 +89,17 @@ export class WorkspaceService {
     return this.toWorkspaceResponseDto(savedWorkspace);
   }
 
-  async cachePoi(workspaceId: string, dto: CreatePoiDto): Promise<CachedPoi> {
+  async cachePoi(
+    workspaceId: string,
+    dto: CreatePoiReqDto,
+  ): Promise<CachedPoi> {
     const cachedPoi: CachedPoi = buildCachedPoi(workspaceId, dto);
     await this.poiCacheService.upsertPoi(workspaceId, cachedPoi);
     return cachedPoi;
   }
 
   async cachePoiConnection(
-    dto: CreatePoiConnectionDto,
+    dto: CreatePoiConnectionReqDto,
   ): Promise<CachePoiConnection> {
     const planDay = await this.planDayService.getPlanDayWithWorkspace(
       dto.planDayId,
@@ -191,7 +194,7 @@ export class WorkspaceService {
       throw new NotFoundException("Workspace doesn't exist");
     }
 
-    return plainToInstance(WorkspaceResponseDto, workspace, {
+    return plainToInstance(WorkspaceResDto, workspace, {
       excludeExtraneousValues: true,
     });
   }
