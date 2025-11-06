@@ -1,4 +1,4 @@
-export class CreateMessageResDto {
+export class ChatMessageResDto {
   readonly username: string;
   readonly message: string;
 
@@ -7,7 +7,7 @@ export class CreateMessageResDto {
     this.message = message;
   }
 
-  static of(username: string, message: string): CreateMessageResDto {
-    return new CreateMessageResDto(username, message);
+  static of(username: string, message: string): ChatMessageResDto {
+    return new ChatMessageResDto(username, message);
   }
 }

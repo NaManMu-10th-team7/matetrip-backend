@@ -17,6 +17,7 @@ import { PoiConnection } from './entities/poi-connection.entity.js';
 import { PostParticipation } from '../post-participation/entities/post-participation.entity.js';
 import { ChatGateway } from './gateway/chat.gateway.js';
 import { ChatMessageService } from './service/chat-message.service.js';
+import { ChatMessage } from './entities/chat-message.entity.js';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ChatMessageService } from './service/chat-message.service.js';
       Poi,
       PoiConnection,
       PostParticipation,
+      ChatMessage,
     ]),
     PostModule,
     RedisModule,

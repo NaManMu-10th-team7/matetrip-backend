@@ -11,7 +11,7 @@ import { JoinChatReqDto } from '../dto/chat/join-chat-req.dto.js';
 import { CreateMessageReqDto } from '../dto/chat/create-message-req.dto.js';
 import { WorkspaceService } from '../service/workspace.service.js';
 import { LeaveChatReqDto } from '../dto/chat/leave-chat-req.dto.js';
-import { CreateMessageResDto } from '../dto/chat/create-message-res.dto.js';
+import { ChatMessageResDto } from '../dto/chat/chat-message-res.dto.js';
 import { ChatConnectionReqDto } from '../dto/chat/connect-chat-req.dto.js';
 
 const ChatEvent = {
@@ -42,13 +42,12 @@ export class ChatGateway {
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: CreateMessageReqDto,
   ) {
-    // TODO 메시지 구현
-
+    // TODO 메시지 캐시로할지 고민(휘발성 or 영구저장)
     socket.broadcast
       .to(this.getChatRoomName(data.workspaceId))
       .emit(
         ChatEvent.JOINED,
-        JSON.stringify(CreateMessageResDto.of(data.username, data.message)),
+        JSON.stringify(ChatMessageResDto.of(data.username, data.message)),
       ); // 일단은 그냥 넘기자
   }
 

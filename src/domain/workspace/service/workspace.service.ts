@@ -82,12 +82,12 @@ export class WorkspaceService {
 
     const savedWorkspace = await this.workspaceRepository.save(workspace);
 
+    // plan_day 생성
     const planDayDtos: PlanDayResDto[] = this.planDayService.createPlanDays(
       savedWorkspace,
       postDto.startDate,
       postDto.endDate,
     );
-    // plan_day 생성
 
     if (planDayDtos && planDayDtos.length > 0) {
       await this.planDayRepository.save(planDayDtos);
