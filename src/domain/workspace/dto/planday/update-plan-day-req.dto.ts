@@ -1,4 +1,4 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { CreatePlanDayReqDto } from './create-plan-day-req.dto';
+import { CreatePlanDayDto } from '../create-plan-day.dto.js';
 
-export class UpdatePlanDayReqDto extends PartialType(CreatePlanDayReqDto) {}
+export class UpdatePlanDayReqDto extends PartialType(CreatePlanDayDto) {}
