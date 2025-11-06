@@ -56,22 +56,20 @@ export class PoiConnectionService {
      * planDay에 맞는 poiConnection들을 찾고
      * persistedConnections: planDay에 맞는 poiConnection들
      */
-    // Todo : 캐시에 찾고 없으면 load
-    // const cached =
-    //   await this.poiConnectionCacheService.getAllPoiConnections(workspaceId);
-    // if (cached.length > 0) {
-    //   return cached;
-    // }
-
-    // const planDays: PlanDay[] =
-    //   await this.planDayService.getWorkspacePlanDays(workspaceId);
-    //const planDayIds = planDays.map((planDay) => planDay.id);
-
     const planDayIds =
       await this.planDayService.getWorkspacePlanDayIds(workspaceId);
 
     if (planDayIds.length === 0) {
       return {};
+    }
+
+    const cachedPoiConnections: CachePoiConnection[] =
+      await this.poiConnectionCacheService.getPoiConnectionsByPlanDayList(
+        planDayIds,
+      );
+
+    if (cachedPoiConnections.length > 0) {
+      return buildGroupedPoiConnectionsDto(planDayIds, cachedPoiConnections);
     }
 
     // Todo: 성능 이슈 보임 => 나중에 최적화 시키기
