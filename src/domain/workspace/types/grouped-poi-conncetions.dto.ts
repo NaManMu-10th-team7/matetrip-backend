@@ -1,4 +1,4 @@
-import { PoiConnectionResponseDto } from '../dto/poi-connection-response.dto.js';
+import { PoiConnectionResponseDto } from '../dto/poi/poi-connection-response.dto.js';
 
 export type GroupedPoiConnectionsDto = Record<
   string,

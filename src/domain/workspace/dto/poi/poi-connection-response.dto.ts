@@ -1,4 +1,4 @@
-import { PoiConnection } from '../entities/poi-connection.entity.js';
+import { PoiConnection } from '../../entities/poi-connection.entity.js';
 
 export interface PoiConnectionResponseDto {
   planDayId: string;

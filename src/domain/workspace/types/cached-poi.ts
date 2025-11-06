@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { CreatePoiDto } from '../dto/create-poi.dto.js';
+import { CreatePoiDto } from '../dto/poi/create-poi.dto.js';
 import { Poi } from '../entities/poi.entity.js';
 
 export interface CachedPoi {

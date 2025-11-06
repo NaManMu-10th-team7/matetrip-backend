@@ -8,7 +8,7 @@ import {
   CachePoiConnection,
   buildCachedPoiConnectionFromEntity,
 } from '../types/cached-poi-connection.js';
-import { RemovePoiConnectionDto } from '../dto/remove-poi-connection.dto.js';
+import { RemovePoiConnectionDto } from '../dto/poi/remove-poi-connection.dto.js';
 import {
   buildGroupedPoiConnectionsDto,
   GroupedPoiConnectionsDto,

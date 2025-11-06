@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -7,13 +7,13 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { SocketPoiDto } from '../dto/socket-poi.dto.js';
-import { CreatePoiDto } from '../dto/create-poi.dto.js';
+import { SocketPoiDto } from '../dto/poi/socket-poi.dto.js';
+import { CreatePoiDto } from '../dto/poi/create-poi.dto.js';
 import { WorkspaceService } from '../service/workspace.service.js';
-import { RemovePoiDto } from '../dto/remove-poi.dto.js';
+import { RemovePoiDto } from '../dto/poi/remove-poi.dto.js';
 import { PoiService } from '../service/poi.service.js';
-import { CreatePoiConnectionDto } from '../dto/create-poi-connection.dto.js';
-import { RemovePoiConnectionDto } from '../dto/remove-poi-connection.dto.js';
+import { CreatePoiConnectionDto } from '../dto/poi/create-poi-connection.dto.js';
+import { RemovePoiConnectionDto } from '../dto/poi/remove-poi-connection.dto.js';
 import { PoiConnectionService } from '../service/poi-connection.service.js';
 import { CachedPoi } from '../types/cached-poi.js';
 import { GroupedPoiConnectionsDto } from '../types/grouped-poi-conncetions.dto.js';
@@ -36,6 +36,7 @@ const PoiSocketEvent = {
   DISCONNECTED: 'disconnected',
 } as const;
 
+@UsePipes(new ValidationPipe())
 @WebSocketGateway(3003, {
   namespace: 'poi',
   cors: {

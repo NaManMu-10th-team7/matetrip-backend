@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { CreatePoiConnectionDto } from '../dto/create-poi-connection.dto.js';
+import { CreatePoiConnectionDto } from '../dto/poi/create-poi-connection.dto.js';
 import { PoiConnection } from '../entities/poi-connection.entity.js';
 
 export interface CachePoiConnection {

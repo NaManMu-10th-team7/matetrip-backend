@@ -12,11 +12,11 @@ import { plainToInstance } from 'class-transformer';
 import { WorkspaceResponseDto } from '../dto/workspace-response.dto.js';
 import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from '../entities/plan-day.entity.js';
-import { CreatePoiDto } from '../dto/create-poi.dto.js';
+import { CreatePoiDto } from '../dto/poi/create-poi.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
 import { CachedPoi, buildCachedPoi } from '../types/cached-poi.js';
 import { PlanDayService } from './plan-day.service.js';
-import { CreatePoiConnectionDto } from '../dto/create-poi-connection.dto.js';
+import { CreatePoiConnectionDto } from '../dto/poi/create-poi-connection.dto.js';
 import {
   buildCachedPoiConnection,
   CachePoiConnection,
