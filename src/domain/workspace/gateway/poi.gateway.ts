@@ -7,16 +7,16 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { SocketPoiDto } from './dto/socket-poi.dto.js';
-import { CreatePoiDto } from './dto/create-poi.dto.js';
-import { WorkspaceService } from './service/workspace.service.js';
-import { RemovePoiDto } from './dto/remove-poi.dto.js';
-import { PoiService } from './service/poi.service.js';
-import { CreatePoiConnectionDto } from './dto/create-poi-connection.dto.js';
-import { RemovePoiConnectionDto } from './dto/remove-poi-connection.dto.js';
-import { PoiConnectionService } from './service/poi-connection.service.js';
-import { CachedPoi } from './types/cached-poi.js';
-import { GroupedPoiConnectionsDto } from './types/grouped-poi-conncetions.dto.js';
+import { SocketPoiDto } from '../dto/socket-poi.dto.js';
+import { CreatePoiDto } from '../dto/create-poi.dto.js';
+import { WorkspaceService } from '../service/workspace.service.js';
+import { RemovePoiDto } from '../dto/remove-poi.dto.js';
+import { PoiService } from '../service/poi.service.js';
+import { CreatePoiConnectionDto } from '../dto/create-poi-connection.dto.js';
+import { RemovePoiConnectionDto } from '../dto/remove-poi-connection.dto.js';
+import { PoiConnectionService } from '../service/poi-connection.service.js';
+import { CachedPoi } from '../types/cached-poi.js';
+import { GroupedPoiConnectionsDto } from '../types/grouped-poi-conncetions.dto.js';
 
 const PoiSocketEvent = {
   JOIN: 'join',
@@ -63,7 +63,7 @@ export class PoiGateway {
   ) {
     // todo : 보안 체크
     try {
-      await socket.join(data.workspaceId);
+      await socket.join(this.getPoiRoomName(data.workspaceId));
       socket.emit(PoiSocketEvent.JOINED, {
         workspaceId: data.workspaceId,
       });
@@ -92,7 +92,7 @@ export class PoiGateway {
     @MessageBody() data: SocketPoiDto,
   ) {
     try {
-      await socket.leave(data.workspaceId);
+      await socket.leave(this.getPoiRoomName(data.workspaceId));
       socket.emit(PoiSocketEvent.LEFT, {
         workspaceId: data.workspaceId,
       });
@@ -239,5 +239,9 @@ export class PoiGateway {
         `Socket ${socket.id} failed to disconnect from POI connection`,
       );
     }
+  }
+
+  private getPoiRoomName(workspaceId: string) {
+    return `poi:${workspaceId}`;
   }
 }

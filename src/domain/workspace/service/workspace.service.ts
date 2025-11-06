@@ -169,6 +169,12 @@ export class WorkspaceService {
     await this.poiCacheService.clearWorkspacePois(workspaceId);
   }
 
+  async isExist(workspaceId: string): Promise<boolean> {
+    return await this.workspaceRepository.existsBy({
+      id: workspaceId,
+    });
+  }
+
   async remove(id: string) {
     await this.workspaceRepository.delete(id);
   }
