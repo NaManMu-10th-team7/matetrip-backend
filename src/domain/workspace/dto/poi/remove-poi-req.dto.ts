@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsUUID } from 'class-validator';
 
-export class RemovePoiDto {
+export class RemovePoiReqDto {
   @IsUUID()
   @IsNotEmpty()
   workspaceId: string;

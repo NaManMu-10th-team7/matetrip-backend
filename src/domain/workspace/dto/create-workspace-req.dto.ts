@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsUUID } from 'class-validator';
 
-export class CreateWorkspaceDto {
+export class CreateWorkspaceReqDto {
   @IsUUID()
   @IsNotEmpty()
   postId: string;

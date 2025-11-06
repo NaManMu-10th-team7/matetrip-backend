@@ -7,7 +7,7 @@ import {
   IsUUID,
 } from 'class-validator';
 
-export class CreatePoiDto {
+export class CreatePoiReqDto {
   @IsUUID()
   @IsNotEmpty()
   workspaceId: string;

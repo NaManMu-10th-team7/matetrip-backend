@@ -8,7 +8,7 @@ import {
   CachePoiConnection,
   buildCachedPoiConnectionFromEntity,
 } from '../types/cached-poi-connection.js';
-import { RemovePoiConnectionDto } from '../dto/remove-poi-connection.dto.js';
+import { RemovePoiConnectionReqDto } from '../dto/poi/remove-poi-connection-req.dto.js';
 import {
   buildGroupedPoiConnectionsDto,
   GroupedPoiConnectionsDto,
@@ -93,7 +93,7 @@ export class PoiConnectionService {
     return buildGroupedPoiConnectionsDto(planDayIds, persistedConnections);
   }
 
-  async removePoiConnection(dto: RemovePoiConnectionDto): Promise<string> {
+  async removePoiConnection(dto: RemovePoiConnectionReqDto): Promise<string> {
     const { id, planDayId } = dto;
 
     const existing = await this.poiConnectionRepository.findOne({

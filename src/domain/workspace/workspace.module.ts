@@ -5,7 +5,7 @@ import { Workspace } from './entities/workspace.entity.js';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PlanDay } from './entities/plan-day.entity.js';
 import { PostModule } from '../post/post.module.js';
-import { PoiGateway } from './poi.gateway.js';
+import { PoiGateway } from './gateway/poi.gateway.js';
 import { PoiCacheService } from './service/poi-cache.service.js';
 import { RedisModule } from '../../redis/redis.module.js';
 import { Poi } from './entities/poi.entity.js';
@@ -15,6 +15,7 @@ import { PoiConnectionCacheService } from './service/poi-connection-cache.servic
 import { PoiConnectionService } from './service/poi-connection.service.js';
 import { PoiConnection } from './entities/poi-connection.entity.js';
 import { PostParticipation } from '../post-participation/entities/post-participation.entity.js';
+import { ChatGateway } from './gateway/chat.gateway.js';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { PostParticipation } from '../post-participation/entities/post-participa
   providers: [
     WorkspaceService,
     PoiGateway,
+    ChatGateway,
     PoiCacheService,
     PoiConnectionCacheService,
     PoiService,
