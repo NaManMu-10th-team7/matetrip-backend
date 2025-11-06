@@ -11,6 +11,7 @@ import { JoinChatReqDto } from '../dto/chat/join-chat-req.dto.js';
 import { CreateMessageReqDto } from '../dto/chat/create-message-req.dto.js';
 import { WorkspaceService } from '../service/workspace.service.js';
 import { LeaveChatReqDto } from '../dto/chat/leave-chat-req.dto.js';
+import { CreateMessageResDto } from '../dto/chat/create-message-res.dto.js';
 
 const ChatEvent = {
   JOIN: 'join',
@@ -39,9 +40,13 @@ export class ChatGateway {
     @MessageBody() data: CreateMessageReqDto,
   ) {
     // TODO 메시지 구현
+
     socket.broadcast
       .to(this.getChatRoomName(data.workspaceId))
-      .emit(ChatEvent.JOINED, { data }); // 일단은 그냥 넘기자
+      .emit(
+        ChatEvent.JOINED,
+        JSON.stringify(CreateMessageResDto.of(data.username, data.message)),
+      ); // 일단은 그냥 넘기자
   }
 
   @SubscribeMessage(ChatEvent.JOIN)

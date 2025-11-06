@@ -10,13 +10,13 @@ import { Server, Socket } from 'socket.io';
 import { SocketPoiDto } from '../dto/poi/socket-poi.dto.js';
 import { CreatePoiReqDto } from '../dto/poi/create-poi-req.dto.js';
 import { WorkspaceService } from '../service/workspace.service.js';
-import { RemovePoiReqDto } from '../dto/poi/remove-poi.dto.js';
 import { PoiService } from '../service/poi.service.js';
 import { CreatePoiConnectionReqDto } from '../dto/poi/create-poi-connection-req.dto.js';
 import { RemovePoiConnectionReqDto } from '../dto/poi/remove-poi-connection-req.dto.js';
 import { PoiConnectionService } from '../service/poi-connection.service.js';
 import { CachedPoi } from '../types/cached-poi.js';
 import { GroupedPoiConnectionsDto } from '../types/grouped-poi-conncetions.dto.js';
+import { RemovePoiReqDto } from '../dto/poi/remove-poi-req.dto.js';
 
 const PoiSocketEvent = {
   JOIN: 'join',
