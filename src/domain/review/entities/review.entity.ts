@@ -30,7 +30,12 @@ export class Review extends BaseTimestampEntity {
   reviewee!: Users;
 
   /** 평점 NUMERIC(10,1) → 코드상 number로 사용 */
-  @Column({ type: 'numeric', precision: 10, scale: 1, transformer: decimalToNumber })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 1,
+    transformer: decimalToNumber,
+  })
   rating!: number;
 
   /** 내용 TEXT */

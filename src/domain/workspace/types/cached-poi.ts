@@ -11,7 +11,7 @@ export interface CachedPoi {
   latitude: number;
   address: string;
   placeName?: string;
-  persisted: boolean;
+  isPersisted: boolean;
 }
 
 export const buildCachedPoi = (
@@ -26,7 +26,7 @@ export const buildCachedPoi = (
   latitude: dto.latitude,
   address: dto.address,
   placeName: dto.placeName,
-  persisted: false,
+  isPersisted: false,
 });
 
 export const buildCachedPoiFromEntity = (
@@ -41,5 +41,5 @@ export const buildCachedPoiFromEntity = (
   latitude: poi.latitude,
   address: poi.address,
   placeName: poi.placeName,
-  persisted: true,
+  isPersisted: true,
 });

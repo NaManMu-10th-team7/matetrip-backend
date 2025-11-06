@@ -4,17 +4,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Poi } from './entities/poi.entity.js';
+import { Poi } from '../entities/poi.entity.js';
 import { In, Repository } from 'typeorm';
-import { CreatePoiDto } from './dto/create-poi.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
-import {
-  buildCachedPoi,
-  buildCachedPoiFromEntity,
-  CachedPoi,
-} from './types/cached-poi.js';
-import { Users } from '../users/entities/users.entity.js';
-import { PlanDay } from './entities/plan-day.entity.js';
+import { buildCachedPoiFromEntity, CachedPoi } from '../types/cached-poi.js';
+import { Users } from '../../users/entities/users.entity.js';
+import { PlanDay } from '../entities/plan-day.entity.js';
 import { PlanDayService } from './plan-day.service.js';
 
 @Injectable()
@@ -26,8 +21,16 @@ export class PoiService {
     private readonly poiCacheService: PoiCacheService,
   ) {}
 
-  async createPoi(workspaceId: string, dto: CreatePoiDto) {
-    return this.cachePoi(workspaceId, dto);
+  async persistPoi(cachedPoi: CachedPoi): Promise<Poi> {
+    const poi = this.poiRepository.create({
+      placeName: cachedPoi.placeName,
+      longitude: cachedPoi.longitude,
+      latitude: cachedPoi.latitude,
+      address: cachedPoi.address,
+      createdBy: { id: cachedPoi.createdBy } as Users,
+      planDay: { id: cachedPoi.planDayId as string } as PlanDay,
+    });
+    return this.poiRepository.save(poi);
   }
 
   // workspace의 저장된 poi들 전부 반환
@@ -57,9 +60,6 @@ export class PoiService {
         },
       },
       relations: ['createdBy', 'planDay'],
-      order: {
-        createdAt: 'ASC',
-      },
     });
 
     const cachedPois = pois.map((poi) =>
@@ -103,7 +103,7 @@ export class PoiService {
      * - 일단 persisted가 false인 애들 고르기
      * -
      */
-    const poisToPersist = cachedPois.filter((poi) => !poi.persisted);
+    const poisToPersist = cachedPois.filter((poi) => !poi.isPersisted);
     const newlyPersistedCount = poisToPersist.length;
     if (poisToPersist.length > 0) {
       const missingPlanDay = poisToPersist.filter((poi) => !poi.planDayId);
@@ -133,17 +133,5 @@ export class PoiService {
       persistedPois: cachedPois.map((poi) => ({ ...poi, persisted: true })),
       newlyPersistedCount,
     };
-  }
-
-  private async cachePoi(
-    workspaceId: string,
-    dto: CreatePoiDto,
-  ): Promise<CachedPoi> {
-    // cachedPoi 전용 DTO 변환
-    const cachedPoi = buildCachedPoi(workspaceId, dto);
-
-    // Redis에 저장
-    await this.poiCacheService.upsertPoi(workspaceId, cachedPoi);
-    return cachedPoi;
   }
 }

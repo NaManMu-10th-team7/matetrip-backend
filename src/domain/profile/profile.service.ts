@@ -4,12 +4,36 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not } from 'typeorm';
+import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Profile } from './entities/profile.entity';
 import { Users } from '../users/entities/users.entity';
+import { GENDER } from './entities/gender.enum';
+import { TravelStyleType } from './entities/travel-style-type.enum';
+import { TendencyType } from './entities/tendency-type.enum';
 import { ProfilePayloadDto } from './dto/profile.payload.dto'; // 변경된 DTO 임포트
 import { plainToInstance } from 'class-transformer';
+import { BinaryContentService } from '../binary-content/binary-content.service';
+import { BinaryContent } from '../binary-content/entities/binary-content.entity';
+
+/**
+ * 클라이언트에 반환되는 프로필 정보 형태
+ * - DB의 Profile 엔티티에서 필요한 필드만 선택적으로 포함합니다.
+ * - user, profileImage 관계를 id 형태로 단순화시켜 외부 노출을 최소화합니다.
+ */
+export interface ProfileResponseDto {
+  id: string; // Profile ID
+  nickname: string;
+  gender: GENDER;
+  description: string;
+  travelStyles: TravelStyleType[];
+  travelTendency: TendencyType[];
+  userId: string;
+  profileImageId: string | null;
+  createdAt: Date;
+  updatedAt: Date | null;
+}
 
 @Injectable()
 export class ProfileService {
@@ -18,7 +42,105 @@ export class ProfileService {
     private readonly profileRepository: Repository<Profile>,
     @InjectRepository(Users)
     private readonly usersRepository: Repository<Users>,
+
+    private readonly binaryContentService: BinaryContentService,
+    @InjectRepository(BinaryContent)
+    private readonly binaryContentRepository: Repository<BinaryContent>,
   ) {}
+
+  /**
+   * Entity → DTO 변환 함수
+   * - Profile 엔티티를 클라이언트에 반환 가능한 ProfileResponseDto 형태로 변환합니다.
+   * - user 객체 전체가 아니라 user.id만 포함시켜 외부 노출 범위를 제한
+   */
+  private toResponseDto(profile: Profile): ProfileResponseDto {
+    const userId = profile.user?.id;
+    if (!userId) {
+      throw new NotFoundException(
+        `User associated with Profile ${profile.id} not found`,
+      );
+    }
+
+    return {
+      id: profile.id,
+      nickname: profile.nickname,
+      gender: profile.gender,
+      description: profile.description,
+      travelStyles: profile.travelStyles,
+      travelTendency: profile.travelTendency,
+      userId,
+      profileImageId: profile.profileImage?.id ?? null,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+    };
+  }
+
+  // /**
+  //  * 프로필 생성
+  //  *  DTO 데이터를 기반으로 새로운 Profile 엔티티 인스턴스를 생성합니다.
+  //  *    (profileData는 createProfileDto에서 userId만 빼고 나머지 필드들을 모은 객체입니다.)
+  //  *  생성된 프로필을 DB에 저장하고, DTO 형태로 반환합니다.
+  //  */
+  // async create(
+  //   createProfileDto: CreateProfileDto,
+  // ): Promise<ProfileResponseDto> {
+  //   const { userId, profileImageId, ...profileData } = createProfileDto;
+
+  //   // userId로 유저 조회
+  //   const user = await this.usersRepository.findOne({ where: { id: userId } });
+  //   if (!user) {
+  //     throw new NotFoundException(`User with ID ${userId} not found`);
+  //   }
+
+  //   // 🔒 동일 유저가 이미 프로필을 가진 경우 오류
+  //   const existingProfile = await this.profileRepository.findOne({
+  //     where: { user: { id: userId } },
+  //     relations: ['user'],
+  //   });
+  //   if (existingProfile) {
+  //     throw new ForbiddenException(
+  //       `User with ID ${userId} already has a profile`,
+  //     );
+  //   }
+  //   //🔒 무결성 검증 imageId 가 있는데 이상한 경우
+  //   let profileImage: BinaryContent | null = null;
+  //   if (typeof profileImageId === 'string') {
+  //     //만약 실제 값이 있다면(null/ undefined 가 아니라면),
+  //     const binary = await this.binaryContentRepository.findOneBy({
+  //       id: profileImageId,
+  //     });
+  //     if (!binary) {
+  //       throw new NotFoundException(
+  //         `BinaryContent (Image) with ID ${profileImageId} not found`,
+  //       );
+  //     }
+
+  //     const existingOwner = await this.profileRepository.findOne({
+  //       where: { profileImage: { id: profileImageId } },
+  //       relations: ['user'],
+  //     });
+  //     if (existingOwner && existingOwner.user.id !== userId) {
+  //       throw new ForbiddenException(
+  //         `BinaryContent (Image) with ID ${profileImageId} is already in use by another profile`,
+  //       );
+  //     }
+
+  //     profileImage = binary;
+  //   }
+
+  //   // 새로운 프로필 생성
+  //   const newProfile = this.profileRepository.create({
+  //     ...profileData,
+  //     user,
+  //     profileImage,
+  //   });
+
+  //   // 데이터베이스에 저장 (INSERT)
+  //   const savedProfile = await this.profileRepository.save(newProfile);
+
+  //   // 저장된 프로필을 DTO로 변환하여 반환
+  //   return this.toResponseDto(savedProfile);
+  // }
 
   /**
    * 전체 프로필 조회
@@ -78,15 +200,74 @@ export class ProfileService {
       throw new NotFoundException(`프로필을 찾을 수 없습니다.`);
     }
 
-    // 전달된 필드만 덮어쓰기
-    Object.assign(profile, updateProfileDto);
+    const { profileImageId, ...textData } = updateProfileDto;
 
+    // 전달된 필드만 덮어쓰기 🌟(사진 파일 제외)
+    Object.assign(profile, textData);
+
+    //사진 파일 따로 처리
+    const oldImageId = profile.profileImage?.id || null;
+    if (profileImageId !== undefined) {
+      // 이미지를 '제거'하라는 요청 (null)
+      if (profileImageId === null) {
+        profile.profileImage = null;
+      } else if (profileImageId === oldImageId) {
+        // 동일한 이미지를 다시 설정하려면 아무 작업도 하지 않는다.
+        // 텍스트 데이터 변경은 그대로 진행된다.
+      }
+      //  이미지를 '교체/추가'하라는 요청 (string ID)
+      else {
+        const newImage = await this.binaryContentRepository.findOneBy({
+          id: profileImageId,
+        });
+        if (!newImage) {
+          throw new NotFoundException(
+            `BinaryContent (Image) with ID ${profileImageId} not found`,
+          );
+        }
+
+        // 🔒 다른 프로필에서 이미 사용 중인지 검증 (타인 이미지 탈취 방지)
+        // "이 이미지를 사용하면서, ID가 '내 ID'가 '아닌' 프로필"을 찾습니다.
+        const otherProfileUsingImage = await this.profileRepository.findOne({
+          where: {
+            profileImage: { id: profileImageId }, // 1. 이 이미지를 사용하고
+            id: Not(profile.id), // 2. 현재 프로필(profile.id)이 아닌
+          },
+        });
+
+        // 만약 그런 '다른' 프로필이 존재한다면 -> 에러
+        if (otherProfileUsingImage) {
+          throw new ForbiddenException(
+            `BinaryContent (Image) with ID ${profileImageId} is already linked to another profile`,
+          );
+        }
+
+        profile.profileImage = newImage;
+      }
+      // profileImageId가 undefined면 (DTO에 안 들어왔으면) 아무것도 안 함 (기존 유지)
+    }
+
+    // 프로필 DB에 저장 (텍스트 + 이미지 관계 변경 사항 적용)
     const updatedProfile = await this.profileRepository.save(profile);
 
+    // (핵심) '고아 파일' 삭제
+    //    - 옛날 이미지가 있었고 (oldImageId !== null)
+    //    - 그게 새 이미지 ID와 다르다면 (oldImageId !== updatedProfile.profileImage?.id)
+    if (oldImageId && oldImageId !== updatedProfile.profileImage?.id) {
+      const remainingReferences = await this.profileRepository.count({
+        where: { profileImage: { id: oldImageId } },
+      });
+
+      if (remainingReferences === 0) {
+        // S3와 DB에서 '옛날 파일' 삭제 (더 이상 어떤 프로필에서도 사용하지 않을 때만)
+        await this.binaryContentService.deleteFile(oldImageId);
+      }
+    }
+
+    //return this.toResponseDto(updatedProfile);
     // DTO로 변환하여 반환
     return this.toProfilePayloadDto(updatedProfile);
   }
-
   /**
    * 프로필 삭제
    * 1. 해당 ID의 프로필이 존재하는지 확인합니다. (존재하지 않으면 404 예외)
@@ -114,8 +295,26 @@ export class ProfileService {
         `User ${userId} cannot delete another user's profile`,
       );
     }
-    // Repository의 remove() 메서드는 해당 엔티티를 삭제합니다.
+
+    const profileImageId = profile.profileImage?.id ?? null;
+    // Repository의 remove() 메서드는 해당 프로필 엔티티를 삭제합니다.
     await this.profileRepository.remove(profile);
+
+    //실제 s3에서 파일 지우기
+    // 🔒 다른 유저가 이미지 삭제 못하도록 방지
+    if (profileImageId) {
+      const remainingReferences = await this.profileRepository.count({
+        //현재 DB에 이 이미지(profileImageId)를 쓰고 있는 프로필이 몇 개 있는지 센 값
+
+        where: { profileImage: { id: profileImageId } },
+      });
+
+      if (remainingReferences === 0) {
+        //아무 것도 참조하고 있지 않을 떄
+        await this.binaryContentService.deleteFile(profileImageId);
+        //S3와 binary_content 테이블에서 해당 파일·메타데이터를 삭제합니다.
+      }
+    }
 
     // 삭제 후 DTO로 변환하여 반환
     return {

@@ -55,7 +55,7 @@ export class ProfilePayloadDto {
   @IsArray()
   @IsEnum(TendencyType, { each: true })
   @IsOptional()
-  tendency?: TendencyType[]; // travelTendency를 tendency로 변경
+  travelTendency?: TendencyType[]; // travelTendency를 tendency로 변경
 
   @Expose()
   @IsUUID()
