@@ -83,15 +83,12 @@ export class WorkspaceService {
     const savedWorkspace = await this.workspaceRepository.save(workspace);
 
     // plan_day 생성
-    const planDayDtos: PlanDayResDto[] = this.planDayService.createPlanDays(
-      savedWorkspace,
-      postDto.startDate,
-      postDto.endDate,
-    );
-
-    if (planDayDtos && planDayDtos.length > 0) {
-      await this.planDayRepository.save(planDayDtos);
-    }
+    const planDayDtos: PlanDayResDto[] =
+      await this.planDayService.createPlanDays(
+        savedWorkspace,
+        postDto.startDate,
+        postDto.endDate,
+      );
 
     // todo : resposedto 형식 바꾸기 (planday도 포함)
     const workspaceResDto = this.toWorkspaceResponseDto(savedWorkspace);
@@ -118,6 +115,7 @@ export class WorkspaceService {
       dto.planDayId,
     );
 
+    // TODO : 바꿀 것
     if (dto.workspaceId !== planDay.workspace.id) {
       throw new BadRequestException(
         'Plan day does not belong to the provided workspace',
