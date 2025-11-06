@@ -30,7 +30,8 @@ const PoiSocketEvent = {
   UNMARKED: 'unmarked',
   FLUSH: 'flush',
   FLUSHED: 'flushed',
-  CONNECT: 'connect',
+  POI_CONNECT: 'poi:connect',
+  POI_DISCONNECT: 'poi:disconnect',
   CONNECTED: 'connected',
   DISCONNECT: 'disconnect',
   DISCONNECTED: 'disconnected',
@@ -190,7 +191,7 @@ export class PoiGateway {
     }
   }
 
-  @SubscribeMessage(PoiSocketEvent.CONNECT)
+  @SubscribeMessage(PoiSocketEvent.POI_CONNECT)
   async handlePoiConnection(
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: CreatePoiConnectionReqDto,
@@ -222,7 +223,7 @@ export class PoiGateway {
     }
   }
 
-  @SubscribeMessage(PoiSocketEvent.DISCONNECT)
+  @SubscribeMessage(PoiSocketEvent.POI_DISCONNECT)
   async handlePoiDisConnection(
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: RemovePoiConnectionReqDto,

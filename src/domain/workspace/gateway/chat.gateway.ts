@@ -12,6 +12,7 @@ import { CreateMessageReqDto } from '../dto/chat/create-message-req.dto.js';
 import { WorkspaceService } from '../service/workspace.service.js';
 import { LeaveChatReqDto } from '../dto/chat/leave-chat-req.dto.js';
 import { CreateMessageResDto } from '../dto/chat/create-message-res.dto.js';
+import { ChatConnectionReqDto } from '../dto/chat/connect-chat-req.dto.js';
 
 const ChatEvent = {
   JOIN: 'join',
@@ -19,6 +20,8 @@ const ChatEvent = {
   LEAVE: 'leave',
   LEFT: 'left',
   MESSAGE: 'message',
+  CONNECT: 'connect',
+  DISCONNECT: 'disconnect',
 };
 
 @UsePipes(new ValidationPipe())
@@ -95,6 +98,16 @@ export class ChatGateway {
         `Socket ${socket.id} failed to leave workspace ${data.workspaceId}`,
       );
     }
+  }
+
+  @SubscribeMessage(ChatEvent.DISCONNECT)
+  async handleChatDisconnection(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: ChatConnectionReqDto,
+  ) {
+    await socket.leave(this.getChatRoomName(data.workspaceId));
+    // cleanup이 필요하면
+    // 자세한 로직은 나중에
   }
 
   private getChatRoomName(workspaceId: string) {

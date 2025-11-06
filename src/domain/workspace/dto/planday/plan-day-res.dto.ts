@@ -4,7 +4,7 @@ export class PlanDayResDto {
   @Expose()
   id: string;
   @Expose()
-  day_no: number;
+  dayNo: number;
   @Expose()
-  plan_date: string;
+  planDate: string;
 }
