@@ -16,6 +16,8 @@ import { PoiConnectionService } from './service/poi-connection.service.js';
 import { PoiConnection } from './entities/poi-connection.entity.js';
 import { PostParticipation } from '../post-participation/entities/post-participation.entity.js';
 import { ChatGateway } from './gateway/chat.gateway.js';
+import { ChatMessageService } from './service/chat-message.service.js';
+import { ChatMessage } from './entities/chat-message.entity.js';
 
 @Module({
   imports: [
@@ -25,6 +27,7 @@ import { ChatGateway } from './gateway/chat.gateway.js';
       Poi,
       PoiConnection,
       PostParticipation,
+      ChatMessage,
     ]),
     PostModule,
     RedisModule,
@@ -37,6 +40,7 @@ import { ChatGateway } from './gateway/chat.gateway.js';
     PoiCacheService,
     PoiConnectionCacheService,
     PoiService,
+    ChatMessageService,
     PlanDayService,
     PoiConnectionService,
   ],
