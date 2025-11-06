@@ -15,6 +15,7 @@ import { ChatMessageModule } from './domain/chat-message/chat-message.module';
 import { PoiConnectionModule } from './domain/poi-connection/poi-connection.module';
 import { AuthModule } from './domain/auth/auth.module';
 import { RedisModule } from './redis/redis.module';
+import { OpenviduModule } from './openvidu/openvidu.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { RedisModule } from './redis/redis.module';
     PoiConnectionModule,
     AuthModule,
     RedisModule,
+    OpenviduModule,
   ],
   controllers: [AppController],
   providers: [AppService],
