@@ -142,6 +142,14 @@ export class PoiGateway {
     @MessageBody() data: RemovePoiReqDto,
   ) {
     try {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      if (!socket.rooms.has(roomName)) {
+        this.logger.warn(
+          `Socket ${socket.id} tried to unmark without joining ${data.workspaceId}`,
+        );
+        return;
+      }
+
       const removedPoi = await this.poiService.removeWorkspacePoi(
         data.workspaceId,
         data.poiId,
@@ -154,9 +162,7 @@ export class PoiGateway {
         return;
       }
 
-      this.server
-        .to(this.getPoiRoomName(data.workspaceId))
-        .emit(PoiSocketEvent.UNMARKED, removedPoi);
+      this.server.to(roomName).emit(PoiSocketEvent.UNMARKED, removedPoi);
       this.logger.debug(
         `Socket ${socket.id} unmarked POI ${data.poiId} in workspace ${data.workspaceId}`,
       );
@@ -204,7 +210,9 @@ export class PoiGateway {
       const cachedPoiConnection =
         await this.workspaceService.cachePoiConnection(data);
 
-      this.server.to(roomName).emit(PoiSocketEvent.CONNECTED, cachedPoiConnection);
+      this.server
+        .to(roomName)
+        .emit(PoiSocketEvent.CONNECTED, cachedPoiConnection);
 
       this.logger.debug(
         `Socket ${socket.id} connected to POI connection ${cachedPoiConnection.id}`,
@@ -222,12 +230,18 @@ export class PoiGateway {
     @MessageBody() data: RemovePoiConnectionReqDto,
   ) {
     try {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      if (!socket.rooms.has(roomName)) {
+        this.logger.warn(
+          `Socket ${socket.id} tried to disconnect without joining ${data.workspaceId}`,
+        );
+        return;
+      }
+
       const removedId =
         await this.poiConnectionService.removePoiConnection(data);
 
-      this.server
-        .to(this.getPoiRoomName(data.workspaceId))
-        .emit(PoiSocketEvent.DISCONNECTED, removedId);
+      this.server.to(roomName).emit(PoiSocketEvent.DISCONNECTED, removedId);
     } catch {
       this.logger.error(
         `Socket ${socket.id} failed to disconnect from POI connection`,
