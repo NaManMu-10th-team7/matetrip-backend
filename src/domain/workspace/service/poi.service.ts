@@ -11,6 +11,7 @@ import { buildCachedPoiFromEntity, CachedPoi } from '../types/cached-poi.js';
 import { Users } from '../../users/entities/users.entity.js';
 import { PlanDay } from '../entities/plan-day.entity.js';
 import { PlanDayService } from './plan-day.service.js';
+import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 
 @Injectable()
 export class PoiService {
@@ -44,7 +45,7 @@ export class PoiService {
     }
 
     // DB에서 찾고 캐시에 저장
-    const planDays: PlanDay[] =
+    const planDays: PlanDayResDto[] =
       await this.planDayService.getWorkspacePlanDays(workspaceId);
 
     if (planDays.length === 0) {

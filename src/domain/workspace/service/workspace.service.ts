@@ -25,6 +25,7 @@ import { PoiConnectionCacheService } from './poi-connection-cache.service.js';
 import { PoiConnectionService } from './poi-connection.service.js';
 import { PoiService } from './poi.service.js';
 import { PostParticipation } from '../../post-participation/entities/post-participation.entity.js';
+import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 
 @Injectable()
 export class WorkspaceService {
@@ -61,12 +62,19 @@ export class WorkspaceService {
       where: { post: { id: postId } },
     });
 
-    // 이미 존재하는 workspace 어케처리할지는 미정
     if (existsWorkspace) {
-      return this.toWorkspaceResponseDto(existsWorkspace);
+      const planDayDtos: PlanDayResDto[] =
+        await this.planDayService.getWorkspacePlanDays(existsWorkspace.id);
+
+      const workspaceResDto = this.toWorkspaceResponseDto(existsWorkspace);
+      return {
+        planDayDtos,
+        workspaceResDto,
+      };
     }
 
     // workspace 생성
+    // todo : planDayId도 넘기기
     const workspace = this.workspaceRepository.create({
       workspaceName: workspaceName,
       post: { id: postDto.id },
@@ -74,19 +82,24 @@ export class WorkspaceService {
 
     const savedWorkspace = await this.workspaceRepository.save(workspace);
 
-    const planDays: PlanDay[] = this.planDayService.createPlanDays(
+    const planDayDtos: PlanDayResDto[] = this.planDayService.createPlanDays(
       savedWorkspace,
       postDto.startDate,
       postDto.endDate,
     );
     // plan_day 생성
 
-    if (planDays.length > 0) {
-      await this.planDayRepository.save(planDays);
+    if (planDayDtos && planDayDtos.length > 0) {
+      await this.planDayRepository.save(planDayDtos);
     }
 
     // todo : resposedto 형식 바꾸기 (planday도 포함)
-    return this.toWorkspaceResponseDto(savedWorkspace);
+    const workspaceResDto = this.toWorkspaceResponseDto(savedWorkspace);
+
+    return {
+      planDayDtos,
+      workspaceResDto,
+    };
   }
 
   async cachePoi(
@@ -189,7 +202,7 @@ export class WorkspaceService {
     return this.toWorkspaceResponseDto(workspace);
   }
 
-  private toWorkspaceResponseDto(workspace: Workspace | null) {
+  private toWorkspaceResponseDto(workspace: Workspace | null): WorkspaceResDto {
     if (!workspace) {
       throw new NotFoundException("Workspace doesn't exist");
     }
