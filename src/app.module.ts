@@ -13,6 +13,7 @@ import { ReviewModule } from './domain/review/review.module';
 import { WorkspaceModule } from './domain/workspace/workspace.module';
 import { AuthModule } from './domain/auth/auth.module';
 import { RedisModule } from './redis/redis.module';
+import { NotificationsModule } from './domain/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { RedisModule } from './redis/redis.module';
     WorkspaceModule,
     AuthModule,
     RedisModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

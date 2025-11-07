@@ -12,10 +12,13 @@ import { PostParticipationResponseDto } from './dto/post-participation-response.
 import { plainToInstance } from 'class-transformer';
 import { UpdatePostParticipationDto } from './dto/update-post-participation.dto';
 import { Users } from '../users/entities/users.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PostParticipationService {
   constructor(
+    private readonly notificationService: NotificationsService,
+
     @InjectRepository(PostParticipation)
     private readonly postParticipationRepository: Repository<PostParticipation>,
     @InjectRepository(Post)
@@ -67,6 +70,16 @@ export class PostParticipationService {
 
     const savedParticipation =
       await this.postParticipationRepository.save(participation);
+
+    try {
+      await this.notificationService.createAndSaveNotification(
+        post.writer,
+        post,
+      );
+    } catch (error) {
+      // 알림 전송 실패는 핵심 기능이 아니므로 로그만 남기고 계속 진행
+      console.error('Failed to send notification : ', error);
+    }
 
     return plainToInstance(
       PostParticipationResponseDto,
