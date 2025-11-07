@@ -153,7 +153,11 @@ export class NotificationsService {
       await this.notificationRepository.save(newNotification);
 
     // 4. 실시간 알림 전송 로직 호출
-    this.sendNotification(recipient.id, savedNotification);
+    try {
+      await this.sendNotification(recipient.id, savedNotification);
+    } catch (error) {
+      console.warn(`Failed to send real-time notification: ${error.message}`);
+    }
 
     // 5. 뱃지 카운트 갱신
     await this.sendUnreadCountUpdate(recipient.id);
