@@ -71,7 +71,15 @@ export class PostParticipationService {
     const savedParticipation =
       await this.postParticipationRepository.save(participation);
 
-    this.notificationService.createAndSaveNotification(post.writer, post);
+    try {
+      await this.notificationService.createAndSaveNotification(
+        post.writer,
+        post,
+      );
+    } catch (error) {
+      // 알림 전송 실패는 핵심 기능이 아니므로 로그만 남기고 계속 진행
+      console.error('Failed to send notification : ', error);
+    }
 
     return plainToInstance(
       PostParticipationResponseDto,

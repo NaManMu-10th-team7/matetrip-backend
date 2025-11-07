@@ -11,11 +11,13 @@ import { GetNotificationsDto } from './dto/get-notifications.dto';
 @Injectable()
 export class NotificationsService {
   /**
-   * 유저 ID를 키로, 해당 유저의 SSE 스트림(Subject)을 값으로 가지는 맵
+   * 유저 ID를 키로, 해당 유저의 SSE 스트림(Subject) Set을 값으로 가지는 맵
    * Subject : RxJS에서 사용하는 특별한 객체로, 데이터를 '발행(Push)'할 수도 있고
    * '구독(Subscribe)'할 수도 있음.
+   * 동일한 유저가 여러 탭을 열었을 때 하나의 탭을 닫으면 다른 모든 탭의 알림 연결까지 끊어짐
+   * 이를 해결하기 위해 각 연결(탭)마다 고유한 Subject를 생성하고 관리하도록 변경
    */
-  private userSubjects = new Map<string, Subject<MessageEvent>>();
+  private userSubjects = new Map<string, Set<Subject<MessageEvent>>>();
 
   constructor(
     // Notification Repository 주입
@@ -27,36 +29,49 @@ export class NotificationsService {
    * 컨트롤러에서 호출
    * 새로운 클라이언트(유저)가 SSE 연결을 요청할 때 호출됨
    * @param userId - 인증된 유저의 ID
-   * @returns 해당 유저가 구독할 수 있는 Observable 스트림
+   * @returns 해당 유저가 구독할 수 있는 { subject, Observable }
    */
-  subscribe(userId: string): Observable<MessageEvent> {
-    // 맵에서 해당 유저의 Subject를 찾음
-    let subject = this.userSubjects.get(userId);
+  subscribe(userId: string): {
+    subject: Subject<MessageEvent>;
+    observable: Observable<MessageEvent>;
+  } {
+    // 맵에서 해당 유저의 Subject Set을 찾음
+    let subjects = this.userSubjects.get(userId);
 
-    // 만약 이 유저의 Subject가 없으면 새로 생성
-    if (!subject) {
-      subject = new Subject<MessageEvent>();
-      this.userSubjects.set(userId, subject);
+    // 만약 이 유저의 Subject Set이 없으면 새로 생성
+    if (!subjects) {
+      subjects = new Set<Subject<MessageEvent>>();
+      this.userSubjects.set(userId, subjects);
     }
 
-    // Subject를 Observable로 변환해 반환
+    // 새 연결을 위한 새 Subject 생성
+    const newSubject = new Subject<MessageEvent>();
+    subjects.add(newSubject);
+
+    // Subject와 Observable을 반환
     // 컨트롤러는 이것을 클라이언트에게 반환해 구독 관계 형성
-    return subject.asObservable();
+    return { subject: newSubject, observable: newSubject.asObservable() };
   }
 
   /**
    * 컨트롤러에서 호출
    * 클라이언트(유저)가 SSE 연결을 끊을 때 호출됨
    * @param userId - 연결을 끊은 유저의 ID
+   * @param subjectToUnsubscribe - 연결을 끊은 특정 Subject
    */
-  unsubscribe(userId: string) {
-    const subject = this.userSubjects.get(userId);
+  unsubscribe(userId: string, subjectToUnsubscribe: Subject<MessageEvent>) {
+    const subjects = this.userSubjects.get(userId);
 
-    if (subject) {
+    if (subjects) {
       // 스트림을 '완료'시켜 더 이상 데이터가 전송되지 않도록 함
-      subject.complete();
-      // 맵에서 해당 유저를 제거해 메모리 누수 방지
-      this.userSubjects.delete(userId);
+      subjectToUnsubscribe.complete();
+      // 셋에서 해당 유저를 제거해 메모리 누수 방지
+      subjects.delete(subjectToUnsubscribe);
+
+      // 셋이 다 비워지면 맵에서 제거
+      if (subjects.size === 0) {
+        this.userSubjects.delete(userId);
+      }
     }
   }
 
@@ -67,23 +82,25 @@ export class NotificationsService {
    * @param data - 전송할 알림 데이터
    */
   async sendNotification(userId: string, data: NotificationEventDto) {
-    // 알림을 받을 유저의 Subject를 찾음
-    const subject = this.userSubjects.get(userId);
+    // 알림을 받을 유저의 Subject Set을 찾음
+    const subjects = this.userSubjects.get(userId);
 
-    // Subject가 존재한다면 (유저가 현재 온라인 상태라면)
-    if (subject) {
-      try {
-        // MessageEvent 형식에 맞춰 데이터 전송
-        // 'type'을 지정하면 클라이언트에서 addEventListener로 특정 이벤트를 구분 가능
-        subject.next({ type: 'new_notification', data: data });
-      } catch (error) {
-        console.error(
-          `Failed to send notification to user ${userId} : `,
-          error,
-        );
-        // 실패한 Subject 정리
-        this.unsubscribe(userId);
-      }
+    // Subject Set이 존재한다면 (유저가 현재 온라인 상태라면)
+    if (subjects) {
+      subjects.forEach((subject) => {
+        try {
+          // MessageEvent 형식에 맞춰 데이터 전송
+          // 'type'을 지정하면 클라이언트에서 addEventListener로 특정 이벤트를 구분 가능
+          subject.next({ type: 'new_notification', data: data });
+        } catch (error) {
+          console.error(
+            `Failed to send notification to user ${userId} : `,
+            error,
+          );
+          // 실패한 Subject 정리
+          this.unsubscribe(userId, subject);
+        }
+      });
     }
   }
 
@@ -94,12 +111,14 @@ export class NotificationsService {
     // 1. 최신 뱃지 카운트를 DB에서 조회
     const unreadCount = await this.getUnreadCount(userId);
 
-    // 2. 해당 유저의 Subject를 찾음
-    const subject = this.userSubjects.get(userId);
+    // 2. 해당 유저의 Subject Set을 찾음
+    const subjects = this.userSubjects.get(userId);
 
-    if (subject) {
+    if (subjects) {
       // 3. 'unread-update'라는 이벤트 타입으로 뱃지 카운트 전송
-      subject.next({ type: 'unread-update', data: { unreadCount } });
+      subjects.forEach((subject) =>
+        subject.next({ type: 'unread-update', data: { unreadCount } }),
+      );
     }
   }
 
@@ -107,12 +126,11 @@ export class NotificationsService {
    * 목록을 갱신하라는 신호만 전송하는 함수
    */
   async sendListStaleUpdate(userId: string) {
-    const subject = this.userSubjects.get(userId);
+    const subjects = this.userSubjects.get(userId);
 
-    if (subject) {
-      // 1페이지를 미리 갱신하라는 신호
-      subject.next({ type: 'list-stale', data: {} });
-    }
+    subjects?.forEach((subject) =>
+      subject.next({ type: 'list-stale', data: {} }),
+    );
   }
 
   /**
@@ -125,7 +143,7 @@ export class NotificationsService {
 
     // 2. Notification 엔티티 생성
     const newNotification = this.notificationRepository.create({
-      userId: { id: recipient.id },
+      user: { id: recipient.id },
       confirmed: false,
       content: message,
     });
@@ -153,7 +171,7 @@ export class NotificationsService {
   async getUnreadCount(userId: string): Promise<number> {
     return this.notificationRepository.count({
       where: {
-        userId: { id: userId },
+        user: { id: userId },
         confirmed: false,
       },
     });
@@ -176,7 +194,7 @@ export class NotificationsService {
     // 3. 데이터베이스에서 알림 목록과 전체 개수를 한 번에 조회
     const [notifications, total] =
       await this.notificationRepository.findAndCount({
-        where: { userId: { id: userId } }, // 특정 사용자의 알림만 필터링
+        where: { user: { id: userId } }, // 특정 사용자의 알림만 필터링
         // 4. 정렬 순서 설정
         order: {
           confirmed: 'ASC', // 읽지 않은 것 먼저
