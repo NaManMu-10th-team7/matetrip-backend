@@ -32,6 +32,20 @@ export class PoiConnectionCacheService {
     }
   }
 
+  async getPoiConnectionsByPlanDayList(
+    planDayIds: string[],
+  ): Promise<CachePoiConnection[]> {
+    const cachedPoiConnections: CachePoiConnection[] = [];
+    for (const planDayId of planDayIds) {
+      const cached = await this.getPoiConnections(planDayId);
+      if (cached.length > 0) {
+        cachedPoiConnections.push(...cached);
+      }
+    }
+
+    return cachedPoiConnections;
+  }
+
   async getPoiConnection(
     planDayId: string,
     poiConnectionId: string,

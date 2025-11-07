@@ -11,7 +11,6 @@ import { PostModule } from './domain/post/post.module';
 import { PostParticipationModule } from './domain/post-participation/post-participation.module';
 import { ReviewModule } from './domain/review/review.module';
 import { WorkspaceModule } from './domain/workspace/workspace.module';
-import { ChatMessageModule } from './domain/chat-message/chat-message.module';
 import { AuthModule } from './domain/auth/auth.module';
 import { RedisModule } from './redis/redis.module';
 import { NotificationsModule } from './domain/notifications/notifications.module';
@@ -31,7 +30,6 @@ import { NotificationsModule } from './domain/notifications/notifications.module
     PostParticipationModule,
     ReviewModule,
     WorkspaceModule,
-    ChatMessageModule,
     AuthModule,
     RedisModule,
     NotificationsModule,

@@ -1,6 +1,6 @@
-import { PoiConnection } from '../entities/poi-connection.entity.js';
+import { PoiConnection } from '../../entities/poi-connection.entity.js';
 
-export interface PoiConnectionResponseDto {
+export interface PoiConnectionResDto {
   planDayId: string;
   prevPoiId: string;
   nextPoiId: string;
@@ -8,9 +8,9 @@ export interface PoiConnectionResponseDto {
   duration?: number;
 }
 
-export const buildPoiConnectionResponseDtoFromEntity = (
+export const buildPoiConnectionResDtoFromEntity = (
   entity: PoiConnection,
-): PoiConnectionResponseDto => ({
+): PoiConnectionResDto => ({
   planDayId: entity.planDay.id,
   prevPoiId: entity.prevPoi.id,
   nextPoiId: entity.nextPoi.id,

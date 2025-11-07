@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Poi } from '../entities/poi.entity.js';
 import { In, Repository } from 'typeorm';
@@ -11,6 +7,7 @@ import { buildCachedPoiFromEntity, CachedPoi } from '../types/cached-poi.js';
 import { Users } from '../../users/entities/users.entity.js';
 import { PlanDay } from '../entities/plan-day.entity.js';
 import { PlanDayService } from './plan-day.service.js';
+import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 
 @Injectable()
 export class PoiService {
@@ -44,7 +41,7 @@ export class PoiService {
     }
 
     // DB에서 찾고 캐시에 저장
-    const planDays: PlanDay[] =
+    const planDays: PlanDayResDto[] =
       await this.planDayService.getWorkspacePlanDays(workspaceId);
 
     if (planDays.length === 0) {
@@ -75,13 +72,7 @@ export class PoiService {
     poiId: string,
   ): Promise<string> {
     // DB에서 먼저 삭제 시도
-    const deleteResult = await this.poiRepository.delete({
-      id: poiId,
-    });
-
-    if (deleteResult.affected === 0) {
-      throw new NotFoundException(`POI with id ${poiId} not found`);
-    }
+    await this.poiRepository.delete({ id: poiId });
 
     // DB 삭제 성공 후 캐시 제거
     await this.poiCacheService.removePoi(workspaceId, poiId);

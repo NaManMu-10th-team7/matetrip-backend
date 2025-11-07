@@ -1,6 +1,6 @@
 import { IsInt, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
 
-export class CreatePoiConnectionDto {
+export class CreatePoiConnectionReqDto {
   @IsUUID()
   workspaceId: string;
 

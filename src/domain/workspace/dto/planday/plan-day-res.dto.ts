@@ -1,8 +1,10 @@
 import { Expose } from 'class-transformer';
 
-export class WorkspaceResponseDto {
+export class PlanDayResDto {
   @Expose()
   id: string;
   @Expose()
-  workspaceName: string;
+  dayNo: number;
+  @Expose()
+  planDate: string;
 }

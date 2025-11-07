@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -7,16 +7,16 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { SocketPoiDto } from './dto/socket-poi.dto.js';
-import { CreatePoiDto } from './dto/create-poi.dto.js';
-import { WorkspaceService } from './service/workspace.service.js';
-import { RemovePoiDto } from './dto/remove-poi.dto.js';
-import { PoiService } from './service/poi.service.js';
-import { CreatePoiConnectionDto } from './dto/create-poi-connection.dto.js';
-import { RemovePoiConnectionDto } from './dto/remove-poi-connection.dto.js';
-import { PoiConnectionService } from './service/poi-connection.service.js';
-import { CachedPoi } from './types/cached-poi.js';
-import { GroupedPoiConnectionsDto } from './types/grouped-poi-conncetions.dto.js';
+import { SocketPoiDto } from '../dto/poi/socket-poi.dto.js';
+import { CreatePoiReqDto } from '../dto/poi/create-poi-req.dto.js';
+import { WorkspaceService } from '../service/workspace.service.js';
+import { PoiService } from '../service/poi.service.js';
+import { CreatePoiConnectionReqDto } from '../dto/poi/create-poi-connection-req.dto.js';
+import { RemovePoiConnectionReqDto } from '../dto/poi/remove-poi-connection-req.dto.js';
+import { PoiConnectionService } from '../service/poi-connection.service.js';
+import { CachedPoi } from '../types/cached-poi.js';
+import { GroupedPoiConnectionsDto } from '../types/grouped-poi-conncetions.dto.js';
+import { RemovePoiReqDto } from '../dto/poi/remove-poi-req.dto.js';
 
 const PoiSocketEvent = {
   JOIN: 'join',
@@ -30,12 +30,14 @@ const PoiSocketEvent = {
   UNMARKED: 'unmarked',
   FLUSH: 'flush',
   FLUSHED: 'flushed',
-  CONNECT: 'connect',
+  POI_CONNECT: 'poi:connect',
+  POI_DISCONNECT: 'poi:disconnect',
   CONNECTED: 'connected',
   DISCONNECT: 'disconnect',
   DISCONNECTED: 'disconnected',
 } as const;
 
+@UsePipes(new ValidationPipe())
 @WebSocketGateway(3003, {
   namespace: 'poi',
   cors: {
@@ -63,7 +65,7 @@ export class PoiGateway {
   ) {
     // todo : 보안 체크
     try {
-      await socket.join(data.workspaceId);
+      await socket.join(this.getPoiRoomName(data.workspaceId));
       socket.emit(PoiSocketEvent.JOINED, {
         workspaceId: data.workspaceId,
       });
@@ -92,7 +94,7 @@ export class PoiGateway {
     @MessageBody() data: SocketPoiDto,
   ) {
     try {
-      await socket.leave(data.workspaceId);
+      await socket.leave(this.getPoiRoomName(data.workspaceId));
       socket.emit(PoiSocketEvent.LEFT, {
         workspaceId: data.workspaceId,
       });
@@ -107,10 +109,11 @@ export class PoiGateway {
   @SubscribeMessage(PoiSocketEvent.MARK)
   async handlePoiMark(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: CreatePoiDto,
+    @MessageBody() data: CreatePoiReqDto,
   ) {
     try {
-      if (!socket.rooms.has(data.workspaceId)) {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      if (!socket.rooms.has(roomName)) {
         this.logger.warn(
           `Socket ${socket.id} tried to mark without joining ${data.workspaceId}`,
         );
@@ -121,10 +124,7 @@ export class PoiGateway {
         data,
       );
 
-      socket.emit(PoiSocketEvent.MARKED, cachedPoi);
-      socket.broadcast
-        .to(data.workspaceId)
-        .emit(PoiSocketEvent.MARKED, cachedPoi);
+      this.server.to(roomName).emit(PoiSocketEvent.MARKED, cachedPoi);
 
       this.logger.debug(
         `Socket ${socket.id} marked POI ${cachedPoi.id} in workspace ${data.workspaceId}`,
@@ -139,9 +139,17 @@ export class PoiGateway {
   @SubscribeMessage(PoiSocketEvent.UNMARK)
   async handlePoiUnmark(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: RemovePoiDto,
+    @MessageBody() data: RemovePoiReqDto,
   ) {
     try {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      if (!socket.rooms.has(roomName)) {
+        this.logger.warn(
+          `Socket ${socket.id} tried to unmark without joining ${data.workspaceId}`,
+        );
+        return;
+      }
+
       const removedPoi = await this.poiService.removeWorkspacePoi(
         data.workspaceId,
         data.poiId,
@@ -154,11 +162,7 @@ export class PoiGateway {
         return;
       }
 
-      socket.emit(PoiSocketEvent.UNMARKED, removedPoi);
-      socket.broadcast
-        .to(data.workspaceId)
-        .emit(PoiSocketEvent.UNMARKED, removedPoi);
-
+      this.server.to(roomName).emit(PoiSocketEvent.UNMARKED, removedPoi);
       this.logger.debug(
         `Socket ${socket.id} unmarked POI ${data.poiId} in workspace ${data.workspaceId}`,
       );
@@ -189,13 +193,14 @@ export class PoiGateway {
     }
   }
 
-  @SubscribeMessage(PoiSocketEvent.CONNECT)
+  @SubscribeMessage(PoiSocketEvent.POI_CONNECT)
   async handlePoiConnection(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: CreatePoiConnectionDto,
+    @MessageBody() data: CreatePoiConnectionReqDto,
   ) {
     try {
-      if (!socket.rooms.has(data.workspaceId)) {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      if (!socket.rooms.has(roomName)) {
         this.logger.warn(
           `Socket ${socket.id} tried to connect without joining ${data.workspaceId}`,
         );
@@ -205,10 +210,8 @@ export class PoiGateway {
       const cachedPoiConnection =
         await this.workspaceService.cachePoiConnection(data);
 
-      socket.emit(PoiSocketEvent.CONNECTED, cachedPoiConnection);
-      socket.broadcast
-        .to(data.workspaceId)
-        // todo : 이거 일단은 전체로 넘겨서 client에서 알아서 day 구분하라고 한거라 최적화 안됨
+      this.server
+        .to(roomName)
         .emit(PoiSocketEvent.CONNECTED, cachedPoiConnection);
 
       this.logger.debug(
@@ -221,23 +224,32 @@ export class PoiGateway {
     }
   }
 
-  @SubscribeMessage(PoiSocketEvent.DISCONNECT)
+  @SubscribeMessage(PoiSocketEvent.POI_DISCONNECT)
   async handlePoiDisConnection(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: RemovePoiConnectionDto,
+    @MessageBody() data: RemovePoiConnectionReqDto,
   ) {
     try {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      if (!socket.rooms.has(roomName)) {
+        this.logger.warn(
+          `Socket ${socket.id} tried to disconnect without joining ${data.workspaceId}`,
+        );
+        return;
+      }
+
       const removedId =
         await this.poiConnectionService.removePoiConnection(data);
 
-      socket.emit(PoiSocketEvent.DISCONNECTED, removedId);
-      socket.broadcast
-        .to(data.workspaceId)
-        .emit(PoiSocketEvent.DISCONNECTED, removedId);
+      this.server.to(roomName).emit(PoiSocketEvent.DISCONNECTED, removedId);
     } catch {
       this.logger.error(
         `Socket ${socket.id} failed to disconnect from POI connection`,
       );
     }
+  }
+
+  private getPoiRoomName(workspaceId: string) {
+    return `poi:${workspaceId}`;
   }
 }

@@ -3,20 +3,20 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateWorkspaceDto } from '../dto/create-workspace.dto';
+import { CreateWorkspaceReqDto } from '../dto/create-workspace-req.dto';
 import { PostService } from '../../post/post.service.js';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Workspace } from '../entities/workspace.entity.js';
 import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
-import { WorkspaceResponseDto } from '../dto/workspace-response.dto.js';
+import { WorkspaceResDto } from '../dto/workspace-res.dto.js';
 import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from '../entities/plan-day.entity.js';
-import { CreatePoiDto } from '../dto/create-poi.dto.js';
+import { CreatePoiReqDto } from '../dto/poi/create-poi-req.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
 import { CachedPoi, buildCachedPoi } from '../types/cached-poi.js';
 import { PlanDayService } from './plan-day.service.js';
-import { CreatePoiConnectionDto } from '../dto/create-poi-connection.dto.js';
+import { CreatePoiConnectionReqDto } from '../dto/poi/create-poi-connection-req.dto.js';
 import {
   buildCachedPoiConnection,
   CachePoiConnection,
@@ -25,6 +25,7 @@ import { PoiConnectionCacheService } from './poi-connection-cache.service.js';
 import { PoiConnectionService } from './poi-connection.service.js';
 import { PoiService } from './poi.service.js';
 import { PostParticipation } from '../../post-participation/entities/post-participation.entity.js';
+import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 
 @Injectable()
 export class WorkspaceService {
@@ -44,7 +45,7 @@ export class WorkspaceService {
   ) {}
 
   @Transactional()
-  async create(createWorkspaceDto: CreateWorkspaceDto) {
+  async create(createWorkspaceDto: CreateWorkspaceReqDto) {
     /**
      * 1. postId에 맞는 workSpace가 있는지 확인
      * 2. 있으면 그에 맞는 workSpace 그대로 반환
@@ -61,12 +62,19 @@ export class WorkspaceService {
       where: { post: { id: postId } },
     });
 
-    // 이미 존재하는 workspace 어케처리할지는 미정
     if (existsWorkspace) {
-      return this.toWorkspaceResponseDto(existsWorkspace);
+      const planDayDtos: PlanDayResDto[] =
+        await this.planDayService.getWorkspacePlanDays(existsWorkspace.id);
+
+      const workspaceResDto = this.toWorkspaceResponseDto(existsWorkspace);
+      return {
+        planDayDtos,
+        workspaceResDto,
+      };
     }
 
     // workspace 생성
+    // todo : planDayId도 넘기기
     const workspace = this.workspaceRepository.create({
       workspaceName: workspaceName,
       post: { id: postDto.id },
@@ -74,34 +82,40 @@ export class WorkspaceService {
 
     const savedWorkspace = await this.workspaceRepository.save(workspace);
 
-    const planDays: PlanDay[] = this.planDayService.createPlanDays(
-      savedWorkspace,
-      postDto.startDate,
-      postDto.endDate,
-    );
     // plan_day 생성
-
-    if (planDays.length > 0) {
-      await this.planDayRepository.save(planDays);
-    }
+    const planDayDtos: PlanDayResDto[] =
+      await this.planDayService.createPlanDays(
+        savedWorkspace,
+        postDto.startDate,
+        postDto.endDate,
+      );
 
     // todo : resposedto 형식 바꾸기 (planday도 포함)
-    return this.toWorkspaceResponseDto(savedWorkspace);
+    const workspaceResDto = this.toWorkspaceResponseDto(savedWorkspace);
+
+    return {
+      planDayDtos,
+      workspaceResDto,
+    };
   }
 
-  async cachePoi(workspaceId: string, dto: CreatePoiDto): Promise<CachedPoi> {
+  async cachePoi(
+    workspaceId: string,
+    dto: CreatePoiReqDto,
+  ): Promise<CachedPoi> {
     const cachedPoi: CachedPoi = buildCachedPoi(workspaceId, dto);
     await this.poiCacheService.upsertPoi(workspaceId, cachedPoi);
     return cachedPoi;
   }
 
   async cachePoiConnection(
-    dto: CreatePoiConnectionDto,
+    dto: CreatePoiConnectionReqDto,
   ): Promise<CachePoiConnection> {
     const planDay = await this.planDayService.getPlanDayWithWorkspace(
       dto.planDayId,
     );
 
+    // TODO : 바꿀 것
     if (dto.workspaceId !== planDay.workspace.id) {
       throw new BadRequestException(
         'Plan day does not belong to the provided workspace',
@@ -169,6 +183,12 @@ export class WorkspaceService {
     await this.poiCacheService.clearWorkspacePois(workspaceId);
   }
 
+  async isExist(workspaceId: string): Promise<boolean> {
+    return await this.workspaceRepository.existsBy({
+      id: workspaceId,
+    });
+  }
+
   async remove(id: string) {
     await this.workspaceRepository.delete(id);
   }
@@ -180,12 +200,12 @@ export class WorkspaceService {
     return this.toWorkspaceResponseDto(workspace);
   }
 
-  private toWorkspaceResponseDto(workspace: Workspace | null) {
+  private toWorkspaceResponseDto(workspace: Workspace | null): WorkspaceResDto {
     if (!workspace) {
       throw new NotFoundException("Workspace doesn't exist");
     }
 
-    return plainToInstance(WorkspaceResponseDto, workspace, {
+    return plainToInstance(WorkspaceResDto, workspace, {
       excludeExtraneousValues: true,
     });
   }
