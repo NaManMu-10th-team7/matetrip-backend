@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { AuthGuard } from '@nestjs/passport';
-import { type Response } from 'express';
+import { type Request, type Response } from 'express';
 import { Observable } from 'rxjs';
 import { NotificationEventDto } from './dto/notification-event.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -75,8 +75,8 @@ export class NotificationsController {
     const userId = req.user.id;
 
     // 1. 테스트용 알림을 DB에 생성 및 저장
-    const newNotification = await this.notificationRepository.create({
-      userId: { id: userId },
+    const newNotification = this.notificationRepository.create({
+      user: { id: userId },
       confirmed: false,
       content: `테스트 알림 : ${req.user.email}`,
     });

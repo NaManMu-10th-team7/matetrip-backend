@@ -72,9 +72,18 @@ export class NotificationsService {
 
     // Subject가 존재한다면 (유저가 현재 온라인 상태라면)
     if (subject) {
-      // MessageEvent 형식에 맞춰 데이터 전송
-      // 'type'을 지정하면 클라이언트에서 addEventListener로 특정 이벤트를 구분 가능
-      subject.next({ type: 'new_notification', data: data });
+      try {
+        // MessageEvent 형식에 맞춰 데이터 전송
+        // 'type'을 지정하면 클라이언트에서 addEventListener로 특정 이벤트를 구분 가능
+        subject.next({ type: 'new_notification', data: data });
+      } catch (error) {
+        console.error(
+          `Failed to send notification to user ${userId} : `,
+          error,
+        );
+        // 실패한 Subject 정리
+        this.unsubscribe(userId);
+      }
     }
   }
 
@@ -192,22 +201,30 @@ export class NotificationsService {
    * @param userId
    */
   async markOneAsRead(notificationId: string, userId: string) {
-    const notification = await this.notificationRepository.findOne({
-      where: { id: notificationId, userId: { id: userId } },
-    });
+    // 원자적 업데이트 : confirmed가 false인 경우에만 업데이트
+    const result = await this.notificationRepository.update(
+      {
+        id: notificationId,
+        user: { id: userId },
+        confirmed: false,
+      },
+      {
+        confirmed: true,
+      },
+    );
 
-    if (!notification) {
-      throw new NotFoundException('Notification not found');
-    }
+    // 알림을 찾지 못했거나 이미 읽음 처리된 경우
+    if (result.affected === 0) {
+      const exists = await this.notificationRepository.findOne({
+        where: { id: notificationId, user: { id: userId } },
+      });
 
-    if (notification.confirmed) {
-      // 이미 읽음 처리된 경우
+      if (!exists) {
+        throw new NotFoundException('Notification not found');
+      }
+
       return { success: true, changed: false };
     }
-
-    await this.notificationRepository.update(notificationId, {
-      confirmed: true,
-    });
 
     await this.sendUnreadCountUpdate(userId);
 

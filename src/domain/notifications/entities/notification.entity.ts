@@ -7,7 +7,7 @@ export class Notification extends BaseTimestampEntity {
   // 수신자
   @ManyToOne(() => Users, { eager: false })
   @JoinColumn({ name: 'user_id' })
-  userId: Users;
+  user: Users;
 
   // 확인 여부
   @Column({ default: false })
