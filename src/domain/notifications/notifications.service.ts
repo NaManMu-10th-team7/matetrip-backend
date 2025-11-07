@@ -1,4 +1,4 @@
-import { Injectable, MessageEvent } from '@nestjs/common';
+import { Injectable, MessageEvent, NotFoundException } from '@nestjs/common';
 import { Observable, Subject } from 'rxjs';
 import { NotificationEventDto } from './dto/notification-event.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { Users } from '../users/entities/users.entity';
 import { Post } from '../post/entities/post.entity';
 import { Notification } from './entities/notification.entity';
+import { GetNotificationsDto } from './dto/get-notifications.dto';
 
 @Injectable()
 export class NotificationsService {
@@ -78,8 +79,36 @@ export class NotificationsService {
   }
 
   /**
+   * 뱃지 카운트만 전송하는 함수
+   */
+  async sendUnreadCountUpdate(userId: string) {
+    // 1. 최신 뱃지 카운트를 DB에서 조회
+    const unreadCount = await this.getUnreadCount(userId);
+
+    // 2. 해당 유저의 Subject를 찾음
+    const subject = this.userSubjects.get(userId);
+
+    if (subject) {
+      // 3. 'unread-update'라는 이벤트 타입으로 뱃지 카운트 전송
+      subject.next({ type: 'unread-update', data: { unreadCount } });
+    }
+  }
+
+  /**
+   * 목록을 갱신하라는 신호만 전송하는 함수
+   */
+  async sendListStaleUpdate(userId: string) {
+    const subject = this.userSubjects.get(userId);
+
+    if (subject) {
+      // 1페이지를 미리 갱신하라는 신호
+      subject.next({ type: 'list-stale', data: {} });
+    }
+  }
+
+  /**
    * 알림을 생성하고 DB에 저장
-   * 나중에 실시간 SSE 전송 로직도 추가 가능
+   * 실시간 SSE 전송
    */
   async createAndSaveNotification(recipient: Users, post: Post) {
     // 1. 알림 메시지 및 URL 생성
@@ -96,9 +125,92 @@ export class NotificationsService {
     const savedNotification =
       await this.notificationRepository.save(newNotification);
 
-    // 4. 향후 확장. 실시간 알림 전송 로직 호출
-    //this.sendNotification(recipient.id, savedNotification);
+    // 4. 실시간 알림 전송 로직 호출
+    this.sendNotification(recipient.id, savedNotification);
+
+    // 5. 뱃지 카운트 갱신
+    await this.sendUnreadCountUpdate(recipient.id);
+
+    // 6. 목록 갱신 신호 전송
+    await this.sendListStaleUpdate(recipient.id);
 
     return savedNotification;
+  }
+
+  /**
+   * 읽지 않은 알림 개수 조회
+   * @param userId
+   */
+  async getUnreadCount(userId: string): Promise<number> {
+    return this.notificationRepository.count({
+      where: {
+        userId: { id: userId },
+        confirmed: false,
+      },
+    });
+  }
+
+  /**
+   * 알림 목록 가져오기 (페이지네이션)
+   * @param userId
+   * @param getNotificationsDto
+   */
+  async getNotifications(
+    userId: string,
+    getNotificationsDto: GetNotificationsDto,
+  ) {
+    // 1. DTO에서 페이지 번호와 페이지당 항목 수를 가져옴
+    const { page, limit } = getNotificationsDto;
+    // 2. 데이터베이스에서 건너뛸 항목 수를 계산
+    const skip = (page - 1) * limit;
+
+    // 3. 데이터베이스에서 알림 목록과 전체 개수를 한 번에 조회
+    const [notifications, total] =
+      await this.notificationRepository.findAndCount({
+        where: { userId: { id: userId } }, // 특정 사용자의 알림만 필터링
+        // 4. 정렬 순서 설정
+        order: {
+          confirmed: 'ASC', // 읽지 않은 것 먼저
+          createdAt: 'DESC', // 최신순
+        },
+        skip: skip, // 건너뛸 개수
+        take: limit, // 가져올 개수
+      });
+
+    return {
+      data: notifications,
+      page,
+      limit,
+      total,
+      hasMore: page * limit < total, // 다음 페이지가 있는지 여부
+    };
+  }
+
+  /**
+   * 특정 알림 하나만 읽음 처리
+   * @param notificationId
+   * @param userId
+   */
+  async markOneAsRead(notificationId: string, userId: string) {
+    const notification = await this.notificationRepository.findOne({
+      where: { id: notificationId, userId: { id: userId } },
+    });
+
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    if (notification.confirmed) {
+      // 이미 읽음 처리된 경우
+      return { success: true, changed: false };
+    }
+
+    await this.notificationRepository.update(notificationId, {
+      confirmed: true,
+    });
+
+    await this.sendUnreadCountUpdate(userId);
+
+    return { success: true, changed: true };
   }
 }

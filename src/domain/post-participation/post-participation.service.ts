@@ -12,10 +12,13 @@ import { PostParticipationResponseDto } from './dto/post-participation-response.
 import { plainToInstance } from 'class-transformer';
 import { UpdatePostParticipationDto } from './dto/update-post-participation.dto';
 import { Users } from '../users/entities/users.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PostParticipationService {
   constructor(
+    private readonly notificationService: NotificationsService,
+
     @InjectRepository(PostParticipation)
     private readonly postParticipationRepository: Repository<PostParticipation>,
     @InjectRepository(Post)
@@ -67,6 +70,8 @@ export class PostParticipationService {
 
     const savedParticipation =
       await this.postParticipationRepository.save(participation);
+
+    this.notificationService.createAndSaveNotification(post.writer, post);
 
     return plainToInstance(
       PostParticipationResponseDto,

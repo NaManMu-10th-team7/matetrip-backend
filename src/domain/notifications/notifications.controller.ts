@@ -2,6 +2,9 @@ import {
   Controller,
   Get,
   MessageEvent,
+  Param,
+  Patch,
+  Query,
   Req,
   Res,
   Sse,
@@ -15,6 +18,7 @@ import { NotificationEventDto } from './dto/notification-event.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Notification } from './entities/notification.entity';
 import { Repository } from 'typeorm';
+import { GetNotificationsDto } from './dto/get-notifications.dto';
 
 interface RequestWithUser extends Request {
   user: {
@@ -24,10 +28,11 @@ interface RequestWithUser extends Request {
 }
 
 @Controller('notifications')
+@UseGuards(AuthGuard('jwt'))
 export class NotificationsController {
   constructor(
     private readonly notificationsService: NotificationsService,
-    // 1. Notification Repository 주입
+    // 1. Notification Repository 주입(테스트용)
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
   ) {}
@@ -37,7 +42,6 @@ export class NotificationsController {
    * @Sse 데코레이터는 이 엔드포인트가 Server-Sent Events 스트림임을 나타냄
    */
   @Sse('connect')
-  @UseGuards(AuthGuard('jwt'))
   subscribe(
     @Req() req: RequestWithUser,
     @Res() res: Response,
@@ -65,7 +69,6 @@ export class NotificationsController {
    * 사용법 : 로그인 상태에서 GET /notifications/test-send
    */
   @Get('test-send')
-  @UseGuards(AuthGuard('jwt'))
   async sentTestNotification(
     @Req() req: RequestWithUser, // 알림 보낼 대상을 req.user에서 찾음
   ) {
@@ -96,24 +99,38 @@ export class NotificationsController {
   }
 
   /**
+   * 로그인한 유저가 읽지 않은 알림의 갯수를 반환
+   * @param req 로그인한 유저
+   * @returns 로그인한 유저가 읽지 않은 알림의 갯수
+   */
+  @Get('count')
+  getUnreadCount(@Req() req: RequestWithUser) {
+    return this.notificationsService.getUnreadCount(req.user.id);
+  }
+
+  /**
    * 로그인한 유저의 모든 알림 목록을 조회
    * 페이지네이션 추가 가능
    */
   @Get()
-  @UseGuards(AuthGuard('jwt'))
-  async getMyNotifications(@Req() req: RequestWithUser) {
-    const userId = req.user.id;
+  async getMyNotifications(
+    @Req() req: RequestWithUser,
+    @Query() getNotificationsDto: GetNotificationsDto,
+  ) {
+    return this.notificationsService.getNotifications(
+      req.user.id,
+      getNotificationsDto,
+    );
+  }
 
-    // DB에서 내가 받은 알림을 찾음
-    // sender 정보를 함께 로드(join)하고, 최신순(createdAt DESC)으로 정렬
-    const notifications = await this.notificationRepository.find({
-      where: { userId: { id: userId } },
-      order: { createdAt: 'DESC' },
-      take: 20, // 최대 20개 알림만 조회
-    });
-
-    return {
-      list: notifications,
-    };
+  /**
+   * 알림 읽음 처리
+   */
+  @Patch(':id/read')
+  markOneAsRead(
+    @Param('id') id: string, // URL에서 알림 ID를 받음
+    @Req() req: RequestWithUser,
+  ) {
+    return this.notificationsService.markOneAsRead(id, req.user.id);
   }
 }
