@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS binary_content
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     file_name  TEXT        NOT NULL,
     file_type  TEXT        NOT NULL,
-    file_size  BIGINT      NOT NULL,
+    file_size  BIGINT      NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS users
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS poi_connection
     distance    INT         NOT NULL DEFAULT 0,
     duration    INT         NOT NULL DEFAULT 0,
     CHECK (distance >= 0 AND duration >= 0),
-    CHECK (prev_poi_id IS NOT NULL OR next_poi_id IS NOT NULL) -- prev/next 둘 다 NULL 금지(최소 한쪽 연결)
+    CHECK (prev_poi_id IS NOT NULL AND next_poi_id IS NOT NULL) -- prev/next 둘 다 NULL 금지(최소 한쪽 연결)
 );
 
 CREATE TABLE IF NOT EXISTS post_participation

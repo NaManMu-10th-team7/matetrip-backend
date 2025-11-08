@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { CreatePoiDto } from '../dto/create-poi.dto.js';
+import { CreatePoiReqDto } from '../dto/poi/create-poi-req.dto.js';
 import { Poi } from '../entities/poi.entity.js';
 
 export interface CachedPoi {
@@ -11,12 +11,12 @@ export interface CachedPoi {
   latitude: number;
   address: string;
   placeName?: string;
-  persisted: boolean;
+  isPersisted: boolean;
 }
 
 export const buildCachedPoi = (
   workspaceId: string,
-  dto: CreatePoiDto,
+  dto: CreatePoiReqDto,
 ): CachedPoi => ({
   id: dto.poiId ?? randomUUID(),
   workspaceId: workspaceId,
@@ -26,7 +26,7 @@ export const buildCachedPoi = (
   latitude: dto.latitude,
   address: dto.address,
   placeName: dto.placeName,
-  persisted: false,
+  isPersisted: false,
 });
 
 export const buildCachedPoiFromEntity = (
@@ -41,5 +41,5 @@ export const buildCachedPoiFromEntity = (
   latitude: poi.latitude,
   address: poi.address,
   placeName: poi.placeName,
-  persisted: true,
+  isPersisted: true,
 });
