@@ -7,6 +7,7 @@ export class MatchCandidateDto {
   score: number;
   overlappingTravelTendencyTypes: TravelStyleType[];
   overlappingTravelTendencies: TendencyType[];
+  mbtiMatchScore: number;
 }
 
 export class MatchResponseDto {
