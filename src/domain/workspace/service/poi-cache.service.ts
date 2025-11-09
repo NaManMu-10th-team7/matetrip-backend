@@ -10,35 +10,50 @@ export class PoiCacheService {
 
   constructor(private readonly redisService: RedisService) {}
 
-  private buildPoisKey(workspaceId: string): string {
-    return `workspace:${workspaceId}:pois`;
+  private buildMarkedPoisKey(workspaceId: string): string {
+    return `workspace:${workspaceId}:marked`;
+  }
+
+  private buildScheduledPoisKey(planDayId: string): string {
+    return `workspace:${planDayId}:scheduled`;
   }
 
   async getWorkspacePois(workspaceId: string): Promise<CachedPoi[]> {
     const client = this.redisService.getClient();
-    const key = this.buildPoisKey(workspaceId);
+    const key = this.buildMarkedPoisKey(workspaceId);
     const rawPois = await client.hVals(key);
     return rawPois.map((poi) => JSON.parse(poi) as CachedPoi);
   }
 
-  async upsertPoi(workspaceId: string, poi: CachedPoi): Promise<void> {
+  // marked Poi는 hash구조로 (main key = workspaceId, sub key = poiId, value = json)
+  async upsertMarkedPoi(workspaceId: string, poi: CachedPoi): Promise<void> {
     const client = this.redisService.getClient();
-    const key = this.buildPoisKey(workspaceId);
+    const key = this.buildMarkedPoisKey(workspaceId);
     await client.hSet(key, poi.id, JSON.stringify(poi));
 
     // todo : 삭제할 것
-    await client.expire(key, this.ttlSeconds);
+    // await client.expire(key, this.ttlSeconds);
     this.logger.debug(
       `POI cached for workspace ${workspaceId}: ${JSON.stringify(poi)}`,
     );
+  }
+
+  async upsertScheduledPoi(planDayId: string, poi: CachedPoi): Promise<void> {
+    const client = this.redisService.getClient();
+    const key = this.buildScheduledPoisKey(planDayId);
+    // await client.hSet(key, poi.id, JSON.stringify(poi));
+
+    // todo : 리스트로 관리하기
+    await client.expire(key, this.ttlSeconds);
   }
 
   async removePoi(
     workspaceId: string,
     poiId: string,
   ): Promise<CachedPoi | undefined> {
+    // MARKED인지 아닌지 확인
     const client = this.redisService.getClient();
-    const key = this.buildPoisKey(workspaceId);
+    const key = this.buildMarkedPoisKey(workspaceId);
     const raw = await client.hGet(key, poiId);
     if (!raw) {
       return undefined;
@@ -59,7 +74,7 @@ export class PoiCacheService {
     const client = this.redisService.getClient();
 
     // key 생성하고 만약 이미 존재하면 삭제
-    const key = this.buildPoisKey(workspaceId);
+    const key = this.buildMarkedPoisKey(workspaceId);
     const pipeline = client.multi();
     pipeline.del(key);
     if (pois.length === 0) {
@@ -86,6 +101,6 @@ export class PoiCacheService {
     }
 
     const client = this.redisService.getClient();
-    await client.del(this.buildPoisKey(workspaceId));
+    await client.del(this.buildMarkedPoisKey(workspaceId));
   }
 }

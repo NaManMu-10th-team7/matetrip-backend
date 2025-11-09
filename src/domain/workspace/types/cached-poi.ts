@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { CreatePoiReqDto } from '../dto/poi/create-poi-req.dto.js';
+import { PoiCreateReqDto } from '../dto/poi/poi-create-req.dto.js';
 import { Poi } from '../entities/poi.entity.js';
 
 export interface CachedPoi {
@@ -16,7 +16,7 @@ export interface CachedPoi {
 
 export const buildCachedPoi = (
   workspaceId: string,
-  dto: CreatePoiReqDto,
+  dto: PoiCreateReqDto,
 ): CachedPoi => ({
   id: dto.poiId ?? randomUUID(),
   workspaceId: workspaceId,

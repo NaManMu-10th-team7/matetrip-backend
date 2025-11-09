@@ -1,7 +1,11 @@
 import { IsNotEmpty, IsUUID } from 'class-validator';
 
-export class SocketPoiDto {
+export class PoiRemoveReqDto {
   @IsUUID()
   @IsNotEmpty()
   workspaceId: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  poiId: string;
 }

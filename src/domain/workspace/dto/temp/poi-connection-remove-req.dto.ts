@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsUUID } from 'class-validator';
 
-export class RemovePoiConnectionReqDto {
+export class PoiConnectionRemoveReqDto {
   @IsNotEmpty()
   @IsUUID()
   id: string;

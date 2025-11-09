@@ -1,5 +1,20 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+
+DROP TABLE if exists poi_connection;
+DROP TABLE IF EXISTS notification;
+DROP TABLE if exists follow;
+DROP TABLE IF EXISTS review;
+DROP TABLE IF EXISTS post_participation;
+DROP TABLE IF EXISTS poi;
+DROP TABLE IF EXISTS plan_day;
+DROP TABLE IF EXISTS chat_message;
+DROP TABLE IF EXISTS workspace;
+DROP TABLE IF EXISTS post;
+DROP TABLE IF EXISTS profile;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS binary_content;
+
 DROP TYPE IF EXISTS keyword_type;
 DROP TYPE IF EXISTS gender;
 DROP TYPE IF EXISTS post_status;
@@ -15,18 +30,6 @@ CREATE TYPE post_participation_status AS ENUM ('대기중', '승인', '거절');
 CREATE TYPE tendency_type AS ENUM ('내향적','외향적');
 CREATE TYPE travel_style_type AS ENUM ('RELAXED', 'ACTIVE', 'CULTURAL', 'FOODIE', 'NATURE');
 CREATE TYPE poi_status AS ENUM ('MARKED', 'SCHEDULED');
-
-DROP TABLE IF EXISTS notification;
-DROP TABLE IF EXISTS review;
-DROP TABLE IF EXISTS post_participation;
-DROP TABLE IF EXISTS poi;
-DROP TABLE IF EXISTS plan_day;
-DROP TABLE IF EXISTS chat_message;
-DROP TABLE IF EXISTS workspace;
-DROP TABLE IF EXISTS post;
-DROP TABLE IF EXISTS profile;
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS binary_content;
 
 
 CREATE TABLE IF NOT EXISTS binary_content
@@ -219,7 +222,7 @@ ALTER TABLE poi
     ADD CONSTRAINT fk_poi_planday
         FOREIGN KEY (plan_day_id) REFERENCES plan_day (id) ON DELETE CASCADE,
     ADD CONSTRAINT fk_poi_creator
-        FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE RESTRICT;
+        FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE restrict,
     ADD CONSTRAINT uq_poi_schedule UNIQUE (plan_day_id, schedule_seq);
 
 
@@ -251,7 +254,7 @@ ALTER TABLE follow
 
 
 CREATE UNIQUE INDEX idx_unique_schedule
-    on poi (plan_day_id, schedule_seq);
+    on poi (plan_day_id, schedule_seq)
     where schedule_seq > 0;
 -- ========= 인덱스 =========
 -- CREATE INDEX idx_post_writer               ON post(writer_id);
