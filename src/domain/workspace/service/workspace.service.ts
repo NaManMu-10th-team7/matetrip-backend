@@ -24,7 +24,6 @@ import {
 import { PoiConnectionCacheService } from './poi-connection-cache.service.js';
 import { PoiConnectionService } from './poi-connection.service.js';
 import { PoiService } from './poi.service.js';
-import { PostParticipation } from '../../post-participation/entities/post-participation.entity.js';
 import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 
 @Injectable()
@@ -35,8 +34,6 @@ export class WorkspaceService {
     private readonly workspaceRepository: Repository<Workspace>,
     @InjectRepository(PlanDay)
     private readonly planDayRepository: Repository<PlanDay>,
-    @InjectRepository(PostParticipation)
-    private readonly postParticipationRepository: Repository<PostParticipation>,
     private readonly poiCacheService: PoiCacheService,
     private readonly poiConnectionCacheService: PoiConnectionCacheService,
     private readonly poiConnectionService: PoiConnectionService,

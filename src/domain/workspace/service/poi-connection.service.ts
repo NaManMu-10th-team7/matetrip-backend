@@ -47,7 +47,6 @@ export class PoiConnectionService {
     return persisted;
   }
 
-  // 이게 문제다... ㅅㅂ
   async getAllPoiConnections(
     workspaceId: string,
   ): Promise<GroupedPoiConnectionsDto> {

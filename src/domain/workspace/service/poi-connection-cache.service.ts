@@ -6,6 +6,7 @@ import { isUUID } from 'class-validator';
 @Injectable()
 export class PoiConnectionCacheService {
   private readonly logger = new Logger(PoiConnectionCacheService.name);
+  // todo : ttl 없애고 다른 저장 방식 생각하기
   private readonly ttlSeconds = 60 * 60 * 24; // 24 hours
 
   constructor(private readonly redisService: RedisService) {}

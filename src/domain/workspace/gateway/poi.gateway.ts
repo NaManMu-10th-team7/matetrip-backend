@@ -35,6 +35,7 @@ const PoiSocketEvent = {
   CONNECTED: 'connected',
   DISCONNECT: 'disconnect',
   DISCONNECTED: 'disconnected',
+  POIDRAG: 'drag',
 } as const;
 
 @UsePipes(new ValidationPipe())
@@ -248,6 +249,15 @@ export class PoiGateway {
       );
     }
   }
+
+  /**
+   * Poi 위치를 드래그앤 드랍으로 바꾸는 경우
+   */
+  @SubscribeMessage(PoiSocketEvent.POIDRAG)
+  async handlePoiDrag(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: SocketPoiDto,
+  ) {}
 
   private getPoiRoomName(workspaceId: string) {
     return `poi:${workspaceId}`;
