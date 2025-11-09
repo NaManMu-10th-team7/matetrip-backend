@@ -92,9 +92,9 @@ CREATE TABLE IF NOT EXISTS workspace
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     post_id        UUID             NOT NULL,
     workspace_name TEXT             NOT NULL,
-    base_longitude DOUBLE PRECISION NOT NULL,
-    base_latitude  DOUBLE PRECISION NOT NULL,
-    memo           TEXT             NOT NULL,
+    -- base_longitude DOUBLE PRECISION NOT NULL,
+    -- base_latitude  DOUBLE PRECISION NOT NULL,
+    memo           TEXT             NULL,
     -- 위경도 범위 체크
     CHECK (base_longitude BETWEEN -180 AND 180),
     CHECK (base_latitude BETWEEN -90 AND 90)
