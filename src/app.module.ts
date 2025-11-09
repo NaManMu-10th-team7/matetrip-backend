@@ -14,6 +14,7 @@ import { WorkspaceModule } from './domain/workspace/workspace.module';
 import { AuthModule } from './domain/auth/auth.module';
 import { RedisModule } from './redis/redis.module';
 import { NotificationsModule } from './domain/notifications/notifications.module';
+import { AiAgentModule } from './ai-agent/ai-agent.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { NotificationsModule } from './domain/notifications/notifications.module
     AuthModule,
     RedisModule,
     NotificationsModule,
+    AiAgentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
