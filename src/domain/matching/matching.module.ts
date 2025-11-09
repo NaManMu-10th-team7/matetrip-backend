@@ -7,9 +7,13 @@ import { MatchingProfile } from './entities/matching-profile.entity';
 import { Profile } from '../profile/entities/profile.entity';
 import { NovaService } from '../../ai/summaryLLM.service';
 import { TitanEmbeddingService } from '../../ai/titan-embedding.service';
+import { Post } from '../post/entities/post.entity';
 
 @Module({
-  imports: [HttpModule, TypeOrmModule.forFeature([MatchingProfile, Profile])],
+  imports: [
+    HttpModule,
+    TypeOrmModule.forFeature([MatchingProfile, Profile, Post]),
+  ],
   controllers: [MatchingController],
   providers: [MatchingService, NovaService, TitanEmbeddingService],
   exports: [MatchingService],

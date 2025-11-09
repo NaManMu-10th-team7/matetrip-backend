@@ -1,16 +1,31 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  Req,
+  HttpStatus,
+  UseGuards,
+  Post,
+} from '@nestjs/common';
 import { MatchingService } from './matching.service';
 import { MatchRequestDto } from './dto/match-request.dto';
-import { SyncMatchingProfileDto } from './dto/sync-matching-profile.dto';
+import { EmbeddingMatchingProfileDto } from './dto/embedding-matching-profile.dto';
+import { AuthGuard } from '@nestjs/passport';
+
+type RequestWithUser = Request & { user: { id: string } };
 
 @Controller('matching')
 export class MatchingController {
   constructor(private readonly matchingService: MatchingService) {}
 
   @Post('search')
+  @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
-  searchMatches(@Body() matchRequestDto: MatchRequestDto) {
-    return this.matchingService.findMatches(matchRequestDto);
+  searchMatches(
+    @Req() req: RequestWithUser,
+    @Body() matchRequestDto: MatchRequestDto,
+  ) {
+    return this.matchingService.findMatches(req.user.id, matchRequestDto);
   }
 
   //   메인 페이지에서 “추천 20명”을 보고 싶을 때 프론트는
@@ -21,9 +36,13 @@ export class MatchingController {
   // 프론트는 전달받은 후보 목록을 그대로 화면에 렌더링합니다.
   // 벡터나 가중치 계산은 모두 서버 쪽에서 처리하므로, 프론트는 결과만 받으면 됩니다.
 
-  @Post('profile/sync')
+  @Post('profile/embedding')
+  @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
-  async syncProfile(@Body() dto: SyncMatchingProfileDto) {
-    return this.matchingService.syncMatchingProfile(dto);
+  async embeddingProfile(
+    @Req() req: RequestWithUser,
+    @Body() dto: EmbeddingMatchingProfileDto,
+  ) {
+    return this.matchingService.embeddingMatchingProfile(req.user.id, dto);
   }
 }
