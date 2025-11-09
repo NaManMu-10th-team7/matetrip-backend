@@ -2,11 +2,7 @@ import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Users } from '../../users/entities/users.entity';
 import { PlanDay } from './plan-day.entity';
 import { BaseTimestampEntity } from '../../../base.entity';
-
-enum PoiStatus {
-  MARKED = 'MARKED',
-  SCHEDULED = 'SCHEDULED',
-}
+import { PoiStatus } from './poi-status.enum.js';
 
 @Entity('poi', { schema: 'public' })
 export class Poi extends BaseTimestampEntity {
@@ -16,7 +12,7 @@ export class Poi extends BaseTimestampEntity {
 
   @ManyToOne(() => PlanDay, { onDelete: 'CASCADE' })
   @JoinColumn([{ name: 'plan_day_id', referencedColumnName: 'id' }])
-  planDay?: PlanDay;
+  planDay: PlanDay;
 
   @Column({ type: 'text', name: 'place_name', nullable: false })
   placeName: string;

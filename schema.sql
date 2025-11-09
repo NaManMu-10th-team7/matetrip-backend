@@ -31,7 +31,6 @@ CREATE TYPE tendency_type AS ENUM ('내향적','외향적');
 CREATE TYPE travel_style_type AS ENUM ('RELAXED', 'ACTIVE', 'CULTURAL', 'FOODIE', 'NATURE');
 CREATE TYPE poi_status AS ENUM ('MARKED', 'SCHEDULED');
 
-
 CREATE TABLE IF NOT EXISTS binary_content
 (
     id         UUID PRIMARY KEY     DEFAULT gen_random_uuid(),

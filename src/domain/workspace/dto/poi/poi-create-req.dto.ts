@@ -36,7 +36,7 @@ export class PoiCreateReqDto {
   @IsNotEmpty()
   address: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  placeName?: string;
+  placeName: string;
 }

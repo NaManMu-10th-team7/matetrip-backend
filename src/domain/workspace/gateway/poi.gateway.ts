@@ -16,10 +16,11 @@ import { PoiSocketDto } from '../dto/poi/poi-socket.dto.js';
 import { PoiCreateReqDto } from '../dto/poi/poi-create-req.dto.js';
 import { WorkspaceService } from '../service/workspace.service.js';
 import { PoiService } from '../service/poi.service.js';
-import { CachedPoi } from '../types/cached-poi.js';
+import { PoiCacheService } from '../service/poi-cache.service.js';
 import { PoiRemoveReqDto } from '../dto/poi/poi-remove-req.dto.js';
-import { PoiCreateResDto } from '../dto/poi/poi-create-res.dto.js';
+import { PoiResDto } from '../dto/poi/poi-res.dto.js';
 import { PoiAddScheduleReqDto } from '../dto/poi/poi-add-schedule-req.dto.js';
+import { PoiReorderReqDto } from '../dto/poi/poi-reorder-req.dto.js';
 
 const PoiSocketEvent = {
   JOIN: 'join',
@@ -37,6 +38,7 @@ const PoiSocketEvent = {
   // POI_DISCONNECT: 'poi:disconnect',
   REORDER: 'reorder',
   ADD_SCHEDULE: 'addSchedule',
+  REMOVE_SCHEDULE: 'removeSchedule',
   CONNECTED: 'connected',
   DISCONNECT: 'disconnect',
   DISCONNECTED: 'disconnected',
@@ -61,6 +63,7 @@ export class PoiGateway {
   constructor(
     private readonly workspaceService: WorkspaceService,
     private readonly poiService: PoiService,
+    private readonly poiCacheService: PoiCacheService,
   ) {}
 
   @SubscribeMessage(PoiSocketEvent.JOIN)
@@ -75,7 +78,7 @@ export class PoiGateway {
         workspaceId: data.workspaceId,
       });
 
-      const pois: CachedPoi[] = await this.poiService.getWorkspacePois(
+      const pois: PoiResDto[] = await this.poiService.getWorkspacePois(
         data.workspaceId,
       );
 
@@ -119,13 +122,10 @@ export class PoiGateway {
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
 
-      const cachedPoi = await this.workspaceService.cachePoi(
-        data.workspaceId,
-        data,
-      );
+      const cachedPoi = await this.workspaceService.cachePoi(data);
 
       // todo : 바뀐거 말하기
-      const markedPoi: PoiCreateResDto = PoiCreateResDto.of(cachedPoi);
+      const markedPoi: PoiResDto = PoiResDto.of(cachedPoi);
 
       this.server.to(roomName).emit(PoiSocketEvent.MARKED, markedPoi);
 
@@ -178,16 +178,14 @@ export class PoiGateway {
   ) {
     try {
       this.validateRoomAuth(this.getPoiRoomName(data.workspaceId), socket);
-      // todo : flushPoiConnections
-      await this.workspaceService.flushPois(data.workspaceId);
-      // await this.workspaceService.flushConnections(data.workspaceId);
 
-      // 일단은 log는 Poi만
-      this.logger.log(`Workspace ${data.workspaceId} flushed POIs `);
-      this.logger.log(`Workspace ${data.workspaceId} flushed POIConnections `);
-    } catch {
+      await this.poiService.flushWorkspacePois(data.workspaceId);
+
+      this.logger.log(`Workspace ${data.workspaceId} flushed POIs`);
+    } catch (error) {
       this.logger.error(
         `Socket ${socket.id} failed to flush workspace ${data.workspaceId}`,
+        error,
       );
     }
   }
@@ -196,10 +194,100 @@ export class PoiGateway {
   async handlePoiAddSchedule(
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: PoiAddScheduleReqDto,
-  ) {}
+  ) {
+    try {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      this.validateRoomAuth(roomName, socket);
+
+      // POI를 SCHEDULED로 전환하고 List에 추가
+      await this.poiCacheService.addToSchedule(
+        data.workspaceId,
+        data.planDayId,
+        data.poiId,
+      );
+
+      // 모든 클라이언트에 알림
+      this.server.to(roomName).emit(PoiSocketEvent.ADD_SCHEDULE, {
+        poiId: data.poiId,
+        planDayId: data.planDayId,
+      });
+
+      this.logger.debug(
+        `Socket ${socket.id} added POI ${data.poiId} to schedule in planDay ${data.planDayId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Socket ${socket.id} failed to add POI to schedule`,
+        error,
+      );
+    }
+  }
+
+  @SubscribeMessage(PoiSocketEvent.REMOVE_SCHEDULE)
+  async handlePoiRemoveSchedule(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: PoiAddScheduleReqDto,
+  ) {
+    try {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      this.validateRoomAuth(roomName, socket);
+
+      // POI를 MARKED로 전환하고 List에서 제거
+      await this.poiCacheService.removeFromSchedule(
+        data.workspaceId,
+        data.planDayId,
+        data.poiId,
+      );
+
+      // 모든 클라이언트에 알림
+      this.server.to(roomName).emit(PoiSocketEvent.REMOVE_SCHEDULE, {
+        poiId: data.poiId,
+        planDayId: data.planDayId,
+      });
+
+      this.logger.debug(
+        `Socket ${socket.id} removed POI ${data.poiId} from schedule in planDay ${data.planDayId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Socket ${socket.id} failed to remove POI from schedule`,
+        error,
+      );
+    }
+  }
 
   @SubscribeMessage(PoiSocketEvent.REORDER)
-  async handlePoiReorder() {}
+  async handlePoiReorder(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: PoiReorderReqDto,
+  ) {
+    try {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      this.validateRoomAuth(roomName, socket);
+
+      // Redis List 순서 업데이트 (Hash의 sequence도 함께 업데이트됨)
+      await this.poiCacheService.reorderScheduledPois(
+        data.workspaceId,
+        data.planDayId,
+        data.poiIds,
+      );
+
+      // 같은 room의 모든 클라이언트에게 순서 변경 알림
+      this.server.to(roomName).emit(PoiSocketEvent.REORDER, {
+        planDayId: data.planDayId,
+        poiIds: data.poiIds,
+      });
+
+      this.logger.debug(
+        `Socket ${socket.id} reordered POIs in planDay ${data.planDayId}: ${data.poiIds.join(', ')}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Socket ${socket.id} failed to reorder POIs in planDay ${data.planDayId}`,
+        error,
+      );
+    }
+  }
 
   // @SubscribeMessage(PoiSocketEvent.POI_CONNECT)
   // async handlePoiConnection(

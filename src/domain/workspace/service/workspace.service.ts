@@ -10,7 +10,7 @@ import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from '../entities/plan-day.entity.js';
 import { PoiCreateReqDto } from '../dto/poi/poi-create-req.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
-import { CachedPoi, buildCachedPoi } from '../types/cached-poi.js';
+import { CachedPoi, buildCachedPoiFromCreateDto } from '../types/cached-poi.js';
 import { PlanDayService } from './plan-day.service.js';
 import { PoiService } from './poi.service.js';
 import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
@@ -83,38 +83,10 @@ export class WorkspaceService {
     };
   }
 
-  async cachePoi(
-    workspaceId: string,
-    dto: PoiCreateReqDto,
-  ): Promise<CachedPoi> {
-    const cachedPoi: CachedPoi = buildCachedPoi(workspaceId, dto);
-    await this.poiCacheService.upsertMarkedPoi(workspaceId, cachedPoi);
+  async cachePoi(dto: PoiCreateReqDto): Promise<CachedPoi> {
+    const cachedPoi: CachedPoi = buildCachedPoiFromCreateDto(dto);
+    await this.poiCacheService.upsertPoi(dto.workspaceId, cachedPoi);
     return cachedPoi;
-  }
-
-  async flushPois(workspaceId: string) {
-    const cachedPois: CachedPoi[] =
-      await this.poiCacheService.getWorkspacePois(workspaceId);
-
-    if (cachedPois.length === 0) return;
-
-    const poisToPersist: CachedPoi[] = cachedPois.filter(
-      (poi) => !poi.isPersisted,
-    );
-
-    if (poisToPersist.length > 0) {
-      try {
-        await Promise.all(
-          poisToPersist.map((poi) => this.poiService.persistPoi(poi)),
-        );
-      } catch (e) {
-        console.log('poi persist error', e);
-        throw e;
-      }
-    }
-
-    // 다 저장했으면 clear
-    await this.poiCacheService.clearWorkspacePois(workspaceId);
   }
 
   async isExist(workspaceId: string): Promise<boolean> {
