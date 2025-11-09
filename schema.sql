@@ -19,17 +19,20 @@ DROP TYPE IF EXISTS keyword_type;
 DROP TYPE IF EXISTS gender;
 DROP TYPE IF EXISTS post_status;
 DROP TYPE IF EXISTS post_participation_status;
-DROP TYPE IF EXISTS tendency_type;
+DROP TYPE IF EXISTS travel_tendency_type;
 DROP TYPE IF EXISTS travel_style_type;
 DROP TYPE IF EXISTS poi_status;
+DROP TYPE if exists mbti_type;
+
 
 CREATE TYPE keyword_type AS ENUM ('FOOD', 'ACCOMMODATION', 'ACTIVITY', 'TRANSPORT');
 CREATE TYPE gender as ENUM ('남성', '여성');
 CREATE TYPE post_status AS ENUM ('모집중','완료');
 CREATE TYPE post_participation_status AS ENUM ('대기중', '승인', '거절');
-CREATE TYPE tendency_type AS ENUM ('내향적','외향적');
+CREATE TYPE travel_tendency_type AS ENUM ('내향적','외향적');
 CREATE TYPE travel_style_type AS ENUM ('RELAXED', 'ACTIVE', 'CULTURAL', 'FOODIE', 'NATURE');
 CREATE TYPE poi_status AS ENUM ('MARKED', 'SCHEDULED');
+CREATE TYPE mbti_type AS ENUM ('ISFJ', 'ISFP', 'ISTJ', 'ISTP', 'INFJ', 'INFP', 'INTJ', 'INTP', 'ESFJ', 'ESFP', 'ESTJ', 'ESTP', 'ENFJ', 'ENFP', 'ENTJ', 'ENTP');
 
 CREATE TABLE IF NOT EXISTS binary_content
 (
@@ -58,9 +61,14 @@ CREATE TABLE IF NOT EXISTS profile
     updated_at       TIMESTAMPTZ,
     nickname         TEXT        NOT NULL,
     gender           gender        NOT NULL,
+    birth_date       DATE        NOT NULL,
+    manner_temperature NUMERIC(4,1) NOT NULL DEFAULT 36.5,
+    intro            TEXT        NOT NULL,
     description      TEXT        NOT NULL,
     travel_styles    travel_style_type[]      NOT NULL DEFAULT '{}'::travel_style_type[],
-    tendency         tendency_type[]      NOT NULL DEFAULT '{}'::tendency_type[]
+    tendency         travel_tendency_type[]      NOT NULL DEFAULT '{}'::tendency_type[],
+    mbti             mbti_type        NOT null,
+    is_pass_auth     BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS post
@@ -86,6 +94,7 @@ CREATE TABLE IF NOT EXISTS workspace
     workspace_name TEXT             NOT NULL,
     base_longitude DOUBLE PRECISION NOT NULL,
     base_latitude  DOUBLE PRECISION NOT NULL,
+    memo           TEXT             NOT NULL,
     -- 위경도 범위 체크
     CHECK (base_longitude BETWEEN -180 AND 180),
     CHECK (base_latitude BETWEEN -90 AND 90)
