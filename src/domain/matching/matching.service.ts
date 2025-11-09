@@ -5,7 +5,7 @@ import { MatchingProfile } from './entities/matching-profile.entity';
 import { MatchRequestDto } from './dto/match-request.dto';
 import { MatchResponseDto } from './dto/match-response.dto';
 import { SyncMatchingProfileDto } from './dto/sync-matching-profile.dto';
-import { Users } from '../users/entities/users.entity';
+import { Profile } from '../profile/entities/profile.entity';
 import { NovaService } from '../../ai/summaryLLM.service';
 import { TitanEmbeddingService } from '../../ai/titan-embedding.service';
 
@@ -14,8 +14,8 @@ export class MatchingService {
   constructor(
     @InjectRepository(MatchingProfile)
     private readonly matchingProfileRepository: Repository<MatchingProfile>,
-    @InjectRepository(Users)
-    private readonly usersRepository: Repository<Users>,
+    @InjectRepository(Profile)
+    private readonly profileRepository: Repository<Profile>,
     private readonly novaService: NovaService,
     private readonly titanEmbeddingService: TitanEmbeddingService,
   ) {}
@@ -28,12 +28,14 @@ export class MatchingService {
   }
 
   async syncMatchingProfile(dto: SyncMatchingProfileDto) {
-    const user = await this.usersRepository.findOne({
-      where: { id: dto.userId },
+    const profile = await this.profileRepository.findOne({
+      where: { user: { id: dto.userId } }, // profile.user_id = dto.userId
+      relations: ['user'], // user relation까지 같이 로드
     });
-    if (!user) {
+    if (!profile?.user) {
       throw new NotFoundException(`User with ID ${dto.userId} not found`);
     }
+    const user = profile.user;
     // LLM이 description을 받고 1~2줄 요약을 해줌 = summary
     const summary = await this.novaService.summarizeDescription(
       dto.description,
