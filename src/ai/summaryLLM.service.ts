@@ -1,52 +1,14 @@
-import { HttpService } from '@nestjs/axios';
+import {
+  BedrockRuntimeClient,
+  BedrockRuntimeServiceException,
+  ConverseCommand,
+  ConverseCommandOutput,
+  Message,
+} from '@aws-sdk/client-bedrock-runtime';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { AxiosRequestConfig, AxiosResponse } from 'axios';
-import axios from 'axios';
 
-// 단일 텍스트 파트를 표현 (Gemini API는 role/parts 구조를 요구)
-interface GeminiRequestPart {
-  text: string;
-}
-
-// role + parts 세트를 묶어 하나의 대화 turn을 나타낸다.
-interface GeminiRequestContent {
-  role: string;
-  parts: GeminiRequestPart[];
-}
-
-// Gemini GenerateContent 호출에 전달되는 전체 payload
-interface GeminiRequest {
-  contents: GeminiRequestContent[];
-  generationConfig?: {
-    temperature?: number;
-    maxOutputTokens?: number;
-    topK?: number;
-    topP?: number;
-  };
-}
-
-// Gemini 응답 내 텍스트 파트
-interface GeminiResponsePart {
-  text?: string;
-}
-
-// 응답의 content 래퍼
-interface GeminiResponseContent {
-  parts?: GeminiResponsePart[];
-}
-
-// 후보 응답 단위
-interface GeminiCandidate {
-  content?: GeminiResponseContent;
-}
-
-// 전체 Gemini 응답
-interface GeminiResponse {
-  candidates?: GeminiCandidate[];
-}
-
-// 요약 동작을 조절할 수 있는 옵션 세트
+// 요약 옵션은 외부 클래스가 그대로 재사용하므로 기존 인터페이스를 유지한다.
 interface SummarizeOptions {
   maxLength?: number;
   language?: string;
@@ -55,137 +17,150 @@ interface SummarizeOptions {
 }
 
 @Injectable()
-export class GeminiService {
-  private readonly logger = new Logger(GeminiService.name);
-  private readonly apiKey: string;
-  private readonly baseUrl =
-    'https://generativelanguage.googleapis.com/v1beta/models';
+export class NovaService {
+  private readonly logger = new Logger(NovaService.name);
+  private readonly client: BedrockRuntimeClient;
+  private readonly modelId: string;
+  private readonly defaultMaxTokens: number;
 
-  constructor(
-    private readonly http: HttpService,
-    private readonly config: ConfigService,
-  ) {
-    this.apiKey = this.config.get<string>('GEMINI_API_KEY') || '';
-    if (!this.apiKey) {
-      this.logger.warn('GEMINI_API_KEY not configured');
+  constructor(private readonly configService: ConfigService) {
+    // Bedrock 호출에 필요한 액세스 키와 리전을 전부 환경 변수에서 로드한다.
+    const accessKeyId =
+      this.configService.get<string>('AWS_ACCESS_KEY_ID') ?? '';
+    const secretAccessKey =
+      this.configService.get<string>('AWS_SECRET_ACCESS_KEY') ?? '';
+    const sessionToken =
+      this.configService.get<string>('AWS_SESSION_TOKEN') ?? undefined;
+    const region =
+      this.configService.get<string>('AWS_BEDROCK_REGION') ||
+      this.configService.get<string>('AWS_REGION') ||
+      'ap-northeast-2'; // 서울 리전을 기본값으로 둬서 베드락 신규 리전에 맞춘다.
+
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error('Bedrock credentials are not configured.');
     }
+
+    // AWS SDK v3 클라이언트는 재사용이 권장되므로 생성자에서 단 한 번만 만든다.
+    this.client = new BedrockRuntimeClient({
+      region,
+      credentials: { accessKeyId, secretAccessKey, sessionToken },
+    });
+
+    // 모델/토큰 수는 환경변수로 오버라이드할 수 있도록 열어 둔다.
+    this.modelId =
+      this.configService.get<string>('NOVA_SUMMARY_MODEL') ??
+      'amazon.nova-lite-v1:0';
+    this.defaultMaxTokens =
+      Number(this.configService.get<string>('NOVA_SUMMARY_MAX_TOKENS')) || 512;
   }
 
   /**
-   * 텍스트 요약 (기본 메서드)
+   * 1~2줄 요약에 맞춘 편의 메서드 (기존 퍼블릭 API 유지)
    */
   async summarizeDescription(description: string): Promise<string> {
-    // 1-2줄 요약을 위해 maxLength: 2로 설정
-    return this.summarize(description, {
-      maxLength: 2,
-      language: '한국어',
-    });
+    return this.summarize(description, { maxLength: 2, language: '한국어' });
   }
 
   /**
-   * 범용 텍스트 요약 메서드
+   * Nova Lite를 이용해 주어진 텍스트를 요약한다.
+   * - 입력이 공백이면 즉시 빈 문자열 반환
+   * - 실패 시에도 빈 문자열로 폴백하여 호출부 영향 최소화
    */
   async summarize(
     text: string,
     options: SummarizeOptions = {},
   ): Promise<string> {
-    if (!text?.trim()) return '';
-    if (!this.apiKey) {
-      this.logger.error('Gemini API key is not configured');
+    if (!text?.trim()) {
       return '';
     }
 
     const {
       maxLength = 2,
       language = '한국어',
-      temperature = 0.7, //답변 랜덤성
+      temperature = 0.7, //랜덤성
       timeout = 5000,
     } = options;
 
-    // *** 변경점 2: 프롬프트를 조금 더 명확하게 수정 ***
-    const prompt = `다음 텍스트를 ${language}로 ${maxLength}줄 이내로 요약해줘. 핵심 내용만 간결하게.
+    // Nova 모델은 영어 지시문을 선호하지만, 한국어 결과를 원하므로 명확히 지정한다.
+    const prompt = `Summarize the following text in ${language} within ${maxLength} sentences. Make it concise but preserve key facts.\n\n---\n${text}\n---`;
 
----
-${text}
----`;
-
-    const body: GeminiRequest = {
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature,
-        maxOutputTokens: 1024, // 조금 여유 있게 설정
-        topK: 40,
-        topP: 0.95,
+    // Bedrock Converse API는 role/content 구조를 사용한다. (텍스트만 사용하므로 심플)
+    const messages: Message[] = [
+      {
+        role: 'user',
+        content: [{ text: prompt }],
       },
-    };
+    ];
+
+    const command = new ConverseCommand({
+      modelId: this.modelId,
+      messages,
+      inferenceConfig: {
+        temperature,
+        topP: 0.9,
+        maxTokens: this.defaultMaxTokens,
+      },
+    });
 
     try {
-      const requestConfig: AxiosRequestConfig<GeminiRequest> = {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout,
-      };
+      // requestTimeout으로 SDK 차원의 타임아웃을 강제해 네트워크 지연으로부터 호출부를 보호한다.
+      const response = await this.client.send(command, {
+        requestTimeout: timeout,
+      });
+      const summary = this.extractText(response);
 
-      // *** 변경점 3: API 키를 URL 파라미터로 전달 (권장 방식) ***
-      const url = `${this.baseUrl}/gemini-1.5-flash-latest:generateContent?key=${this.apiKey}`;
-
-      // *** 변경점 4: POST 요청의 제네릭 타입을 간소화 ***
-      // T = 응답 데이터 타입 (GeminiResponse)
-      // R = 전체 응답 객체 타입 (AxiosResponse<GeminiResponse>)
-      // D = 요청 데이터 타입 (GeminiRequest)
-      //await: 동기로 처리함
-      const response = await this.http.axiosRef.post<
-        GeminiResponse,
-        AxiosResponse<GeminiResponse>,
-        GeminiRequest
-      >(url, body, requestConfig);
-
-      // (기존 코드와 동일)
-      const result =
-        response.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
-      //여러 개의 답변 후보를 생성 ,대체 응답을 보낼 수 있도록 확장성을 고려해 배열로 설계되었는데
-      // 이 경우에는 응답이 하나만 필요함. 첫번째 답변만 받아옴(사실 이 경우, 첫번째 응답밖에 없음)
-      //?? : 첫 번째 파트에서 텍스트를 꺼내오고 없으면 빈 문자열을 반환하는 방어 코드
-
-      if (!result) {
-        this.logger.warn('No text content in Gemini response', response.data);
+      if (!summary) {
+        this.logger.warn('Nova Lite returned an empty summary response.');
         return '';
       }
 
-      return result; // 요약본 반환
-    } catch (error: unknown) {
+      return summary;
+    } catch (error) {
       this.handleError(error);
-      return ''; // 에러 발생 시 빈 문자열 반환
+      return '';
     }
   }
 
   /**
-   * *** 변경점 5: 타입-안전한 에러 핸들링 (핵심) ***
+   * Converse 응답 객체에서 텍스트 블록만 추출해 하나의 문자열로 합친다.
+   */
+  private extractText(response: ConverseCommandOutput): string | null {
+    const contentBlocks = response.output?.message?.content;
+    if (!contentBlocks?.length) {
+      return null;
+    }
+
+    const chunks = contentBlocks
+      .map((block) => block.text?.trim())
+      .filter((chunk): chunk is string => Boolean(chunk));
+    // Nova는 하나 이상의 텍스트 블록을 반환할 수 있으므로 모두 이어붙여 완성된 요약으로 만든다.
+    //nova는 블록단위로 답변을 보내는 데, 블록을 합쳐서 하나의 답변을 만든다
+
+    if (!chunks.length) {
+      return null;
+    }
+
+    return chunks.join('\n');
+  }
+
+  /**
+   * Bedrock 예외는 전부 BedrockRuntimeServiceException을 확장하므로 이를 우선 처리한다.
    */
   private handleError(error: unknown): void {
-    // 1. Axios 에러인지 타입 가드로 확인
-    if (axios.isAxiosError<GeminiResponse, GeminiRequest>(error)) {
-      // 이 블록 안에서 `error`는 `AxiosError` 타입으로 안전하게 추론됩니다.
-      const status = error.response?.status;
-      const data: GeminiResponse | undefined = error.response?.data;
-      const message = error.message;
-
-      if (status === 429) {
-        this.logger.warn('Gemini API rate limit exceeded (429).');
-      } else if (status === 400) {
-        this.logger.error('Gemini API bad request (400):', data);
-      } else if (status === 403) {
-        this.logger.error(
-          'Gemini API authentication failed (403) - Check API Key.',
-        );
-      } else {
-        this.logger.error(`Gemini API error (${status}): ${message}`, data);
-      }
-    } else if (error instanceof Error) {
-      this.logger.error(`Non-Axios error: ${error.message}`, error.stack);
-    } else {
-      this.logger.error('An unknown error occurred', error);
+    if (error instanceof BedrockRuntimeServiceException) {
+      const status = error.$metadata?.httpStatusCode;
+      this.logger.error(
+        `Bedrock service error (${status ?? 'unknown'}) - ${error.name}: ${error.message}`,
+      );
+      return;
     }
+
+    if (error instanceof Error) {
+      // SDK 레벨에서 발생한 네트워크/직렬화 오류 등은 여기서 전부 처리한다.
+      this.logger.error(`Bedrock client error: ${error.message}`, error.stack);
+      return;
+    }
+
+    this.logger.error('Unknown error occurred while calling Nova Lite', error);
   }
 }

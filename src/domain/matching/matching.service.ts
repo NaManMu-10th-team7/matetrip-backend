@@ -6,7 +6,7 @@ import { MatchRequestDto } from './dto/match-request.dto';
 import { MatchResponseDto } from './dto/match-response.dto';
 import { SyncMatchingProfileDto } from './dto/sync-matching-profile.dto';
 import { Users } from '../users/entities/users.entity';
-import { GeminiService } from '../../ai/summaryLLM.service';
+import { NovaService } from '../../ai/summaryLLM.service';
 import { TitanEmbeddingService } from '../../ai/titan-embedding.service';
 
 @Injectable()
@@ -16,7 +16,7 @@ export class MatchingService {
     private readonly matchingProfileRepository: Repository<MatchingProfile>,
     @InjectRepository(Users)
     private readonly usersRepository: Repository<Users>,
-    private readonly geminiService: GeminiService,
+    private readonly novaService: NovaService,
     private readonly titanEmbeddingService: TitanEmbeddingService,
   ) {}
 
@@ -35,7 +35,7 @@ export class MatchingService {
       throw new NotFoundException(`User with ID ${dto.userId} not found`);
     }
     // LLM이 description을 받고 1~2줄 요약을 해줌 = summary
-    const summary = await this.geminiService.summarizeDescription(
+    const summary = await this.novaService.summarizeDescription(
       dto.description,
     );
     const matchingProfile = // 인스턴스 생성(이미 있으면 내용 추가, 아니면 생성)
