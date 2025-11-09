@@ -294,10 +294,7 @@ export class MatchingService {
         relations: ['user'],
       })) ?? this.matchingProfileRepository.create({ user });
     // matching_profile 정보 넣기
-    matchingProfile.profileDetail = dto.description;
     matchingProfile.profileSummary = summary;
-    matchingProfile.travelTendencyTypes = dto.travelTendencyTypes ?? [];
-    matchingProfile.travelTendencies = dto.travelTendencies ?? [];
     matchingProfile.profileEmbedding =
       (await this.titanEmbeddingService.embedText(
         summary || dto.description,
