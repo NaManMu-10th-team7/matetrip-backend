@@ -14,6 +14,9 @@ import { TendencyType } from '../profile/entities/tendency-type.enum';
 import { Post } from '../post/entities/post.entity';
 import { PostStatus } from '../post/entities/post-status.enum';
 import { MBTI_TYPES } from '../profile/entities/mbti.enum';
+import { SyncMatchingProfileDto } from './dto/sync-matching-profile.dto';
+import { NovaService } from '../../ai/summaryLLM.service';
+import { TitanEmbeddingService } from '../../ai/titan-embedding.service';
 
 interface RawMatchRow {
   userId: string;
@@ -36,9 +39,13 @@ export class MatchingService {
     private readonly matchingProfileRepository: Repository<MatchingProfile>,
     @InjectRepository(Profile)
     private readonly profileRepository: Repository<Profile>,
+    private readonly novaService: NovaService,
+    private readonly titanEmbeddingService: TitanEmbeddingService,
   ) {}
 
-  async findMatches(matchRequestDto: MatchRequestDto): Promise<MatchResponseDto> {
+  async findMatches(
+    matchRequestDto: MatchRequestDto,
+  ): Promise<MatchResponseDto> {
     const requesterProfile = await this.profileRepository.findOne({
       where: { user: { id: matchRequestDto.userId } },
       relations: { user: true },
@@ -266,5 +273,35 @@ export class MatchingService {
       TENDENCY_WEIGHT * tendencyScore +
       MBTI_WEIGHT * mbtiScore
     );
+  }
+
+  async syncMatchingProfile(dto: SyncMatchingProfileDto) {
+    const profile = await this.profileRepository.findOne({
+      where: { user: { id: dto.userId } }, // profile.user_id = dto.userId
+      relations: ['user'], // user relation까지 같이 로드
+    });
+    if (!profile?.user) {
+      throw new NotFoundException(`User with ID ${dto.userId} not found`);
+    }
+    const user = profile.user;
+    // LLM이 description을 받고 1~2줄 요약을 해줌 = summary
+    const summary = await this.novaService.summarizeDescription(
+      dto.description,
+    );
+    const matchingProfile = // 인스턴스 생성(이미 있으면 내용 추가, 아니면 생성)
+      (await this.matchingProfileRepository.findOne({
+        where: { user: { id: dto.userId } },
+        relations: ['user'],
+      })) ?? this.matchingProfileRepository.create({ user });
+    // matching_profile 정보 넣기
+    matchingProfile.profileSummary = summary;
+    matchingProfile.profileEmbedding =
+      (await this.titanEmbeddingService.embedText(
+        summary || dto.description,
+      )) ?? null;
+    // 요약이 있으면 그걸 먼저 쓰고, 요약이 비어 있으면 원본 description으로 폴백
+
+    return this.matchingProfileRepository.save(matchingProfile);
+    // 실제 DB에 이 레코드 반영 (INSERT or UPDATE)
   }
 }

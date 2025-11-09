@@ -44,7 +44,13 @@ import { JwtAuthGuard } from './jwt_auth.guard';
   ],
 
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy, LocalAuthGuard, JwtAuthGuard],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    LocalStrategy,
+    LocalAuthGuard,
+    JwtAuthGuard,
+  ],
   // 다른 모듈에서도 사용할 수 있게
   exports: [AuthService, PassportModule],
 })

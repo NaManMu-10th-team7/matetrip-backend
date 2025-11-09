@@ -3,18 +3,19 @@ import {
   ArrayUnique,
   IsArray,
   IsEnum,
-  IsNumber,
   IsOptional,
+  IsString,
   IsUUID,
-  Max,
-  Min,
 } from 'class-validator';
 import { TravelStyleType } from '../../profile/entities/travel-style-type.enum';
 import { TendencyType } from '../../profile/entities/tendency-type.enum';
 
-export class MatchRequestDto {
+export class SyncMatchingProfileDto {
   @IsUUID()
   userId: string;
+
+  @IsString()
+  description: string;
 
   @IsOptional()
   @IsArray()
@@ -29,11 +30,4 @@ export class MatchRequestDto {
   @ArrayNotEmpty()
   @IsEnum(TendencyType, { each: true })
   travelTendencies?: TendencyType[];
-
-  //유사도를 통해 얻어낼 사람 수 제한
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(50)
-  limit?: number;
 }
