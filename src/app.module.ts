@@ -15,6 +15,7 @@ import { AuthModule } from './domain/auth/auth.module';
 import { RedisModule } from './redis/redis.module';
 import { NotificationsModule } from './domain/notifications/notifications.module';
 import { OpenviduModule } from './openvidu/openvidu.module';
+import { MatchingModule } from './domain/matching/matching.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { OpenviduModule } from './openvidu/openvidu.module';
     RedisModule,
     NotificationsModule,
     OpenviduModule,
+    MatchingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

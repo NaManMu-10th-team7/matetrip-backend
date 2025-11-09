@@ -1,16 +1,4 @@
 export enum TendencyType {
   INTROVERT = '내향적',
   EXTROVERT = '외향적',
-  CITY = '도시',
-  RURAL = '시골',
-  TRADITIONAL_CITY = '전통도시',
-  HISTORIC_CITY = '역사도시',
-  RESORT_CITY = '휴양도시',
-  PORT_TOWN = '항구도시',
-  ARCHITECTURE_TOUR = '건축물탐방',
-  NIGHT_VIEW = '야경감상',
-  SUNSET_SPOT = '일몰명소',
-  SUNRISE_SPOT = '일출명소',
-  LOCAL_MARKET = '현지시장',
-  SHOPPING = '쇼핑',
 }
