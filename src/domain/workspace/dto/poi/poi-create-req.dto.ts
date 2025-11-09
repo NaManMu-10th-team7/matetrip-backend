@@ -7,7 +7,7 @@ import {
   IsUUID,
 } from 'class-validator';
 
-export class CreatePoiReqDto {
+export class PoiCreateReqDto {
   @IsUUID()
   @IsNotEmpty()
   workspaceId: string;
@@ -36,7 +36,7 @@ export class CreatePoiReqDto {
   @IsNotEmpty()
   address: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  placeName?: string;
+  placeName: string;
 }

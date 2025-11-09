@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { CreatePoiReqDto } from '../dto/poi/create-poi-req.dto.js';
+import { PoiCreateReqDto } from '../dto/poi/poi-create-req.dto.js';
+import { PoiStatus } from '../entities/poi-status.enum.js';
 import { Poi } from '../entities/poi.entity.js';
 
 export interface CachedPoi {
@@ -7,25 +8,28 @@ export interface CachedPoi {
   workspaceId: string;
   planDayId?: string;
   createdBy: string;
+  placeName: string;
   longitude: number;
   latitude: number;
   address: string;
-  placeName?: string;
+  status: PoiStatus;
+  sequence: number;
   isPersisted: boolean;
 }
 
-export const buildCachedPoi = (
-  workspaceId: string,
-  dto: CreatePoiReqDto,
+export const buildCachedPoiFromCreateDto = (
+  dto: PoiCreateReqDto,
 ): CachedPoi => ({
   id: dto.poiId ?? randomUUID(),
-  workspaceId: workspaceId,
+  workspaceId: dto.workspaceId,
   planDayId: dto.planDayId,
   createdBy: dto.createdBy,
+  placeName: dto.placeName,
   longitude: dto.longitude,
   latitude: dto.latitude,
   address: dto.address,
-  placeName: dto.placeName,
+  status: PoiStatus.MARKED,
+  sequence: 0,
   isPersisted: false,
 });
 
@@ -41,5 +45,7 @@ export const buildCachedPoiFromEntity = (
   latitude: poi.latitude,
   address: poi.address,
   placeName: poi.placeName,
+  status: poi.status,
+  sequence: poi.sequence,
   isPersisted: true,
 });

@@ -1,11 +1,15 @@
 import { IsNotEmpty, IsUUID } from 'class-validator';
 
-export class RemovePoiReqDto {
-  @IsUUID()
+export class PoiAddScheduleReqDto {
   @IsNotEmpty()
+  @IsUUID()
   workspaceId: string;
 
-  @IsUUID()
   @IsNotEmpty()
+  @IsUUID()
+  planDayId: string;
+
+  @IsNotEmpty()
+  @IsUUID()
   poiId: string;
 }
