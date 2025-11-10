@@ -65,7 +65,9 @@ export class UsersController {
   }
 
   @Get(':userId/participations')
-  findUserParticipations(@Param('userId') userId: string) {
+  findUserParticipations(
+    @Param('userId') userId: string,
+  ): Promise<PostResponseDto[]> {
     return this.postParticipationService.findUserParticipations(userId);
   }
 }

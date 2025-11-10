@@ -27,9 +27,7 @@ export class PostParticipationService {
     private readonly postRepository: Repository<Post>, // @InjectRepository(Users) // private readonly userRepository: Repository<Users>,
   ) {}
 
-  async findUserParticipations(
-    userId: string,
-  ): Promise<PostParticipationResponseDto[]> {
+  async findUserParticipations(userId: string): Promise<PostResponseDto[]> {
     const participations = await this.postParticipationRepository.find({
       where: { requester: { id: userId } },
       relations: {
@@ -50,23 +48,20 @@ export class PostParticipationService {
     });
 
     return participations.map((p) =>
-      plainToInstance(PostParticipationResponseDto, {
-        ...p,
-        post: plainToInstance(
-          PostResponseDto,
-          {
-            ...p.post,
-            participations: p.post.participations.map((pp) =>
-              plainToInstance(SimplePostParticipationResponseDto, pp, {
-                excludeExtraneousValues: true,
-              }),
-            ),
-          },
-          {
-            excludeExtraneousValues: true,
-          },
-        ),
-      }),
+      plainToInstance(
+        PostResponseDto,
+        {
+          ...p.post,
+          participations: p.post.participations.map((pp) =>
+            plainToInstance(SimplePostParticipationResponseDto, pp, {
+              excludeExtraneousValues: true,
+            }),
+          ),
+        },
+        {
+          excludeExtraneousValues: true,
+        },
+      ),
     );
   }
 
