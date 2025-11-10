@@ -12,7 +12,7 @@ import { Post } from '../post/entities/post.entity';
 @Module({
   imports: [
     HttpModule,
-    TypeOrmModule.forFeature([MatchingProfile, Profile, Post], 'vector'), // ← 두 번째 커넥션 이름
+    TypeOrmModule.forFeature([MatchingProfile, Profile, Post]),
   ],
   controllers: [MatchingController],
   providers: [MatchingService, NovaService, TitanEmbeddingService],

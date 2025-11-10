@@ -44,7 +44,7 @@ const TENDENCY_WEIGHT = 0.2;
 @Injectable()
 export class MatchingService {
   constructor(
-    @InjectRepository(MatchingProfile, 'vector')
+    @InjectRepository(MatchingProfile)
     private readonly matchingProfileRepository: Repository<MatchingProfile>,
     @InjectRepository(Profile)
     private readonly profileRepository: Repository<Profile>,
@@ -55,7 +55,7 @@ export class MatchingService {
   ) {}
 
   async save(m: MatchingProfile) {
-    return this.matchingProfileRepository.save(m); // 항상 Docker pgvector DB로 감
+    return this.matchingProfileRepository.save(m);
   }
 
   async findMatches(
@@ -125,9 +125,9 @@ export class MatchingService {
     const baseTravelTendencies = requesterProfile.travelTendency ?? [];
 
     const filterTravelStyles =
-      matchRequestDto.travelTendencyTypes?.length &&
-      matchRequestDto.travelTendencyTypes.length > 0
-        ? matchRequestDto.travelTendencyTypes
+      matchRequestDto.travelStyleTypes?.length &&
+      matchRequestDto.travelStyleTypes.length > 0
+        ? matchRequestDto.travelStyleTypes
         : baseTravelStyles;
 
     const filterTravelTendencies =
@@ -206,7 +206,7 @@ export class MatchingService {
       query: {
         ...matchRequestDto,
         limit,
-        travelTendencyTypes: filterTravelStyles,
+        travelStyleTypes: filterTravelStyles,
         travelTendencies: filterTravelTendencies,
       },
     };

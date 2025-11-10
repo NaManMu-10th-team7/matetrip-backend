@@ -21,7 +21,7 @@ export class MatchRequestDto {
   @ArrayUnique()
   @ArrayNotEmpty()
   @IsEnum(TravelStyleType, { each: true })
-  travelTendencyTypes?: TravelStyleType[];
+  travelStyleTypes?: TravelStyleType[];
 
   @IsOptional()
   @IsArray()

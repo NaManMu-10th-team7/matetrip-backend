@@ -26,9 +26,9 @@ export class NovaService {
   constructor(private readonly configService: ConfigService) {
     // Bedrock 호출에 필요한 액세스 키와 리전을 전부 환경 변수에서 로드한다.
     const accessKeyId =
-      this.configService.get<string>('AWS_ACCESS_KEY_ID') ?? '';
+      this.configService.get<string>('AWS_LLM_ACCESS_KEY_ID') ?? '';
     const secretAccessKey =
-      this.configService.get<string>('AWS_SECRET_ACCESS_KEY') ?? '';
+      this.configService.get<string>('AWS_LLM_SECRET_ACCESS_KEY') ?? '';
     const sessionToken =
       this.configService.get<string>('AWS_SESSION_TOKEN') ?? undefined;
     const region =
@@ -49,7 +49,7 @@ export class NovaService {
     // 모델/토큰 수는 환경변수로 오버라이드할 수 있도록 열어 둔다.
     this.modelId =
       this.configService.get<string>('NOVA_SUMMARY_MODEL') ??
-      'amazon.nova-lite-v1:0';
+      'arn:aws:bedrock:ap-northeast-2:620257467167:inference-profile/apac.amazon.nova-lite-v1:0'; //arn url 갖고 와야함
     this.defaultMaxTokens =
       Number(this.configService.get<string>('NOVA_SUMMARY_MAX_TOKENS')) || 512;
   }
