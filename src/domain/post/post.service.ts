@@ -13,12 +13,16 @@ import { PostResponseDto } from './dto/post-response.dto.js';
 import { PostsPageQueryDto } from './dto/list-posts-query.dto.js';
 import { SearchPostDto } from './dto/search-post.dto';
 import { SimplePostParticipationResponseDto } from '../post-participation/dto/simple-post-participation-response.dto.js';
+import { PostParticipation } from '../post-participation/entities/post-participation.entity';
+import { PostParticipationStatus } from '../post-participation/entities/post-participation-status';
 
 @Injectable()
 export class PostService {
   constructor(
     @InjectRepository(Post)
     private readonly postRepository: Repository<Post>,
+    @InjectRepository(PostParticipation)
+    private readonly postParticipationRepository: Repository<PostParticipation>,
   ) {}
 
   async create(createPostDto: CreatePostDto, userId: string) {
@@ -181,5 +185,31 @@ export class PostService {
       .getMany();
 
     return posts.map((post) => this.toPostResponseDto(post));
+  }
+
+  async cancelParticipation(
+    postId: string,
+    participationId: string,
+    userId: string,
+  ): Promise<void> {
+    const participation = await this.postParticipationRepository.findOne({
+      where: {
+        id: participationId,
+        post: { id: postId },
+        requester: { id: userId },
+      },
+    });
+
+    if (!participation) {
+      throw new NotFoundException(
+        '해당하는 동행 신청을 찾을 수 없습니다. (잘못된 postId, participationId 또는 userId)',
+      );
+    }
+
+    const result = await this.postParticipationRepository.delete(participationId);
+
+    if (result.affected === 0) {
+      throw new BadRequestException('동행 신청 취소에 실패했습니다.');
+    }
   }
 }

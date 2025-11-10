@@ -20,7 +20,7 @@ import { PostResponseDto } from './dto/post-response.dto.js';
 import { SearchPostDto } from './dto/search-post.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
-@Controller('post')
+@Controller('posts')
 export class PostController {
   constructor(private readonly postService: PostService) {}
 
@@ -77,6 +77,21 @@ export class PostController {
     await this.postService.remove(id, userId);
     return {
       message: '성공적으로 삭제되었습니다',
+    };
+  }
+
+  @Delete(':postId/participations/:participationId')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  async cancelParticipation(
+    @Param('postId', new ParseUUIDPipe()) postId: string,
+    @Param('participationId', new ParseUUIDPipe()) participationId: string,
+    @Req() req: Request & { user: { id: string } },
+  ): Promise<any> {
+    const userId = req.user.id;
+    await this.postService.cancelParticipation(postId, participationId, userId);
+    return {
+      message: '동행 신청이 성공적으로 취소되었습니다.',
     };
   }
 }
