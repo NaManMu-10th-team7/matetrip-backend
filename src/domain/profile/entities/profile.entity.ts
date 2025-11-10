@@ -60,9 +60,9 @@ export class Profile extends BaseTimestampEntity {
   /*travel_tendency*/
   @Column({
     type: 'enum',
-    name: 'travel_tendency',
+    name: 'tendency',
     enum: TendencyType,
-    enumName: 'travel_tendency_type',
+    enumName: 'travel_tendency',
     array: true,
     default: () => "'{}'::travel_tendency_type[]",
   })

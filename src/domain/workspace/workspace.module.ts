@@ -11,8 +11,6 @@ import { RedisModule } from '../../redis/redis.module.js';
 import { Poi } from './entities/poi.entity.js';
 import { PoiService } from './service/poi.service.js';
 import { PlanDayService } from './service/plan-day.service.js';
-import { PoiConnectionCacheService } from './service/poi-connection-cache.service.js';
-import { PoiConnectionService } from './service/poi-connection.service.js';
 import { PoiConnection } from './entities/poi-connection.entity.js';
 import { PostParticipation } from '../post-participation/entities/post-participation.entity.js';
 import { ChatGateway } from './gateway/chat.gateway.js';
@@ -38,11 +36,9 @@ import { ChatMessage } from './entities/chat-message.entity.js';
     PoiGateway,
     ChatGateway,
     PoiCacheService,
-    PoiConnectionCacheService,
     PoiService,
     ChatMessageService,
     PlanDayService,
-    PoiConnectionService,
   ],
 })
 export class WorkspaceModule {}

@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateWorkspaceReqDto } from '../dto/create-workspace-req.dto';
 import { PostService } from '../../post/post.service.js';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,19 +8,11 @@ import { plainToInstance } from 'class-transformer';
 import { WorkspaceResDto } from '../dto/workspace-res.dto.js';
 import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from '../entities/plan-day.entity.js';
-import { CreatePoiReqDto } from '../dto/poi/create-poi-req.dto.js';
+import { PoiCreateReqDto } from '../dto/poi/poi-create-req.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
-import { CachedPoi, buildCachedPoi } from '../types/cached-poi.js';
+import { CachedPoi, buildCachedPoiFromCreateDto } from '../types/cached-poi.js';
 import { PlanDayService } from './plan-day.service.js';
-import { CreatePoiConnectionReqDto } from '../dto/poi/create-poi-connection-req.dto.js';
-import {
-  buildCachedPoiConnection,
-  CachePoiConnection,
-} from '../types/cached-poi-connection.js';
-import { PoiConnectionCacheService } from './poi-connection-cache.service.js';
-import { PoiConnectionService } from './poi-connection.service.js';
 import { PoiService } from './poi.service.js';
-import { PostParticipation } from '../../post-participation/entities/post-participation.entity.js';
 import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 
 @Injectable()
@@ -35,11 +23,7 @@ export class WorkspaceService {
     private readonly workspaceRepository: Repository<Workspace>,
     @InjectRepository(PlanDay)
     private readonly planDayRepository: Repository<PlanDay>,
-    @InjectRepository(PostParticipation)
-    private readonly postParticipationRepository: Repository<PostParticipation>,
     private readonly poiCacheService: PoiCacheService,
-    private readonly poiConnectionCacheService: PoiConnectionCacheService,
-    private readonly poiConnectionService: PoiConnectionService,
     private readonly poiService: PoiService,
     private readonly planDayService: PlanDayService,
   ) {}
@@ -99,88 +83,10 @@ export class WorkspaceService {
     };
   }
 
-  async cachePoi(
-    workspaceId: string,
-    dto: CreatePoiReqDto,
-  ): Promise<CachedPoi> {
-    const cachedPoi: CachedPoi = buildCachedPoi(workspaceId, dto);
-    await this.poiCacheService.upsertPoi(workspaceId, cachedPoi);
+  async cachePoi(dto: PoiCreateReqDto): Promise<CachedPoi> {
+    const cachedPoi: CachedPoi = buildCachedPoiFromCreateDto(dto);
+    await this.poiCacheService.upsertPoi(dto.workspaceId, cachedPoi);
     return cachedPoi;
-  }
-
-  async cachePoiConnection(
-    dto: CreatePoiConnectionReqDto,
-  ): Promise<CachePoiConnection> {
-    const planDay = await this.planDayService.getPlanDayWithWorkspace(
-      dto.planDayId,
-    );
-
-    // TODO : 바꿀 것
-    if (dto.workspaceId !== planDay.workspace.id) {
-      throw new BadRequestException(
-        'Plan day does not belong to the provided workspace',
-      );
-    }
-
-    const cachedPoiConnection: CachePoiConnection =
-      buildCachedPoiConnection(dto);
-
-    // 일단 update도 한번에 처리
-    await this.poiConnectionCacheService.upsertPoiConnection(
-      cachedPoiConnection,
-    );
-    return cachedPoiConnection;
-  }
-
-  async flushConnections(workspaceId: string) {
-    const connections: CachePoiConnection[] =
-      await this.poiConnectionCacheService.getPoiConnections(workspaceId);
-
-    if (connections.length === 0) return;
-
-    const connectionToPersist = connections.filter((c) => !c.isPersisted);
-
-    // todo : 이거 배치 처리하는 거 알아보기
-    if (connectionToPersist.length > 0) {
-      try {
-        await Promise.all(
-          connectionToPersist.map((connection) =>
-            this.poiConnectionService.persistPoiConnection(connection),
-          ),
-        );
-      } catch (e) {
-        console.log('connection persist error', e);
-        throw e;
-      }
-    }
-    await this.poiConnectionCacheService.clearWorkspacePoiConnections(
-      workspaceId,
-    );
-  }
-
-  async flushPois(workspaceId: string) {
-    const cachedPois: CachedPoi[] =
-      await this.poiCacheService.getWorkspacePois(workspaceId);
-
-    if (cachedPois.length === 0) return;
-
-    const poisToPersist: CachedPoi[] = cachedPois.filter(
-      (poi) => !poi.isPersisted,
-    );
-
-    if (poisToPersist.length > 0) {
-      try {
-        await Promise.all(
-          poisToPersist.map((poi) => this.poiService.persistPoi(poi)),
-        );
-      } catch (e) {
-        console.log('poi persist error', e);
-        throw e;
-      }
-    }
-
-    // 다 저장했으면 clear
-    await this.poiCacheService.clearWorkspacePois(workspaceId);
   }
 
   async isExist(workspaceId: string): Promise<boolean> {
@@ -209,4 +115,54 @@ export class WorkspaceService {
       excludeExtraneousValues: true,
     });
   }
+
+  // async cachePoiConnection(
+  //   dto: CreatePoiConnectionReqDto,
+  // ): Promise<CachePoiConnection> {
+  //   const planDay = await this.planDayService.getPlanDayWithWorkspace(
+  //     dto.planDayId,
+  //   );
+
+  //   // TODO : 바꿀 것
+  //   if (dto.workspaceId !== planDay.workspace.id) {
+  //     throw new BadRequestException(
+  //       'Plan day does not belong to the provided workspace',
+  //     );
+  //   }
+
+  //   const cachedPoiConnection: CachePoiConnection =
+  //     buildCachedPoiConnection(dto);
+
+  //   // // 일단 update도 한번에 처리
+  //   // await this.poiConnectionCacheService.upsertPoiConnection(
+  //   //   cachedPoiConnection,
+  //   // );
+  //   return cachedPoiConnection;
+  // }
+
+  // async flushConnections(workspaceId: string) {
+  //   const connections: CachePoiConnection[] =
+  //     await this.poiConnectionCacheService.getPoiConnections(workspaceId);
+
+  //   if (connections.length === 0) return;
+
+  //   const connectionToPersist = connections.filter((c) => !c.isPersisted);
+
+  //   // todo : 이거 배치 처리하는 거 알아보기
+  //   if (connectionToPersist.length > 0) {
+  //     try {
+  //       await Promise.all(
+  //         connectionToPersist.map((connection) =>
+  //           this.poiConnectionService.persistPoiConnection(connection),
+  //         ),
+  //       );
+  //     } catch (e) {
+  //       console.log('connection persist error', e);
+  //       throw e;
+  //     }
+  //   }
+  //   await this.poiConnectionCacheService.clearWorkspacePoiConnections(
+  //     workspaceId,
+  //   );
+  // }
 }

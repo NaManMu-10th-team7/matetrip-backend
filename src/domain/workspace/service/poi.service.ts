@@ -3,11 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Poi } from '../entities/poi.entity.js';
 import { In, Repository } from 'typeorm';
 import { PoiCacheService } from './poi-cache.service.js';
-import { buildCachedPoiFromEntity, CachedPoi } from '../types/cached-poi.js';
+import { CachedPoi } from '../types/cached-poi.js';
 import { Users } from '../../users/entities/users.entity.js';
 import { PlanDay } from '../entities/plan-day.entity.js';
 import { PlanDayService } from './plan-day.service.js';
 import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
+import { PoiResDto } from '../dto/poi/poi-res.dto.js';
 
 @Injectable()
 export class PoiService {
@@ -33,7 +34,7 @@ export class PoiService {
   // workspace의 저장된 poi들 전부 반환
   // 캐시에 있다면 그대로 반환
   // 캐시에 없다면 DB에서 반환 후 캐시
-  async getWorkspacePois(workspaceId: string): Promise<CachedPoi[]> {
+  async getWorkspacePois(workspaceId: string): Promise<PoiResDto[]> {
     const cached = await this.poiCacheService.getWorkspacePois(workspaceId);
     if (cached.length > 0) {
       // TODO: DTO로 변환
@@ -59,12 +60,9 @@ export class PoiService {
       relations: ['createdBy', 'planDay'],
     });
 
-    const cachedPois = pois.map((poi) =>
-      buildCachedPoiFromEntity(poi, workspaceId),
-    );
-    await this.poiCacheService.setWorkspacePois(workspaceId, cachedPois);
-    // TODO : DTO로 반환
-    return cachedPois;
+    await this.poiCacheService.setWorkspacePois(workspaceId, pois);
+
+    return pois.map((poi) => PoiResDto.fromEntity(poi));
   }
 
   async removeWorkspacePoi(
@@ -89,39 +87,48 @@ export class PoiService {
       return { persistedPois: [], newlyPersistedCount: 0 };
     }
 
-    /**
-     * flush 해야하는 경우
-     * - 일단 persisted가 false인 애들 고르기
-     * -
-     */
-    const poisToPersist = cachedPois.filter((poi) => !poi.isPersisted);
-    const newlyPersistedCount = poisToPersist.length;
-    if (poisToPersist.length > 0) {
-      const missingPlanDay = poisToPersist.filter((poi) => !poi.planDayId);
-      if (missingPlanDay.length > 0) {
-        throw new BadRequestException(
-          'planDayId is required to persist POIs for a workspace',
-        );
-      }
-
-      const entities = poisToPersist.map((poi) =>
-        this.poiRepository.create({
-          longitude: poi.longitude,
-          latitude: poi.latitude,
-          address: poi.address,
-          placeName: poi.placeName ?? '',
-          createdBy: { id: poi.createdBy } as Users,
-          planDay: { id: poi.planDayId as string } as PlanDay,
-        }),
+    const missingPlanDay = cachedPois.filter((poi) => !poi.planDayId);
+    if (missingPlanDay.length > 0) {
+      throw new BadRequestException(
+        'planDayId is required to persist POIs for a workspace',
       );
-
-      await this.poiRepository.save(entities);
     }
 
-    await this.poiCacheService.clearWorkspacePois(workspaceId);
+    /**
+     * 1. 모든 POI를 DB에 upsert
+     * - 새로 생성된 POI (isPersisted=false)
+     * - 상태가 변경된 POI (SCHEDULED↔MARKED)
+     * - sequence가 변경된 POI
+     */
+    const newlyPersistedCount = cachedPois.filter(
+      (poi) => !poi.isPersisted,
+    ).length;
+
+    const entities = cachedPois.map((poi) =>
+      this.poiRepository.create({
+        id: poi.id,
+        longitude: poi.longitude,
+        latitude: poi.latitude,
+        address: poi.address,
+        placeName: poi.placeName ?? '',
+        status: poi.status,
+        sequence: poi.sequence,
+        createdBy: { id: poi.createdBy } as Users,
+        planDay: { id: poi.planDayId as string } as PlanDay,
+      }),
+    );
+
+    // 모든 POI upsert: id 중복이면 update, 아니면 insert
+    // 변경 없는 POI는 실제로 write 안 일어남 (DB 최적화)
+    await this.poiRepository.upsert(entities, ['id']);
+
+    const planDayIds =
+      await this.planDayService.getWorkspacePlanDayIds(workspaceId);
+
+    await this.poiCacheService.clearWorkspacePois(workspaceId, planDayIds);
 
     return {
-      persistedPois: cachedPois.map((poi) => ({ ...poi, persisted: true })),
+      persistedPois: cachedPois.map((poi) => ({ ...poi, isPersisted: true })),
       newlyPersistedCount,
     };
   }
