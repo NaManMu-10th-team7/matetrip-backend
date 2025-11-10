@@ -15,12 +15,16 @@ import { SearchPostDto } from './dto/search-post.dto';
 import { SimplePostParticipationResponseDto } from '../post-participation/dto/simple-post-participation-response.dto.js';
 import { PostParticipation } from '../post-participation/entities/post-participation.entity';
 import { PostParticipationStatus } from '../post-participation/entities/post-participation-status';
+import { UserResponseDto } from '../users/dto/user-response.dto';
+import { Workspace } from '../workspace/entities/workspace.entity.js';
 
 @Injectable()
 export class PostService {
   constructor(
     @InjectRepository(Post)
     private readonly postRepository: Repository<Post>,
+    @InjectRepository(Workspace)
+    private readonly workspaceRepository: Repository<Workspace>,
     @InjectRepository(PostParticipation)
     private readonly postParticipationRepository: Repository<PostParticipation>,
     private readonly dataSource: DataSource,
@@ -260,5 +264,66 @@ export class PostService {
     if (result.affected === 0) {
       throw new BadRequestException('동행 신청 취소에 실패했습니다.');
     }
+  }
+
+  async getPostMembersByWorkspaceId(
+    workspaceId: string,
+  ): Promise<UserResponseDto[]> {
+    // workspaceId를 기반으로 Workspace를 찾고, 연관된 Post 정보를 가져옵니다.
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspaceId },
+      relations: ['post'],
+    });
+
+    if (!workspace || !workspace.post) {
+      throw new NotFoundException(
+        `Workspace with ID "${workspaceId}" not found or has no associated post.`,
+      );
+    }
+
+    return this.getPostMembers(workspace.post.id);
+  }
+  async getPostMembers(postId: string): Promise<UserResponseDto[]> {
+    const post = await this.postRepository.findOne({
+      where: { id: postId },
+      relations: ['writer', 'writer.profile'],
+    });
+
+    if (!post) {
+      throw new NotFoundException(`Post with ID "${postId}" not found`);
+    }
+
+    const approvedParticipations = await this.postParticipationRepository.find({
+      where: {
+        post: { id: postId },
+        status: PostParticipationStatus.APPROVED,
+      },
+      relations: ['requester', 'requester.profile'],
+    });
+
+    const author = post.writer;
+    const participants = approvedParticipations.map(
+      (participation) => participation.requester,
+    );
+
+    // 작성자와 참여자 목록을 합치고 중복을 제거합니다.
+    // Map을 사용하여 id를 키로 중복을 효율적으로 제거합니다.
+    const membersMap = new Map<string, any>();
+    if (author) {
+      membersMap.set(author.id, author);
+    }
+    participants.forEach((p) => {
+      if (p) {
+        membersMap.set(p.id, p);
+      }
+    });
+
+    const members = Array.from(membersMap.values());
+
+    return members.map((member) =>
+      plainToInstance(UserResponseDto, member, {
+        excludeExtraneousValues: true,
+      }),
+    );
   }
 }
