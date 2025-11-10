@@ -46,6 +46,14 @@ export class PostController {
     return this.postService.searchPosts(searchPostDto);
   }
 
+  @Get('user/:userId') // 엔드포인트 변경: 특정 userId의 게시글 조회
+  @HttpCode(HttpStatus.OK)
+  async getPostsByUserId( // 함수명 변경
+    @Param('userId', new ParseUUIDPipe()) userId: string, // userId를 파라미터로 받음
+  ): Promise<PostResponseDto[]> {
+    return this.postService.findMyPosts(userId); // 기존 findMyPosts 함수 재활용
+  }
+
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async getOne(

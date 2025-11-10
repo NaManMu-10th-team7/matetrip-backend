@@ -96,6 +96,34 @@ export class PostService {
     return result.map((post) => this.toPostResponseDto(post));
   }
 
+  async findPostsByUserId(userId: string): Promise<PostResponseDto[]> { // 함수명 변경
+    const writtenPosts = await this.postRepository.find({
+      where: { writer: { id: userId } },
+      relations: {
+        writer: { profile: true },
+        participations: { requester: { profile: true } },
+      },
+    });
+
+    const participatedPosts = await this.postParticipationRepository
+      .createQueryBuilder('participation')
+      .leftJoinAndSelect('participation.post', 'post')
+      .leftJoinAndSelect('post.writer', 'writer')
+      .leftJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('post.participations', 'postParticipations')
+      .leftJoinAndSelect('postParticipations.requester', 'requester')
+      .leftJoinAndSelect('requester.profile', 'requesterProfile')
+      .where('participation.requester.id = :userId', { userId })
+      .getMany();
+
+    const allPosts = [...writtenPosts, ...participatedPosts.map(p => p.post)];
+
+    // 중복 제거 (Set을 활용하여 id 기준으로 중복 제거)
+    const uniquePosts = Array.from(new Map(allPosts.map(post => [post.id, post])).values());
+
+    return uniquePosts.map(post => this.toPostResponseDto(post));
+  }
+
   async update(id: string, userId: string, dto: UpdatePostDto) {
     const post = await this.postRepository.findOne({
       where: { id: id, writer: { id: userId } },
