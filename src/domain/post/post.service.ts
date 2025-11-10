@@ -7,7 +7,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Post } from './entities/post.entity.js';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto.js';
 import { PostsPageQueryDto } from './dto/list-posts-query.dto.js';
@@ -23,6 +23,7 @@ export class PostService {
     private readonly postRepository: Repository<Post>,
     @InjectRepository(PostParticipation)
     private readonly postParticipationRepository: Repository<PostParticipation>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(createPostDto: CreatePostDto, userId: string) {
@@ -96,7 +97,8 @@ export class PostService {
     return result.map((post) => this.toPostResponseDto(post));
   }
 
-  async findPostsByUserId(userId: string): Promise<PostResponseDto[]> { // 함수명 변경
+  async findPostsByUserId(userId: string): Promise<PostResponseDto[]> {
+    // 함수명 변경
     const writtenPosts = await this.postRepository.find({
       where: { writer: { id: userId } },
       relations: {
@@ -116,12 +118,14 @@ export class PostService {
       .where('participation.requester.id = :userId', { userId })
       .getMany();
 
-    const allPosts = [...writtenPosts, ...participatedPosts.map(p => p.post)];
+    const allPosts = [...writtenPosts, ...participatedPosts.map((p) => p.post)];
 
     // 중복 제거 (Set을 활용하여 id 기준으로 중복 제거)
-    const uniquePosts = Array.from(new Map(allPosts.map(post => [post.id, post])).values());
+    const uniquePosts = Array.from(
+      new Map(allPosts.map((post) => [post.id, post])).values(),
+    );
 
-    return uniquePosts.map(post => this.toPostResponseDto(post));
+    return uniquePosts.map((post) => this.toPostResponseDto(post));
   }
 
   async update(id: string, userId: string, dto: UpdatePostDto) {
@@ -141,14 +145,30 @@ export class PostService {
   }
 
   async remove(id: string, userId: string) {
-    const result = await this.postRepository.delete({
-      id: id,
-      writer: { id: userId },
-    });
+    await this.dataSource.transaction(async (transactionalEntityManager) => {
+      const post = await transactionalEntityManager.findOne(Post, {
+        where: { id, writer: { id: userId } },
+      });
 
-    if (!result.affected) {
-      throw new NotFoundException('Post delete failed');
-    }
+      if (!post) {
+        throw new NotFoundException(
+          'Post delete failed: Post not found or user not authorized',
+        );
+      }
+
+      await transactionalEntityManager.delete(PostParticipation, {
+        post: { id },
+      });
+
+      const result = await transactionalEntityManager.delete(Post, {
+        id,
+        writer: { id: userId },
+      });
+
+      if (result.affected === 0) {
+        throw new NotFoundException('Post delete failed');
+      }
+    });
   }
 
   private toPostResponseDto(post: Post | null) {
@@ -234,7 +254,8 @@ export class PostService {
       );
     }
 
-    const result = await this.postParticipationRepository.delete(participationId);
+    const result =
+      await this.postParticipationRepository.delete(participationId);
 
     if (result.affected === 0) {
       throw new BadRequestException('동행 신청 취소에 실패했습니다.');
