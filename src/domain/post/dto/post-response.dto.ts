@@ -11,8 +11,8 @@ import {
 } from 'class-validator';
 import { PostStatus } from '../entities/post-status.enum';
 import { KeywordType } from '../entities/keywords-type.enum';
-import { PostParticipationResponseDto } from '../../post-participation/dto/post-participation-response.dto';
 import { UserResponseDto } from '../../users/dto/user-response.dto';
+import { SimplePostParticipationResponseDto } from '../../post-participation/dto/simple-post-participation-response.dto';
 
 export class PostResponseDto {
   @Expose()
@@ -62,8 +62,8 @@ export class PostResponseDto {
   endDate?: string | null;
 
   @Expose()
-  @Type(() => PostParticipationResponseDto)
+  @Type(() => SimplePostParticipationResponseDto)
   @ValidateNested({ each: true })
   @IsArray()
-  participations: PostParticipationResponseDto[];
+  participations: SimplePostParticipationResponseDto[];
 }

@@ -12,6 +12,7 @@ import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto.js';
 import { PostsPageQueryDto } from './dto/list-posts-query.dto.js';
 import { SearchPostDto } from './dto/search-post.dto';
+import { SimplePostParticipationResponseDto } from '../post-participation/dto/simple-post-participation-response.dto.js';
 
 @Injectable()
 export class PostService {
@@ -129,7 +130,7 @@ export class PostService {
         'Writer information is missing for the post.',
       );
     }
-    
+
     const postResponse = {
       ...post,
       writer: {
@@ -137,13 +138,11 @@ export class PostService {
         email: post.writer.email,
         profile: post.writer.profile,
       },
-      participations: post.participations?.map(p => ({
-        ...p,
-        requester: {
-          id: p.requester.id,
-          profile: p.requester.profile,
-        }
-      }))
+      participations: post.participations?.map((p) =>
+        plainToInstance(SimplePostParticipationResponseDto, p, {
+          excludeExtraneousValues: true,
+        }),
+      ),
     };
     return plainToInstance(PostResponseDto, postResponse, {
       excludeExtraneousValues: true,

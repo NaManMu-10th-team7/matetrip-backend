@@ -13,6 +13,8 @@ import { plainToInstance } from 'class-transformer';
 import { UpdatePostParticipationDto } from './dto/update-post-participation.dto';
 import { Users } from '../users/entities/users.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PostResponseDto } from '../post/dto/post-response.dto';
+import { SimplePostParticipationResponseDto } from './dto/simple-post-participation-response.dto';
 
 @Injectable()
 export class PostParticipationService {
@@ -22,9 +24,7 @@ export class PostParticipationService {
     @InjectRepository(PostParticipation)
     private readonly postParticipationRepository: Repository<PostParticipation>,
     @InjectRepository(Post)
-    private readonly postRepository: Repository<Post>,
-    // @InjectRepository(Users)
-    // private readonly userRepository: Repository<Users>,
+    private readonly postRepository: Repository<Post>, // @InjectRepository(Users) // private readonly userRepository: Repository<Users>,
   ) {}
 
   async findUserParticipations(
@@ -33,6 +33,9 @@ export class PostParticipationService {
     const participations = await this.postParticipationRepository.find({
       where: { requester: { id: userId } },
       relations: {
+        requester: {
+          profile: true,
+        },
         post: {
           writer: {
             profile: true,
@@ -46,7 +49,25 @@ export class PostParticipationService {
       },
     });
 
-    return plainToInstance(PostParticipationResponseDto, participations);
+    return participations.map((p) =>
+      plainToInstance(PostParticipationResponseDto, {
+        ...p,
+        post: plainToInstance(
+          PostResponseDto,
+          {
+            ...p.post,
+            participations: p.post.participations.map((pp) =>
+              plainToInstance(SimplePostParticipationResponseDto, pp, {
+                excludeExtraneousValues: true,
+              }),
+            ),
+          },
+          {
+            excludeExtraneousValues: true,
+          },
+        ),
+      }),
+    );
   }
 
   async requestParticipation(
