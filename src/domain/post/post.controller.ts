@@ -51,7 +51,7 @@ export class PostController {
   async getPostsByUserId( // 함수명 변경
     @Param('userId', new ParseUUIDPipe()) userId: string, // userId를 파라미터로 받음
   ): Promise<PostResponseDto[]> {
-    return this.postService.findMyPosts(userId); // 기존 findMyPosts 함수 재활용
+    return this.postService.findPostsByUserId(userId); // 기존 findMyPosts 함수 재활용
   }
 
   @Get(':id')
