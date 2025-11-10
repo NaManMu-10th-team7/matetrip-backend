@@ -30,6 +30,11 @@ interface RawMatchRow {
   mbti: MBTI_TYPES | null;
 }
 
+interface MatchCandidatesResult {
+  matches: MatchCandidateDto[];
+  query: MatchRequestDto;
+}
+
 const DEFAULT_LIMIT = 20;
 const VECTOR_WEIGHT = 0.3;
 const STYLE_WEIGHT = 0.25;
@@ -39,7 +44,7 @@ const TENDENCY_WEIGHT = 0.2;
 @Injectable()
 export class MatchingService {
   constructor(
-    @InjectRepository(MatchingProfile)
+    @InjectRepository(MatchingProfile, 'vector')
     private readonly matchingProfileRepository: Repository<MatchingProfile>,
     @InjectRepository(Profile)
     private readonly profileRepository: Repository<Profile>,
@@ -49,10 +54,49 @@ export class MatchingService {
     private readonly titanEmbeddingService: TitanEmbeddingService,
   ) {}
 
+  async save(m: MatchingProfile) {
+    return this.matchingProfileRepository.save(m); // 항상 Docker pgvector DB로 감
+  }
+
   async findMatches(
     userId: string,
     matchRequestDto: MatchRequestDto,
+  ): Promise<MatchCandidateDto[]> {
+    const { matches } = await this.buildMatchCandidatesResult(
+      userId,
+      matchRequestDto,
+    );
+    return matches;
+  }
+
+  async findMatchesWithRecruitingPosts(
+    userId: string,
+    matchRequestDto: MatchRequestDto,
   ): Promise<MatchResponseDto> {
+    const { matches, query } = await this.buildMatchCandidatesResult(
+      userId,
+      matchRequestDto,
+    );
+
+    const recruitingPostMap = await this.loadRecruitingPostMap(
+      matches.map((candidate) => candidate.userId),
+    );
+
+    const matchesWithPosts = matches.map((candidate) => ({
+      ...candidate,
+      recruitingPost: recruitingPostMap.get(candidate.userId) ?? null,
+    }));
+
+    return {
+      query,
+      matches: matchesWithPosts,
+    };
+  }
+
+  private async buildMatchCandidatesResult(
+    userId: string,
+    matchRequestDto: MatchRequestDto,
+  ): Promise<MatchCandidatesResult> {
     const requesterProfile = await this.profileRepository.findOne({
       where: { user: { id: userId } },
       relations: { user: true },
@@ -157,27 +201,14 @@ export class MatchingService {
       )
       .sort((a, b) => b.score - a.score);
 
-    // 추천된 사용자 ID 목록을 활용해 "각 사용자당 1개의 모집중 게시글"을 매핑한다.
-
-    //matches의 userId 목록을 넘겨 “사용자 ID → 최신 모집중 게시글 DTO” 형태의 Map을 만듬
-    const recruitingPostMap = await this.loadRecruitingPostMap(
-      matches.map((candidate) => candidate.userId),
-    );
-    // 각 매칭 후보에 대해 1:1로 게시글 요약 DTO를 붙인다. (없으면 null)
-    const matchesWithPosts = matches.map((candidate) => ({
-      ...candidate,
-      recruitingPost: recruitingPostMap.get(candidate.userId) ?? null,
-    }));
-
     return {
+      matches,
       query: {
         ...matchRequestDto,
         limit,
         travelTendencyTypes: filterTravelStyles,
         travelTendencies: filterTravelTendencies,
       },
-      //matches 배열의 각 원소가 MatchCandidateDto / 그리고 그 안에 MatchRecruitingPostDto 가 있는데 거기에 postdto 내용을 넣는 것임
-      matches: matchesWithPosts, //유사도 + 게시글 요약 정보
     };
   }
 
