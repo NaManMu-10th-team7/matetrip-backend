@@ -22,7 +22,7 @@ export class ChatMessageService {
     });
     await this.chatMessageRepository.save(message);
 
-    return ChatMessageResDto.of(dto.username, dto.message);
+    return ChatMessageResDto.of(dto.username, dto.message, dto.userId);
   }
 
   findAll() {
