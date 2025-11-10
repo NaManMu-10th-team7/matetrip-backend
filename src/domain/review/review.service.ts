@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
@@ -50,6 +51,28 @@ export class ReviewService {
       }
 
       const postId = workspace.post.id;
+
+      // 중복 리뷰 검사
+      await Promise.all(
+        dtos.map(async (dto) => {
+          const existingReview = await transactionalEntityManager.findOne(
+            Review,
+            {
+              where: {
+                post: { id: postId },
+                reviewer: { id: reviewerId },
+                reviewee: { id: dto.revieweeId },
+              },
+            },
+          );
+
+          if (existingReview) {
+            throw new ConflictException(
+              `Review for user ${dto.revieweeId} by ${reviewerId} on post ${postId} already exists.`,
+            );
+          }
+        }),
+      );
 
       // DTO 배열을 Review 엔티티 배열로 변환
       const reviewsToCreate = dtos.map((dto) => {
