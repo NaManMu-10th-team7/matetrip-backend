@@ -38,13 +38,13 @@ export class Poi extends BaseTimestampEntity {
 
   @Column({
     type: 'enum',
-    name: 'poi_status',
+    name: 'status',
     enum: PoiStatus,
     enumName: 'poi_status',
     default: PoiStatus.MARKED,
   })
   status: PoiStatus = PoiStatus.MARKED;
 
-  @Column({ type: 'int', name: 'sequence', nullable: false, default: 0 })
+  @Column({ type: 'int', name: 'schedule_seq', nullable: false, default: 0 })
   sequence: number = 0;
 }

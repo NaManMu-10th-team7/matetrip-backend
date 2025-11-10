@@ -121,13 +121,17 @@ export class PoiGateway {
     try {
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
+      console.log('테스트');
 
       const cachedPoi = await this.workspaceService.cachePoi(data);
+      console.log('테스트1');
 
       // todo : 바뀐거 말하기
       const markedPoi: PoiResDto = PoiResDto.of(cachedPoi);
+      console.log('테스트2');
 
       this.server.to(roomName).emit(PoiSocketEvent.MARKED, markedPoi);
+      console.log('테스트3');
 
       this.logger.debug(
         `Socket ${socket.id} marked POI ${cachedPoi.id} in workspace ${data.workspaceId}`,
