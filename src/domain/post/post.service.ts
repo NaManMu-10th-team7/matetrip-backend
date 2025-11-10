@@ -36,6 +36,9 @@ export class PostService {
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.writer', 'writer')
       .leftJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('post.participations', 'participations')
+      .leftJoinAndSelect('participations.requester', 'requester')
+      .leftJoinAndSelect('requester.profile', 'requesterProfile')
       .orderBy('post.createdAt', 'DESC')
       .getMany();
 
@@ -47,6 +50,11 @@ export class PostService {
       where: { id },
       relations: {
         writer: { profile: true },
+        participations: {
+          requester: {
+            profile: true,
+          },
+        },
       },
     });
 
@@ -68,6 +76,11 @@ export class PostService {
       relations: {
         writer: {
           profile: true,
+        },
+        participations: {
+          requester: {
+            profile: true,
+          },
         },
       },
       order: { createdAt: 'DESC', id: 'DESC' },
@@ -116,13 +129,23 @@ export class PostService {
         'Writer information is missing for the post.',
       );
     }
-    // DTO로 변환하기 전에 필요한 데이터를 명시적으로 매핑합니다.
-    const postWithWriterId = {
+    
+    const postResponse = {
       ...post,
-      writerId: post.writer.id,
-      writerProfile: post.writer.profile,
+      writer: {
+        id: post.writer.id,
+        email: post.writer.email,
+        profile: post.writer.profile,
+      },
+      participations: post.participations?.map(p => ({
+        ...p,
+        requester: {
+          id: p.requester.id,
+          profile: p.requester.profile,
+        }
+      }))
     };
-    return plainToInstance(PostResponseDto, postWithWriterId, {
+    return plainToInstance(PostResponseDto, postResponse, {
       excludeExtraneousValues: true,
     });
   }

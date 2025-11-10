@@ -1,7 +1,7 @@
 import { Expose, Type } from 'class-transformer';
-import { IsEnum, IsUUID } from 'class-validator';
+import { IsEnum, IsUUID, ValidateNested } from 'class-validator';
 import { PostParticipationStatus } from '../entities/post-participation-status';
-import { SimpleUserResponseDto } from 'src/domain/post-participation/dto/simple-user-response.dto';
+import { PostResponseDto } from 'src/domain/post/dto/post-response.dto';
 
 export class PostParticipationResponseDto {
   @Expose()
@@ -9,14 +9,11 @@ export class PostParticipationResponseDto {
   id: string;
 
   @Expose()
-  @IsUUID()
-  postId: string;
-
-  @Expose()
   @IsEnum(PostParticipationStatus)
   status: PostParticipationStatus;
 
   @Expose()
-  @Type(() => SimpleUserResponseDto)
-  requester: SimpleUserResponseDto;
+  @Type(() => PostResponseDto)
+  @ValidateNested()
+  post: PostResponseDto;
 }
