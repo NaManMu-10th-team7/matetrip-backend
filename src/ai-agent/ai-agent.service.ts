@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import { Injectable } from '@nestjs/common';
 import { PostService } from 'src/domain/post/post.service';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
@@ -9,16 +8,21 @@ import { PostResponseDto } from 'src/domain/post/dto/post-response.dto';
 
 @Injectable()
 export class AiAgentService {
-  private genAI: GoogleGenAI;
+  private llm: ChatGoogleGenerativeAI;
 
   constructor(private readonly postService: PostService) {
-    // const apiKey = process.env.GOOGLE_API_KEY;
-    // if (!apiKey) {
-    //   throw new Error(
-    //     'GOOGLE_API_KEY is not set in the environment variables.',
-    //   );
-    // }
-    // this.genAI = new GoogleGenAI({ apiKey });
+    const apiKey = process.env.GOOGLE_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        'GOOGLE_API_KEY is not set in the environment variables.',
+      );
+    }
+
+    // LangChain용 Gemini 모델 초기화
+    this.llm = new ChatGoogleGenerativeAI({
+      model: 'gemini-2.5-flash',
+      apiKey: apiKey,
+    });
   }
 
   /**
@@ -31,12 +35,6 @@ export class AiAgentService {
     prompt: string,
   ): Promise<string | PostResponseDto[] | undefined> {
     try {
-      // LangChain용 Gemini 모델 초기화
-      const model = new ChatGoogleGenerativeAI({
-        model: 'gemini-2.5-flash',
-        apiKey: process.env.GOOGLE_API_KEY,
-      });
-
       // AI에게 도구를 알려줌
       const searchPostTool = {
         // AI가 호출할 도구 이름
@@ -61,7 +59,7 @@ export class AiAgentService {
       };
 
       // 모델에 도구 바인딩
-      const modelWithTools = model.bindTools([searchPostTool]);
+      const modelWithTools = this.llm.bindTools([searchPostTool]);
 
       // 사용자 프롬프트 모델에 전달
       const result = await modelWithTools.invoke([new HumanMessage(prompt)]);
@@ -87,19 +85,12 @@ export class AiAgentService {
       // AI가 도구 사용을 결정하지 않은 경우 (일반 대화)
       // (result.content는 AIMessage 객체이므로 .content로 내용 추출)
       if (typeof result.content === 'string') {
+        // 일반 대화 답변을 사용자에게 반환
         return result.content;
       } else {
         // (혹시 모를 복잡한 응답 대비)
         return JSON.stringify(result.content);
       }
-      //   // 사용할 모델에 프롬프트를 보내고 결과를 받음
-      //   const response = await this.genAI.models.generateContent({
-      //     model: 'gemini-2.5-flash',
-      //     contents: prompt,
-      //   });
-
-      //   // 텍스트 응답 반환
-      //   return response.text;
     } catch (error) {
       console.error('AI 에이전트 응답 생성 실패:', error);
       throw new Error('AI 응답 생성에 실패했습니다.');
