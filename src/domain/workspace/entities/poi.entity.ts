@@ -45,6 +45,6 @@ export class Poi extends BaseTimestampEntity {
   })
   status: PoiStatus = PoiStatus.MARKED;
 
-  @Column({ type: 'int', name: 'schedule_seq', nullable: false, default: 0 })
+  @Column({ type: 'int', name: 'sequence', nullable: false, default: 0 })
   sequence: number = 0;
 }
