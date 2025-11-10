@@ -15,7 +15,7 @@ export class MatchingProfile {
   profileSummary: string | null;
 
   @Column({
-    type: 'vector(1024)' as ColumnType,
+    type: 'vector' as ColumnType,
     name: 'profile_embedding',
     nullable: true,
   })
