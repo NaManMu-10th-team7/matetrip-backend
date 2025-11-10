@@ -13,5 +13,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
   ],
   controllers: [PostParticipationController],
   providers: [PostParticipationService],
+  exports: [PostParticipationService],
 })
 export class PostParticipationModule {}

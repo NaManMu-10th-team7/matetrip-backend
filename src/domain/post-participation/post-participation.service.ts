@@ -27,6 +27,21 @@ export class PostParticipationService {
     // private readonly userRepository: Repository<Users>,
   ) {}
 
+  async findUserParticipations(userId: string): Promise<PostParticipationResponseDto[]> {
+    const participations = await this.postParticipationRepository.find({
+      where: { requester: { id: userId } },
+      relations: {
+        post: {
+          writer: {
+            profile: true,
+          },
+        },
+      },
+    });
+
+    return plainToInstance(PostParticipationResponseDto, participations);
+  }
+
   async requestParticipation(
     postId: string,
     requesterId: string,

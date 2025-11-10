@@ -65,7 +65,11 @@ export class PostService {
     const { page, limit } = listPostsQueryDto;
     const result = await this.postRepository.find({
       where: { writer: { id: userId } },
-      //relations: ['writer'],
+      relations: {
+        writer: {
+          profile: true,
+        },
+      },
       order: { createdAt: 'DESC', id: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,

@@ -5,11 +5,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Users } from './entities/users.entity.js';
 import { Profile } from '../profile/entities/profile.entity';
 import { PostModule } from '../post/post.module.js';
+import { ProfileModule } from '../profile/profile.module';
+import { PostParticipationModule } from '../post-participation/post-participation.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Users, Profile]),
     forwardRef(() => PostModule),
+    ProfileModule,
+    PostParticipationModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],
