@@ -50,7 +50,7 @@ const PoiSocketEvent = {
   namespace: 'poi',
   cors: {
     origin: process.env.ALLOWED_ORIGINS?.split(',') || [
-      'http://localhost:3000',
+      'http://13.125.171.175:3000/',
     ],
   },
 })
