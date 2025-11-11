@@ -13,6 +13,7 @@ import { WorkspaceService } from '../service/workspace.service.js';
 import { LeaveChatReqDto } from '../dto/chat/leave-chat-req.dto.js';
 import { ChatMessageResDto } from '../dto/chat/chat-message-res.dto.js';
 import { ChatConnectionReqDto } from '../dto/chat/connect-chat-req.dto.js';
+import { AiService } from '../../../ai/ai.service.js';
 
 const ChatEvent = {
   JOIN: 'join',
@@ -24,6 +25,10 @@ const ChatEvent = {
   DISCONNECT: 'disconnect',
 };
 
+const AGENT_NAME = '@AI';
+// AI 에이전트를 위한 고유 식별자 (UUID 형식)
+const AGENT_USER_ID = '00000000-0000-0000-0000-000000000000';
+
 @UsePipes(new ValidationPipe())
 @WebSocketGateway(3004, {
   namespace: 'chat',
@@ -32,7 +37,10 @@ const ChatEvent = {
 export class ChatGateway {
   private readonly logger = new Logger(ChatGateway.name);
 
-  constructor(private readonly workspaceService: WorkspaceService) {}
+  constructor(
+    private readonly workspaceService: WorkspaceService,
+    private readonly aiService: AiService,
+  ) {}
 
   @WebSocketServer()
   server: Server;
@@ -42,7 +50,8 @@ export class ChatGateway {
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: CreateMessageReqDto,
   ) {
-    const roomName = this.getChatRoomName(data.workspaceId);
+    const { workspaceId, message } = data;
+    const roomName = this.getChatRoomName(workspaceId);
     const messagePayload = ChatMessageResDto.of(
       data.username,
       data.message,
@@ -53,6 +62,31 @@ export class ChatGateway {
       `[MESSAGE] Emitting to room: ${roomName}, Payload: ${JSON.stringify(messagePayload)}`,
     );
     this.server.to(roomName).emit(ChatEvent.MESSAGE, messagePayload);
+
+    // 1. AI 멘션인지 확인
+    if (message.trim().startsWith(AGENT_NAME)) {
+      // 2. AI에게 보낼 프롬프트 정리
+      const prompt = message.replace(AGENT_NAME, '').trim();
+      // 각 채팅방을 AI 세션으로 사용
+      const sessionId = workspaceId;
+
+      try {
+        // 3. AiService를 호출해 AI 응답을 받음
+        const aiResponse = this.aiService.getAgentResponse(prompt, sessionId);
+
+        // 4. AI 응답을 ChatMessageResDto 형식으로 만듦
+        // const aiMessagePayload = ChatMessageResDto.of(
+        //   AGENT_NAME,
+        //   aiResponse.response, // ai.service.ts의 응답 형식에 따라 'output' 필드 사용
+        //   AGENT_USER_ID, // AI 에이전트의 고유 ID 사용
+        // );
+
+        // // 5. 채팅방에 AI 메시지 전송
+        // this.server.to(roomName).emit(ChatEvent.MESSAGE, aiMessagePayload);
+      } catch (error) {
+        this.logger.error(`Error getting AI response: ${error.message}`);
+      }
+    }
   }
 
   @SubscribeMessage(ChatEvent.JOIN)

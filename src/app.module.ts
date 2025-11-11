@@ -16,6 +16,8 @@ import { RedisModule } from './redis/redis.module';
 import { NotificationsModule } from './domain/notifications/notifications.module';
 import { OpenviduModule } from './openvidu/openvidu.module';
 import { MatchingModule } from './domain/matching/matching.module';
+import { AiModule } from './ai/ai.module';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -24,6 +26,10 @@ import { MatchingModule } from './domain/matching/matching.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: getTypeOrmConfig,
+    }),
+    HttpModule.register({
+      timeout: 5000, // 5초 타임아웃
+      maxRedirects: 5,
     }),
     BinaryContentModule,
     ProfileModule,
@@ -37,6 +43,7 @@ import { MatchingModule } from './domain/matching/matching.module';
     NotificationsModule,
     OpenviduModule,
     MatchingModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
