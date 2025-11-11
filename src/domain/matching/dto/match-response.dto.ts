@@ -16,6 +16,9 @@ export class MatchRecruitingPostDto {
 export class MatchCandidateDto {
   userId: string;
   score: number;
+  vectorScore: number;
+  styleScore: number;
+  tendencyScore: number;
   overlappingTravelTendencyTypes: TravelStyleType[];
   overlappingTravelTendencies: TendencyType[];
   mbtiMatchScore: number;
