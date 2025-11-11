@@ -117,29 +117,34 @@ export class PoiGateway {
   async handlePoiMark(
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: PoiCreateReqDto,
-  ) {
+  ): Promise<PoiResDto | { error: string }> {
     try {
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
-      console.log('테스트');
 
       const cachedPoi = await this.workspaceService.cachePoi(data);
-      console.log('테스트1');
 
-      // todo : 바뀐거 말하기
       const markedPoi: PoiResDto = PoiResDto.of(cachedPoi);
-      console.log('테스트2');
 
+      // 같은 워크스페이스의 모든 클라이언트에게 'marked' 이벤트를 전파합니다.
       this.server.to(roomName).emit(PoiSocketEvent.MARKED, markedPoi);
-      console.log('테스트3');
 
       this.logger.debug(
         `Socket ${socket.id} marked POI ${cachedPoi.id} in workspace ${data.workspaceId}`,
       );
-    } catch {
+
+      // 이벤트를 발생시킨 클라이언트에게 생성된 POI 정보를 응답(ack)으로 보냅니다.
+      return markedPoi;
+    } catch (error) {
       this.logger.error(
-        `Socket ${socket.id} failed to mark POI in workspace ${data.workspaceId}`,
+        `Socket ${socket.id} failed to mark POI in workspace ${data.workspaceId}: ${error.message}`,
+        error.stack,
       );
+
+      // 에러 발생 시, 이벤트를 발생시킨 클라이언트에게 에러 응답(ack)을 보냅니다.
+      return {
+        error: error.message || 'Failed to mark POI.',
+      };
     }
   }
 

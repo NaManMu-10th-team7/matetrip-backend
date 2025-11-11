@@ -4,20 +4,23 @@ import {
   Post,
   Body,
   HttpCode,
-  Req /*, UseGuards*/,
+  Req,
+  Get,
+  UseGuards,
+  Param,
+  ParseUUIDPipe /*, UseGuards*/,
 } from '@nestjs/common';
 import { ReviewService } from './review.service';
 import { CreateReviewDto } from './dto/create-review.dto';
+import { AuthGuard } from '@nestjs/passport';
 // import { JwtAuthGuard } from '../auth/guards/jwt.guard'; // 인증이 준비되어 있다면 사용
 
 @Controller('reviews')
 export class ReviewController {
-  constructor(private readonly service: ReviewService) {}
+  constructor(private readonly reviewService: ReviewService) {}
 
-  @Post()
-  @HttpCode(201)
-  async create(@Body() dto: CreateReviewDto) {
-    // JWT 미사용: dto.reviewerId 를 그대로 전달
-    return this.service.create(dto);
+  @Get('user/:userId')
+  async getReviewsForUser(@Param('userId', ParseUUIDPipe) userId: string) {
+    return this.reviewService.getReviewsByReceiverId(userId);
   }
 }

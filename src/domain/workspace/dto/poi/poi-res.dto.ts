@@ -6,6 +6,8 @@ export class PoiResDto {
   @Expose()
   readonly id: string; // 뺄까??
   @Expose()
+  readonly placeName: string;
+  @Expose()
   readonly address: string;
   @Expose()
   readonly longitude: number;
@@ -14,22 +16,36 @@ export class PoiResDto {
 
   private constructor(
     id: string,
+    placeName: string,
     address: string,
     longitude: number,
     latitude: number,
   ) {
     this.id = id;
+    this.placeName = placeName;
     this.address = address;
     this.longitude = longitude;
     this.latitude = latitude;
   }
 
   static of(poi: CachedPoi): PoiResDto {
-    return new PoiResDto(poi.id, poi.address, poi.longitude, poi.latitude);
+    return new PoiResDto(
+      poi.id,
+      poi.placeName,
+      poi.address,
+      poi.longitude,
+      poi.latitude,
+    );
   }
 
   static fromEntity(poi: Poi): PoiResDto {
-    return new PoiResDto(poi.id, poi.address, poi.longitude, poi.latitude);
+    return new PoiResDto(
+      poi.id,
+      poi.placeName,
+      poi.address,
+      poi.longitude,
+      poi.latitude,
+    );
   }
 }
 

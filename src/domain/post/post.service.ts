@@ -7,17 +7,27 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Post } from './entities/post.entity.js';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto.js';
 import { PostsPageQueryDto } from './dto/list-posts-query.dto.js';
 import { SearchPostDto } from './dto/search-post.dto';
+import { SimplePostParticipationResponseDto } from '../post-participation/dto/simple-post-participation-response.dto.js';
+import { PostParticipation } from '../post-participation/entities/post-participation.entity';
+import { PostParticipationStatus } from '../post-participation/entities/post-participation-status';
+import { UserResponseDto } from '../users/dto/user-response.dto';
+import { Workspace } from '../workspace/entities/workspace.entity.js';
 
 @Injectable()
 export class PostService {
   constructor(
     @InjectRepository(Post)
     private readonly postRepository: Repository<Post>,
+    @InjectRepository(Workspace)
+    private readonly workspaceRepository: Repository<Workspace>,
+    @InjectRepository(PostParticipation)
+    private readonly postParticipationRepository: Repository<PostParticipation>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(createPostDto: CreatePostDto, userId: string) {
@@ -36,6 +46,9 @@ export class PostService {
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.writer', 'writer')
       .leftJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('post.participations', 'participations')
+      .leftJoinAndSelect('participations.requester', 'requester')
+      .leftJoinAndSelect('requester.profile', 'requesterProfile')
       .orderBy('post.createdAt', 'DESC')
       .getMany();
 
@@ -47,6 +60,11 @@ export class PostService {
       where: { id },
       relations: {
         writer: { profile: true },
+        participations: {
+          requester: {
+            profile: true,
+          },
+        },
       },
     });
 
@@ -65,13 +83,53 @@ export class PostService {
     const { page, limit } = listPostsQueryDto;
     const result = await this.postRepository.find({
       where: { writer: { id: userId } },
-      //relations: ['writer'],
+      relations: {
+        writer: {
+          profile: true,
+        },
+        participations: {
+          requester: {
+            profile: true,
+          },
+        },
+      },
       order: { createdAt: 'DESC', id: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     });
     // todo : meta 데이터도 클라에 넘겨주기
     return result.map((post) => this.toPostResponseDto(post));
+  }
+
+  async findPostsByUserId(userId: string): Promise<PostResponseDto[]> {
+    // 함수명 변경
+    const writtenPosts = await this.postRepository.find({
+      where: { writer: { id: userId } },
+      relations: {
+        writer: { profile: true },
+        participations: { requester: { profile: true } },
+      },
+    });
+
+    const participatedPosts = await this.postParticipationRepository
+      .createQueryBuilder('participation')
+      .leftJoinAndSelect('participation.post', 'post')
+      .leftJoinAndSelect('post.writer', 'writer')
+      .leftJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('post.participations', 'postParticipations')
+      .leftJoinAndSelect('postParticipations.requester', 'requester')
+      .leftJoinAndSelect('requester.profile', 'requesterProfile')
+      .where('participation.requester.id = :userId', { userId })
+      .getMany();
+
+    const allPosts = [...writtenPosts, ...participatedPosts.map((p) => p.post)];
+
+    // 중복 제거 (Set을 활용하여 id 기준으로 중복 제거)
+    const uniquePosts = Array.from(
+      new Map(allPosts.map((post) => [post.id, post])).values(),
+    );
+
+    return uniquePosts.map((post) => this.toPostResponseDto(post));
   }
 
   async update(id: string, userId: string, dto: UpdatePostDto) {
@@ -91,14 +149,30 @@ export class PostService {
   }
 
   async remove(id: string, userId: string) {
-    const result = await this.postRepository.delete({
-      id: id,
-      writer: { id: userId },
-    });
+    await this.dataSource.transaction(async (transactionalEntityManager) => {
+      const post = await transactionalEntityManager.findOne(Post, {
+        where: { id, writer: { id: userId } },
+      });
 
-    if (!result.affected) {
-      throw new NotFoundException('Post delete failed');
-    }
+      if (!post) {
+        throw new NotFoundException(
+          'Post delete failed: Post not found or user not authorized',
+        );
+      }
+
+      await transactionalEntityManager.delete(PostParticipation, {
+        post: { id },
+      });
+
+      const result = await transactionalEntityManager.delete(Post, {
+        id,
+        writer: { id: userId },
+      });
+
+      if (result.affected === 0) {
+        throw new NotFoundException('Post delete failed');
+      }
+    });
   }
 
   private toPostResponseDto(post: Post | null) {
@@ -112,13 +186,21 @@ export class PostService {
         'Writer information is missing for the post.',
       );
     }
-    // DTO로 변환하기 전에 필요한 데이터를 명시적으로 매핑합니다.
-    const postWithWriterId = {
+
+    const postResponse = {
       ...post,
-      writerId: post.writer.id,
-      writerProfile: post.writer.profile,
+      writer: {
+        id: post.writer.id,
+        email: post.writer.email,
+        profile: post.writer.profile,
+      },
+      participations: post.participations?.map((p) =>
+        plainToInstance(SimplePostParticipationResponseDto, p, {
+          excludeExtraneousValues: true,
+        }),
+      ),
     };
-    return plainToInstance(PostResponseDto, postWithWriterId, {
+    return plainToInstance(PostResponseDto, postResponse, {
       excludeExtraneousValues: true,
     });
   }
@@ -155,5 +237,93 @@ export class PostService {
       .getMany();
 
     return posts.map((post) => this.toPostResponseDto(post));
+  }
+
+  async cancelParticipation(
+    postId: string,
+    participationId: string,
+    userId: string,
+  ): Promise<void> {
+    const participation = await this.postParticipationRepository.findOne({
+      where: {
+        id: participationId,
+        post: { id: postId },
+        requester: { id: userId },
+      },
+    });
+
+    if (!participation) {
+      throw new NotFoundException(
+        '해당하는 동행 신청을 찾을 수 없습니다. (잘못된 postId, participationId 또는 userId)',
+      );
+    }
+
+    const result =
+      await this.postParticipationRepository.delete(participationId);
+
+    if (result.affected === 0) {
+      throw new BadRequestException('동행 신청 취소에 실패했습니다.');
+    }
+  }
+
+  async getPostMembersByWorkspaceId(
+    workspaceId: string,
+  ): Promise<UserResponseDto[]> {
+    // workspaceId를 기반으로 Workspace를 찾고, 연관된 Post 정보를 가져옵니다.
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspaceId },
+      relations: ['post'],
+    });
+
+    if (!workspace || !workspace.post) {
+      throw new NotFoundException(
+        `Workspace with ID "${workspaceId}" not found or has no associated post.`,
+      );
+    }
+
+    return this.getPostMembers(workspace.post.id);
+  }
+  async getPostMembers(postId: string): Promise<UserResponseDto[]> {
+    const post = await this.postRepository.findOne({
+      where: { id: postId },
+      relations: ['writer', 'writer.profile'],
+    });
+
+    if (!post) {
+      throw new NotFoundException(`Post with ID "${postId}" not found`);
+    }
+
+    const approvedParticipations = await this.postParticipationRepository.find({
+      where: {
+        post: { id: postId },
+        status: PostParticipationStatus.APPROVED,
+      },
+      relations: ['requester', 'requester.profile'],
+    });
+
+    const author = post.writer;
+    const participants = approvedParticipations.map(
+      (participation) => participation.requester,
+    );
+
+    // 작성자와 참여자 목록을 합치고 중복을 제거합니다.
+    // Map을 사용하여 id를 키로 중복을 효율적으로 제거합니다.
+    const membersMap = new Map<string, any>();
+    if (author) {
+      membersMap.set(author.id, author);
+    }
+    participants.forEach((p) => {
+      if (p) {
+        membersMap.set(p.id, p);
+      }
+    });
+
+    const members = Array.from(membersMap.values());
+
+    return members.map((member) =>
+      plainToInstance(UserResponseDto, member, {
+        excludeExtraneousValues: true,
+      }),
+    );
   }
 }

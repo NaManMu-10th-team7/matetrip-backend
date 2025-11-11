@@ -7,10 +7,12 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  ValidateNested,
 } from 'class-validator';
 import { PostStatus } from '../entities/post-status.enum';
 import { KeywordType } from '../entities/keywords-type.enum';
-import { ProfilePayloadDto } from '../../profile/dto/profile.payload.dto';
+import { UserResponseDto } from '../../users/dto/user-response.dto';
+import { SimplePostParticipationResponseDto } from '../../post-participation/dto/simple-post-participation-response.dto';
 
 export class PostResponseDto {
   @Expose()
@@ -18,13 +20,8 @@ export class PostResponseDto {
   id: string;
 
   @Expose()
-  @IsUUID()
-  writerId: string;
-
-  @Expose()
-  @Type(() => ProfilePayloadDto)
-  @IsOptional()
-  writerProfile?: ProfilePayloadDto;
+  @Type(() => UserResponseDto)
+  writer: UserResponseDto;
 
   @Expose()
   createdAt: string;
@@ -63,4 +60,10 @@ export class PostResponseDto {
   @Expose()
   @IsOptional()
   endDate?: string | null;
+
+  @Expose()
+  @Type(() => SimplePostParticipationResponseDto)
+  @ValidateNested({ each: true })
+  @IsArray()
+  participations: SimplePostParticipationResponseDto[];
 }
