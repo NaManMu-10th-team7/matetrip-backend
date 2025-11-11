@@ -13,8 +13,8 @@ import { TravelStyleType } from '../../profile/entities/travel-style-type.enum';
 import { TendencyType } from '../../profile/entities/tendency-type.enum';
 
 export class MatchRequestDto {
-  @IsUUID()
-  userId: string;
+  // @IsUUID()
+  // userId: string;
 
   @IsOptional()
   @IsArray()

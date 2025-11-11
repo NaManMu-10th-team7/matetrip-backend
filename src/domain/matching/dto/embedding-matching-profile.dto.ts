@@ -3,16 +3,17 @@ import {
   // ArrayUnique,
   // IsArray,
   // IsEnum,
-  // IsOptional,
+  IsOptional,
   IsString,
-  // IsUUID,
+  IsUUID,
 } from 'class-validator';
 // import { TravelStyleType } from '../../profile/entities/travel-style-type.enum';
 // import { TendencyType } from '../../profile/entities/tendency-type.enum';
 
 export class EmbeddingMatchingProfileDto {
-  // @IsUUID()
-  // userId: string;
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
 
   @IsString()
   description: string;

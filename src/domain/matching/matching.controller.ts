@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   HttpCode,
@@ -39,6 +40,11 @@ export class MatchingController {
     @Req() req: RequestWithUser,
     @Body() dto: EmbeddingMatchingProfileDto,
   ) {
-    return this.matchingService.embeddingMatchingProfile(req.user.id, dto);
+    const userId = req.user?.id;
+    //?? dto.userId;
+    if (!userId) {
+      throw new BadRequestException('userId가 필요합니다.');
+    }
+    return this.matchingService.embeddingMatchingProfile(userId, dto);
   }
 }

@@ -29,9 +29,9 @@ export class TitanEmbeddingService {
   constructor(private readonly configService: ConfigService) {
     // Bedrock 호출에 필요한 액세스 키·리전 정보를 전부 .env에서 읽어온다.
     const accessKeyId =
-      this.configService.get<string>('AWS_ACCESS_KEY_ID') ?? '';
+      this.configService.get<string>('AWS_LLM_ACCESS_KEY_ID') ?? '';
     const secretAccessKey =
-      this.configService.get<string>('AWS_SECRET_ACCESS_KEY') ?? '';
+      this.configService.get<string>('AWS_LLM_SECRET_ACCESS_KEY') ?? '';
     const sessionToken =
       this.configService.get<string>('AWS_SESSION_TOKEN') ?? undefined;
     const region =
@@ -99,7 +99,36 @@ export class TitanEmbeddingService {
         return null;
       }
 
-      return embedding;
+      if (Array.isArray(embedding)) {
+        return embedding;
+      }
+
+      // TypedArray 혹은 문자열 형태로 내려오는 경우 방어 처리
+      if (
+        typeof embedding === 'object' &&
+        embedding !== null &&
+        'length' in (embedding as { length: number })
+      ) {
+        return Array.from(embedding as ArrayLike<number>);
+      }
+
+      if (typeof embedding === 'string') {
+        const textEmbedding = embedding as string;
+        const parts = textEmbedding
+          .trim()
+          .split(/\s+/)
+          .map((value) => Number(value))
+          .filter((value) => Number.isFinite(value));
+        if (parts.length) {
+          return parts;
+        }
+      }
+
+      this.logger.warn(
+        'Titan embedding response has unsupported format',
+        typeof embedding,
+      );
+      return null;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
