@@ -28,7 +28,7 @@ export interface ProfileResponseDto {
   gender: GENDER;
   description: string;
   travelStyles: TravelStyleType[];
-  travelTendency: TendencyType[];
+  tendency: TendencyType[];
   userId: string;
   profileImageId: string | null;
   createdAt: Date;
@@ -67,7 +67,7 @@ export class ProfileService {
       gender: profile.gender,
       description: profile.description,
       travelStyles: profile.travelStyles,
-      travelTendency: profile.travelTendency,
+      tendency: profile.tendency,
       userId,
       profileImageId: profile.profileImage?.id ?? null,
       createdAt: profile.createdAt,
