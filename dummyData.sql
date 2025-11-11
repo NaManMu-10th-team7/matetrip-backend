@@ -228,3 +228,5 @@ SELECT
 FROM users u
 WHERE u.email IN ('user01@naver.com', 'user02@naver.com', 'user03@naver.com',
                    'user04@naver.com', 'user05@naver.com', 'user06@naver.com');
+
+INSERT INTO post_participation
