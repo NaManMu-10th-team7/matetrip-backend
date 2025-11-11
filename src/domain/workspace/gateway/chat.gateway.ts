@@ -46,7 +46,7 @@ export class ChatGateway {
   server: Server;
 
   @SubscribeMessage(ChatEvent.MESSAGE)
-  handleMessage(
+  async handleMessage(
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: CreateMessageReqDto,
   ) {
@@ -72,17 +72,20 @@ export class ChatGateway {
 
       try {
         // 3. AiService를 호출해 AI 응답을 받음
-        const aiResponse = this.aiService.getAgentResponse(prompt, sessionId);
+        const aiResponse = await this.aiService.getAgentResponse(
+          prompt,
+          sessionId,
+        );
 
         // 4. AI 응답을 ChatMessageResDto 형식으로 만듦
-        // const aiMessagePayload = ChatMessageResDto.of(
-        //   AGENT_NAME,
-        //   aiResponse.response, // ai.service.ts의 응답 형식에 따라 'output' 필드 사용
-        //   AGENT_USER_ID, // AI 에이전트의 고유 ID 사용
-        // );
+        const aiMessagePayload = ChatMessageResDto.of(
+          AGENT_NAME,
+          aiResponse.response, // ai.service.ts의 응답 형식에 따라 'output' 필드 사용
+          AGENT_USER_ID, // AI 에이전트의 고유 ID 사용
+        );
 
-        // // 5. 채팅방에 AI 메시지 전송
-        // this.server.to(roomName).emit(ChatEvent.MESSAGE, aiMessagePayload);
+        // 5. 채팅방에 AI 메시지 전송
+        this.server.to(roomName).emit(ChatEvent.MESSAGE, aiMessagePayload);
       } catch (error) {
         this.logger.error(`Error getting AI response: ${error.message}`);
       }
