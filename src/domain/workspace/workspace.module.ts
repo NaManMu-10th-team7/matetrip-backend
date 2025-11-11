@@ -16,6 +16,7 @@ import { PostParticipation } from '../post-participation/entities/post-participa
 import { ChatGateway } from './gateway/chat.gateway.js';
 import { ChatMessageService } from './service/chat-message.service.js';
 import { ChatMessage } from './entities/chat-message.entity.js';
+import { ReviewModule } from '../review/review.module.js';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ChatMessage } from './entities/chat-message.entity.js';
     ]),
     PostModule,
     RedisModule,
+    ReviewModule, // ReviewService를 사용하기 위해 ReviewModule을 import
   ],
   controllers: [WorkspaceController],
   providers: [

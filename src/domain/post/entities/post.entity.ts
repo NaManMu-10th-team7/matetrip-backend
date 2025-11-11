@@ -1,8 +1,9 @@
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { Users } from '../../users/entities/users.entity';
 import { PostStatus } from './post-status.enum.js';
 import { BaseTimestampEntity } from '../../base.entity.js';
 import { KeywordType } from './keywords-type.enum.js';
+import { PostParticipation } from '../../post-participation/entities/post-participation.entity.js';
 
 @Entity('post')
 export class Post extends BaseTimestampEntity {
@@ -46,4 +47,10 @@ export class Post extends BaseTimestampEntity {
   @ManyToOne((): typeof Users => Users, { onDelete: 'RESTRICT' })
   @JoinColumn([{ name: 'writer_id', referencedColumnName: 'id' }])
   writer: Users;
+
+  @OneToMany(
+    () => PostParticipation,
+    (postParticipation) => postParticipation.post,
+  )
+  participations: PostParticipation[];
 }

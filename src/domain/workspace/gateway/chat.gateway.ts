@@ -42,13 +42,17 @@ export class ChatGateway {
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: CreateMessageReqDto,
   ) {
-    // TODO 메시지 캐시로할지 고민(휘발성 or 영구저장)
-    socket.broadcast
-      .to(this.getChatRoomName(data.workspaceId))
-      .emit(
-        ChatEvent.JOINED,
-        JSON.stringify(ChatMessageResDto.of(data.username, data.message)),
-      ); // 일단은 그냥 넘기자
+    const roomName = this.getChatRoomName(data.workspaceId);
+    const messagePayload = ChatMessageResDto.of(
+      data.username,
+      data.message,
+      data.userId,
+    ); // data.userId 전달
+
+    this.logger.log(
+      `[MESSAGE] Emitting to room: ${roomName}, Payload: ${JSON.stringify(messagePayload)}`,
+    );
+    this.server.to(roomName).emit(ChatEvent.MESSAGE, messagePayload);
   }
 
   @SubscribeMessage(ChatEvent.JOIN)
@@ -56,25 +60,28 @@ export class ChatGateway {
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: JoinChatReqDto,
   ) {
-    console.log(`join 요청 받었습니다`);
+    console.log(`join 요청 받았습니다`);
     const isExist = await this.workspaceService.isExist(data.workspaceId);
     if (!isExist) {
       throw new Error("Workspace doesn't exist");
     }
-    console.log(`${data.username}이 join했다`);
+    console.log(`${data.username}이 join했습니다`);
 
     try {
-      await socket.join(this.getChatRoomName(data.workspaceId));
-      socket.broadcast
-        .to(this.getChatRoomName(data.workspaceId))
-        .emit(ChatEvent.JOINED, {
-          data: `${data.username}`,
-        });
+      const roomName = this.getChatRoomName(data.workspaceId);
+      await socket.join(roomName);
+      this.logger.log(
+        `[JOIN] Socket ${socket.id} joined room: ${roomName} by user: ${data.username}`,
+      );
+
+      socket.broadcast.to(roomName).emit(ChatEvent.JOINED, {
+        data: `${data.username}`,
+      });
 
       this.logger.log(`${data.username}님이 채팅방에 들어왔습니다.`);
-    } catch {
+    } catch (error) {
       this.logger.error(
-        `Socket ${socket.id} failed to join workspace ${data.workspaceId}`,
+        `Socket ${socket.id} failed to join workspace ${data.workspaceId}. Error: ${error.message}`,
       );
     }
   }

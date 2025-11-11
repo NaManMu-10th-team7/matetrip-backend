@@ -2,9 +2,8 @@ import { Expose, Type } from 'class-transformer';
 import { IsDateString, IsEnum, IsUUID, ValidateNested } from 'class-validator';
 import { PostParticipationStatus } from '../entities/post-participation-status';
 import { UserResponseDto } from '../../users/dto/user-response.dto';
-import { PostResponseDto } from 'src/domain/post/dto/post-response.dto';
 
-export class PostParticipationResponseDto {
+export class SimplePostParticipationResponseDto {
   @Expose()
   @IsUUID()
   id: string;
@@ -21,9 +20,4 @@ export class PostParticipationResponseDto {
   @Expose()
   @IsDateString()
   requestedAt: string;
-
-  @Expose()
-  @Type(() => PostResponseDto)
-  @ValidateNested()
-  post: PostResponseDto;
 }
