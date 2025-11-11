@@ -1,16 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AiService {
-  constructor(private readonly httpService: HttpService) {}
-
-  // FastAPI AI 서버 주소
-  private readonly aiApiBaseUrl = 'http://localhost:8000';
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async getAgentResponse(query: string, sessionId: string) {
-    const url = `${this.aiApiBaseUrl}/invoke`;
+    const url = `${this.configService.get<string>('AI_API_SERVER_URL')}/invoke`;
 
     try {
       const response = await firstValueFrom(
