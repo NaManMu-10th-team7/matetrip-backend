@@ -12,6 +12,7 @@ import { Workspace } from '../workspace/entities/workspace.entity';
     // TypeORM 리포지토리를 DI로 사용하기 위해 forFeature 등록
     TypeOrmModule.forFeature([Review, Post, Users, Workspace]),
   ],
+  controllers: [ReviewController],
   providers: [ReviewService], // 서비스 프로바이더 등록
   exports: [ReviewService],
 })

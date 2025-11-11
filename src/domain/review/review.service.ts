@@ -101,4 +101,17 @@ export class ReviewService {
       }
     });
   }
+
+  async getReviewsByReceiverId(userId: string): Promise<Review[]> {
+    const reviews = await this.reviewRepo.find({
+      where: { reviewee: { id: userId } },
+      relations: ['reviewer'], // 리뷰를 작성한 사용자 정보를 함께 로드합니다.
+    });
+
+    if (!reviews || reviews.length === 0) {
+      return [];
+    }
+
+    return reviews;
+  }
 }
