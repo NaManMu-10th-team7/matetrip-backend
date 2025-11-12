@@ -229,4 +229,220 @@ FROM users u
 WHERE u.email IN ('user01@naver.com', 'user02@naver.com', 'user03@naver.com',
                    'user04@naver.com', 'user05@naver.com', 'user06@naver.com');
 
-INSERT INTO post_participation
+-- 준성
+INSERT INTO review (
+  post_id,
+  reviewer_id,
+  reviewee_id,
+  rating,
+  content
+)
+VALUES (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  (SELECT id FROM users WHERE email = 'user04@naver.com'),
+  4,
+  '참 좋으신 분 같고 다 좋았는데, 식사하실 떄 좀 쩝쩝거리는 소리 때문에 불쾌했어요.'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user02@naver.com'),
+  (SELECT id FROM users WHERE email = 'user04@naver.com'),
+  5,
+  '정말 좋은 시간 이였습니다 나중에 기회가 된다면 같이 여행 또 가요!'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user03@naver.com'),
+  (SELECT id FROM users WHERE email = 'user04@naver.com'),
+  5,
+  '**님 덕분에 좋은 추억 쌓았습니다!ㅋㅋ 종종 연락하며 지내요!'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user05@naver.com'),
+  (SELECT id FROM users WHERE email = 'user04@naver.com'),
+  5,
+  '정말 친절하고 배려심 많으신 분이에요! 여행 내내 편하게 다녔습니다. 강추합니다 👍'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user06@naver.com'),
+  (SELECT id FROM users WHERE email = 'user04@naver.com'),
+  5,
+  '시간 약속 잘 지키시고 의사소통도 원활해요. 다음에도 같이 여행하고 싶어요!'
+)
+
+-- 후동
+INSERT INTO review (
+  post_id,
+  reviewer_id,
+  reviewee_id,
+  rating,
+  content
+)
+VALUES (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  (SELECT id FROM users WHERE email = 'user02@naver.com'),
+  4,
+  '여행 일정 짜는 것도 꼼꼼하시고 센스있으셔서 좋았습니다. 추천해요~'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user03@naver.com'),
+  (SELECT id FROM users WHERE email = 'user02@naver.com'),
+  5,
+  '완벽한 메이트! 분위기도 좋고 책임감도 있으시고 정말 만족스러웠어요 ㅎㅎ'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user04@naver.com'),
+  (SELECT id FROM users WHERE email = 'user02@naver.com'),
+  5,
+  '긍정적인 에너지 가득하셔서 여행이 더 즐거웠어요. 또 함께하고 싶습니다!'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user05@naver.com'),
+  (SELECT id FROM users WHERE email = 'user02@naver.com'),
+  5,
+  '여행 계획을 정말 세심하게 짜주셔서 편하게 다녀왔어요. 사진도 잘 찍어주시고 최고!'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user06@naver.com'),
+  (SELECT id FROM users WHERE email = 'user02@naver.com'),
+  5,
+  '현지 맛집도 많이 아시고 알찬 여행이었습니다. 덕분에 좋은 추억 많이 쌓았어요 감사합니다'
+)
+
+-- 지훈
+INSERT INTO review (
+  post_id,
+  reviewer_id,
+  reviewee_id,
+  rating,
+  content
+)
+VALUES (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  (SELECT id FROM users WHERE email = 'user03@naver.com'),
+  4,
+  '유머 감각도 있으시고 같이 다니기 정말 편한 분이었어요. 다음에 또 가요~'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user02@naver.com'),
+  (SELECT id FROM users WHERE email = 'user03@naver.com'),
+  5,
+  '말도 잘 통하고 취향도 비슷해서 여행이 너무 재밌었습니다! 강력 추천드려요!'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user04@naver.com'),
+  (SELECT id FROM users WHERE email = 'user03@naver.com'),
+  5,
+  '배려심 넘치시고 예의 바르셔서 정말 좋았어요. 완벽한 여행 메이트였습니다!'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user05@naver.com'),
+  (SELECT id FROM users WHERE email = 'user03@naver.com'),
+  5,
+  '처음 만나는데도 불구하고 편하게 대해주셔서 좋았어요. 여행 내내 웃으면서 다녔습니다 ㅋㅋ'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user06@naver.com'),
+  (SELECT id FROM users WHERE email = 'user03@naver.com'),
+  2,
+  '길 찾기를 못하셔서 계속 헤맸어요. 시간 낭비가 너무 많았습니다.'
+)
+
+--요한
+INSERT INTO review (
+  post_id,
+  reviewer_id,
+  reviewee_id,
+  rating,
+  content
+)
+VALUES (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user02@naver.com'),
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  1,
+  '약속 시간에 30분이나 늦으셨고 사과도 없으셔서 기분이 좀 안좋았어요. 나머지는 괜찮았습니다.'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user03@naver.com'),
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  2,
+  '일정이 너무 빡빡해서 피곤했어요. 그리고 본인 위주로만 계획하셔서 제 의견은 잘 반영이 안됐습니다'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user04@naver.com'),
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  3,
+  '참 좋으신 분 같고 다 좋았는데, 식사하실 때 좀 쩝쩝거리는 소리 때문에 불쾌했어요.'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user05@naver.com'),
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  1,
+  '계속 휴대폰만 보셔서 대화가 잘 안 됐어요. 같이 여행하는 의미가 없었습니다.'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user06@naver.com'),
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  2,
+  '금전 정산할 때 애매하게 하셔서 불편했어요. 1원 단위까지는 아니더라도 명확했으면 좋겠어요.'
+)
+
+-- 지훈
+INSERT INTO review (
+  post_id,
+  reviewer_id,
+  reviewee_id,
+  rating,
+  content
+)
+VALUES (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  (SELECT id FROM users WHERE email = 'user03@naver.com'),
+  5,
+  '대화 주제도 다양하고 지루할 틈이 없었어요. 여행이 너무 빨리 지나갔네요!'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user02@naver.com'),
+  (SELECT id FROM users WHERE email = 'user03@naver.com'),
+  5,
+  '현지 언어도 잘 하셔서 소통에 문제 없었어요. 든든한 메이트였습니다!'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user04@naver.com'),
+  (SELECT id FROM users WHERE email = 'user03@naver.com'),
+  5,
+  '식사 취향도 잘 맞고 맛집 투어가 정말 즐거웠습니다. 미식가 인정!'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user05@naver.com'),
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  5,
+  '길 찾기도 잘 하시고 방향치 저한테는 정말 고마운 메이트였어요 ㅎㅎ'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user06@naver.com'),
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  5,
+  '차분하고 침착하셔서 예상치 못한 상황에서도 잘 대처해주셨어요'
+), (
+  NULL,
+  (SELECT id FROM users WHERE email = 'user06@naver.com'),
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  5,
+  '아침형 인간이라 일정 관리가 수월했고 시간 활용을 잘 하셨어요!'
+)(
+  NULL,
+  (SELECT id FROM users WHERE email = 'user06@naver.com'),
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  5,
+  '여유롭게 여행하는 스타일이라 쉬엄쉬엄 다녀서 좋았어요. 힐링 제대로 했습니다'
+)(
+  NULL,
+  (SELECT id FROM users WHERE email = 'user07@naver.com'),
+  (SELECT id FROM users WHERE email = 'user01@naver.com'),
+  5,
+  '사진 찍는 센스가 탁월하시네요! SNS 올릴 사진 잔뜩 건졌어요 감사합니다!'
+)
