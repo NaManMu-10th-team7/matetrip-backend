@@ -473,8 +473,9 @@ export class MatchingService {
   }
 
   private normalizeEnumArray<T>(value: DbEnumArray<T> | undefined): T[] {
-    // QueryBuilder raw 결과가 배열이라면 그대로 반환하고,
-    // '{"FOO","BAR"}' 형태라면 괄호/따옴표를 제거해 T[]로 바꿔준다.
+    // TypeORM raw 쿼리는 상황에 따라 enum[]을 `[ 'FOO', 'BAR' ]` 배열이나
+    // `{"FOO","BAR"}` 문자열 중 하나로 내려보낸다. 계산 로직은 항상 T[]를
+    // 기대하므로 문자열로 내려온 경우에도 괄호/따옴표를 제거해 동일한 배열로 맞춘다.
     if (!value) {
       return [];
     }
@@ -700,6 +701,7 @@ export class MatchingService {
     return `[${title}]\n${lines.join('\n')}`;
   }
 
+  //정규식으로 모든 공백을 단일 스페이스로 바꾸고 앞뒤 공백을 잘라 줌
   private async buildDescriptionSummary(
     rawDescription?: string,
   ): Promise<string> {
@@ -711,7 +713,7 @@ export class MatchingService {
     if (normalized.length <= SUMMARY_CHAR_LIMIT) {
       return normalized;
     }
-
+    //📌 상세소개 요약하는 서비스
     const summarized = await this.novaService.summarizeDescription(normalized);
     const cleaned = this.normalizeWhitespace(summarized);
 
@@ -719,9 +721,7 @@ export class MatchingService {
       return normalized.slice(0, SUMMARY_CHAR_LIMIT);
     }
 
-    return cleaned.length > SUMMARY_CHAR_LIMIT
-      ? cleaned.slice(0, SUMMARY_CHAR_LIMIT)
-      : cleaned;
+    return cleaned;
   }
 
   private normalizeWhitespace(text?: string): string {
