@@ -137,13 +137,12 @@ export class PoiGateway {
       return markedPoi;
     } catch (error) {
       this.logger.error(
-        `Socket ${socket.id} failed to mark POI in workspace ${data.workspaceId}: ${error.message}`,
-        error.stack,
+        `Socket ${socket.id} failed to mark POI in workspace ${data.workspaceId}: ${(error as Error).message}`,
       );
 
       // 에러 발생 시, 이벤트를 발생시킨 클라이언트에게 에러 응답(ack)을 보냅니다.
       return {
-        error: error.message || 'Failed to mark POI.',
+        error: (error as Error).message || 'Failed to mark POI.',
       };
     }
   }
