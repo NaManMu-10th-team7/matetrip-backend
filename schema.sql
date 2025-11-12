@@ -1,5 +1,5 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
+CREATE EXTENSION IF NOT EXISTS vector; -- RDS에서만
 
 DROP TABLE if exists poi_connection;
 DROP TABLE IF EXISTS notification;
@@ -25,12 +25,108 @@ DROP TYPE IF EXISTS poi_status;
 DROP TYPE if exists mbti_type;
 
 
-CREATE TYPE keyword_type AS ENUM ('FOOD', 'ACCOMMODATION', 'ACTIVITY', 'TRANSPORT');
+CREATE TYPE keyword_type AS ENUM (
+    '도심/야경 위주',
+    '자연 위주',
+    '바다/리조트 휴양',
+    '로컬 동네/시골 감성',
+    '맛집/먹방 중심',
+    '카페/포토 스팟 탐방',
+    '가벼운 야외활동',
+    '강한 액티비티',
+    '전시/유적/축제/공연 중심',
+    '여유로운 일정',
+    '빡빡한 일정',
+    '가성비 중시',
+    '편안한 휴양/힐링 중시',
+    '소수/조용한 동행 선호',
+    '활발/수다 많은 동행 선호'
+    );
 CREATE TYPE gender as ENUM ('남성', '여성');
 CREATE TYPE post_status AS ENUM ('모집중','완료');
 CREATE TYPE post_participation_status AS ENUM ('대기중', '승인', '거절');
-CREATE TYPE travel_tendency_type AS ENUM ('내향적','외향적');
-CREATE TYPE travel_style_type AS ENUM ('RELAXED', 'ACTIVE', 'CULTURAL', 'FOODIE', 'NATURE');
+CREATE TYPE travel_tendency_type AS ENUM (
+    '도시',
+    '시골',
+    '전통도시',
+    '휴양도시',
+    '항구도시',
+    '건축물탐방',
+    '야경감상',
+    '전통시장',
+    '쇼핑',
+    '바다',
+    '섬',
+    '산',
+    '계곡',
+    '호수',
+    '꽃구경',
+    '트레킹',
+    '등산',
+    '캠핑',
+    '자전거',
+    '서핑',
+    '스노클링',
+    '프리다이빙',
+    '낚시',
+    '스키',
+    '스노보드',
+    '골프',
+    '박물관',
+    '미술관',
+    '유적지탐방',
+    '공연뮤지컬',
+    '콘서트',
+    '스포츠관람',
+    '놀이공원',
+    '아쿠아리움',
+    '동물원',
+    '야시장',
+    '현지축제',
+    '길거리음식',
+    '로컬레스토랑',
+    '맛집탐방',
+    '카페디저트',
+    '호캉스',
+    '경치드라이브',
+    '조용한휴식',
+    '렌터카',
+    '오토바이여행',
+    '캠핑카',
+    '대중교통',
+    '기차여행',
+    '러닝',
+    '빡빡한일정',
+    '여유로운일정',
+    '호텔',
+    '리조트',
+    '게스트하우스',
+    '모텔',
+    '펜션',
+    '에어비앤비',
+    '글램핑',
+    '풀빌라',
+    '비건필요',
+    '돼지고기비선호',
+    '해산물비선호',
+    '매운맛선호',
+    '순한맛선호',
+    '해산물선호',
+    '육류선호',
+    '배낭여행',
+    '운전가능',
+    '사진촬영',
+    '풍경촬영',
+    '비흡연',
+    '흡연',
+    '비음주',
+    '음주',
+    '소수인원선호',
+    '조용한동행선호',
+    '수다떠는동행선호',
+    '음식우선','숙소우선'
+    );
+CREATE TYPE travel_style_type AS ENUM ('모험적','즉흥적','계획적','느긋한','효율적','외향적','내향적','활동적','사교적','독립적','주도적','낭만','가성비','감성적','이성적','힐링');
 CREATE TYPE poi_status AS ENUM ('MARKED', 'SCHEDULED');
 CREATE TYPE mbti_type AS ENUM ('ISFJ', 'ISFP', 'ISTJ', 'ISTP', 'INFJ', 'INFP', 'INTJ', 'INTP', 'ESFJ', 'ESFP', 'ESTJ', 'ESTP', 'ENFJ', 'ENFP', 'ENTJ', 'ENTP');
 
@@ -54,50 +150,45 @@ CREATE TABLE IF NOT EXISTS users
 
 CREATE TABLE IF NOT EXISTS profile
 (
-    id               UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
-    user_id          UUID        NOT NULL,
-    profile_image_id UUID,
-    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at       TIMESTAMPTZ,
-    nickname         TEXT        NOT NULL,
-    gender           gender        NOT NULL,
-    birth_date       DATE        NOT NULL,
-    manner_temperature NUMERIC(4,1) NOT NULL DEFAULT 36.5,
-    intro            TEXT        NOT NULL,
-    description      TEXT        NOT NULL,
-    travel_styles    travel_style_type[]      NOT NULL DEFAULT '{}'::travel_style_type[],
-    tendency         travel_tendency_type[]      NOT NULL DEFAULT '{}'::tendency_type[],
-    mbti             mbti_type        NOT null,
-    is_pass_auth     BOOLEAN NOT NULL DEFAULT FALSE
+    id                 UUID PRIMARY KEY                DEFAULT gen_random_uuid(),
+    user_id            UUID                   NOT NULL,
+    profile_image_id   UUID,
+    created_at         TIMESTAMPTZ            NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ,
+    nickname           TEXT                   NOT NULL,
+    gender             gender                 NOT NULL,
+    manner_temperature NUMERIC(4, 1)          NOT NULL DEFAULT 36.5,
+    intro              TEXT                   NOT NULL,
+    description        TEXT                   NOT NULL,
+    travel_styles      travel_style_type[]    NOT NULL DEFAULT '{}'::travel_style_type[],
+    tendency           travel_tendency_type[] NOT NULL DEFAULT '{}'::travel_tendency_type[],
+    mbti               mbti_type              NOT null,
+    is_pass_auth       BOOLEAN                NOT NULL DEFAULT FALSE,
+    profile_embedding  VECTOR(1024)
 );
 
 CREATE TABLE IF NOT EXISTS post
 (
-    id        UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
-    writer_id UUID        NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id               UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
+    writer_id        UUID        NOT NULL,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     -- image_id  UUID ON DELETE SET NULL,
-    title     TEXT        NOT NULL,
-    content   TEXT        NOT NULL,
-    status    post_status NOT NULL DEFAULT '모집중',
-    location  TEXT        NOT NULL,
-    max_participants INT NOT NULL DEFAULT 2,
-    keywords  keyword_type[] DEFAULT '{}'::keyword_type[],
-    start_date DATE NULL,
-    end_date  DATE NULL
+    title            TEXT        NOT NULL,
+    content          TEXT        NOT NULL,
+    status           post_status NOT NULL DEFAULT '모집중',
+    location         TEXT        NOT NULL,
+    max_participants INT         NOT NULL DEFAULT 2,
+    keywords         keyword_type[]       DEFAULT '{}'::keyword_type[],
+    start_date       DATE        NULL,
+    end_date         DATE        NULL
 );
 
 CREATE TABLE IF NOT EXISTS workspace
 (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    post_id        UUID             NOT NULL,
-    workspace_name TEXT             NOT NULL,
-    -- base_longitude DOUBLE PRECISION NOT NULL,
-    -- base_latitude  DOUBLE PRECISION NOT NULL,
-    memo           TEXT             NULL,
-    -- 위경도 범위 체크
-    CHECK (base_longitude BETWEEN -180 AND 180),
-    CHECK (base_latitude BETWEEN -90 AND 90)
+    post_id        UUID NOT NULL,
+    workspace_name TEXT NOT NULL,
+    memo           TEXT NULL
 );
 
 CREATE TABLE IF NOT EXISTS chat_message
@@ -122,16 +213,16 @@ CREATE TABLE IF NOT EXISTS plan_day
 
 CREATE TABLE IF NOT EXISTS poi
 (
-    id          UUID PRIMARY KEY          DEFAULT gen_random_uuid(),
-    plan_day_id UUID             NOT NULL,
-    created_by  UUID             NOT NULL,
-    created_at  TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
-    place_name  TEXT             NOT NULL,
-    longitude   DOUBLE PRECISION NOT NULL,
-    latitude    DOUBLE PRECISION NOT NULL,
-    address     TEXT             NOT NULL,
-    status      poi_status       NOT NULL DEFAULT 'MARKED',
-    schedule_seq    INT              NOT NULL DEFAULT 0,
+    id           UUID PRIMARY KEY          DEFAULT gen_random_uuid(),
+    plan_day_id  UUID             NOT NULL,
+    created_by   UUID             NOT NULL,
+    created_at   TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+    place_name   TEXT             NOT NULL,
+    longitude    DOUBLE PRECISION NOT NULL,
+    latitude     DOUBLE PRECISION NOT NULL,
+    address      TEXT             NOT NULL,
+    status       poi_status       NOT NULL DEFAULT 'MARKED',
+    sequence INT              NOT NULL DEFAULT 0,
     CHECK (longitude BETWEEN -180 AND 180),
     CHECK (latitude BETWEEN -90 AND 90)
 );
@@ -151,10 +242,10 @@ CREATE TABLE IF NOT EXISTS poi
 
 CREATE TABLE IF NOT EXISTS post_participation
 (
-    id           UUID PRIMARY KEY              DEFAULT gen_random_uuid(),
-    requester_id UUID                 NOT NULL,
-    post_id      UUID                 NOT NULL,
-    requested_at TIMESTAMPTZ          NOT NULL DEFAULT NOW(),
+    id           UUID PRIMARY KEY                   DEFAULT gen_random_uuid(),
+    requester_id UUID                      NOT NULL,
+    post_id      UUID                      NOT NULL,
+    requested_at TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
     status       post_participation_status NOT NULL DEFAULT '대기중'
 );
 
@@ -170,21 +261,21 @@ CREATE TABLE IF NOT EXISTS review
     CHECK (rating >= 0 AND rating <= 5)
 );
 
-CREATE  TABLE IF NOT EXISTS notification
+CREATE TABLE IF NOT EXISTS notification
 (
-    id UUID PRIMARY KEY  DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL ,
+    id         UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
+    user_id    UUID        NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    content TEXT NOT NULL,
-    confirmed BOOLEAN NOT NULL DEFAULT FALSE
+    content    TEXT        NOT NULL,
+    confirmed  BOOLEAN     NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS follow
 (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    follower_id uuid NOT NULL,
-    following_id uuid NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id           uuid PRIMARY KEY     DEFAULT gen_random_uuid(),
+    follower_id  uuid        NOT NULL,
+    following_id uuid        NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ========= 2) ALTER TABLE: UNIQUE  =========
@@ -206,11 +297,15 @@ ALTER TABLE profile
     ADD CONSTRAINT fk_profile_image
         FOREIGN KEY (profile_image_id) REFERENCES binary_content (id) ON DELETE SET NULL;
 
+ALTER TABLE profile_embedding
+    ADD CONSTRAINT  fk_profile_embedding_profile
+        FOREIGN KEY (profile_id) REFERENCES profile (id) ON DELETE SET NULL;
+
 ALTER TABLE post
     ADD CONSTRAINT fk_post_writer
         FOREIGN KEY (writer_id) REFERENCES users (id) ON DELETE RESTRICT;
-    -- ADD CONSTRAINT fk_post_image 나중에 추가하기 
-    --     FOREIGN KEY (image_id) REFERENCES binary_content (id) ON DELETE SET NULL;        
+-- ADD CONSTRAINT fk_post_image 나중에 추가하기
+--     FOREIGN KEY (image_id) REFERENCES binary_content (id) ON DELETE SET NULL;
 
 ALTER TABLE workspace
     ADD CONSTRAINT fk_workspace_post
@@ -231,7 +326,7 @@ ALTER TABLE poi
         FOREIGN KEY (plan_day_id) REFERENCES plan_day (id) ON DELETE CASCADE,
     ADD CONSTRAINT fk_poi_creator
         FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE restrict,
-    ADD CONSTRAINT uq_poi_schedule UNIQUE (plan_day_id, schedule_seq);
+    ADD CONSTRAINT uq_poi_schedule UNIQUE (plan_day_id, sequence);
 
 
 -- ALTER TABLE poi_connection
@@ -262,8 +357,8 @@ ALTER TABLE follow
 
 
 CREATE UNIQUE INDEX idx_unique_schedule
-    on poi (plan_day_id, schedule_seq)
-    where schedule_seq > 0;
+    on poi (plan_day_id, sequence)
+    where sequence > 0;
 -- ========= 인덱스 =========
 -- CREATE INDEX idx_post_writer               ON post(writer_id);
 -- CREATE INDEX idx_workspace_post_id         ON workspace(post_id);
