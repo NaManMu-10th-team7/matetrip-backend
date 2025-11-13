@@ -11,17 +11,17 @@ export class Place extends BaseTimestampEntity {
   @Column()
   address: string;
 
-  @Column()
+  @Column({ type: 'float', nullable: false })
   latitude: number;
 
-  @Column()
+  @Column({ type: 'float', nullable: false })
   longitude: number;
 
   @Column({ type: 'text', nullable: false })
   category: string;
 
   @Column({ type: 'text', nullable: true })
-  image_rul?: string;
+  image_url?: string;
 
   @Column({ type: 'jsonb', nullable: false })
   tags: string[] = [];

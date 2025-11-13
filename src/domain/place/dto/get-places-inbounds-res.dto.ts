@@ -39,7 +39,7 @@ export class GetPlacesInboundsResDto {
       place.longitude,
       place.latitude,
       place.summary,
-      place.image_rul,
+      place.image_url,
     );
   }
 }
