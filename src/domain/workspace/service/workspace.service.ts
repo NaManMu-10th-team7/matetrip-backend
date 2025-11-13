@@ -17,6 +17,7 @@ import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { lastValueFrom } from 'rxjs';
+import { AxiosError } from 'axios';
 
 @Injectable()
 export class WorkspaceService {
@@ -179,9 +180,11 @@ export class WorkspaceService {
       const response = await lastValueFrom(
         this.httpService.get(url, {
           headers: { Authorization: `KakaoAK ${kakaoKey}` },
-          params: { query: query, size: 30 },
+          params: { query: query, size: 10 },
         }),
       );
+
+      console.log('API 호출 성공 ^^!');
 
       return response.data.documents.map((place) => ({
         name: place.place_name,
@@ -193,8 +196,11 @@ export class WorkspaceService {
         url: place.place_url,
         category: place.category_name,
       }));
-    } catch (error) {
-      throw new Error('Kakao API 호출 실패');
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        console.error('Kakao API Error:', error.response?.data);
+      }
+      throw new Error('Kakao API를 호출하는 중 오류가 발생했습니다.');
     }
   }
 }

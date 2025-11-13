@@ -61,18 +61,17 @@ export class WorkspaceController {
     };
   }
 
+  @Get('search')
+  async searchLocation(@Query('keyword') keyword: string) {
+    return this.workspaceService.searchPlaces(keyword);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.workspaceService.findOne(id);
   }
-
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.workspaceService.remove(id);
-  }
-
-  @Get('search')
-  async searchLocation(@Query('keyword') keyword: string) {
-    return this.workspaceService.searchPlaces(keyword);
   }
 }
