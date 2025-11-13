@@ -33,7 +33,7 @@ export class GetPlacesInboundsResDto {
   static from(place: Place) {
     return new GetPlacesInboundsResDto(
       place.id,
-      place.categories[0], // DB변경 전 임시
+      place.category, // DB변경 전 임시
       place.title,
       place.address,
       place.longitude,

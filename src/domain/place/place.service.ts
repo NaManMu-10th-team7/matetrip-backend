@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { CreatePlaceReqDto } from './dto/create-place-req.dto';
-import { UpdatePlaceDto } from './dto/update-place.dto';
 import { GetPlacesInboundsReqDto } from './dto/get-places-inbounds-req.dto.js';
 import { Place } from './entities/place.entity.js';
 import { InjectRepository } from '@nestjs/typeorm';

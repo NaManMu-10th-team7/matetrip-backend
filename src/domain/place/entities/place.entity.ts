@@ -17,8 +17,8 @@ export class Place extends BaseTimestampEntity {
   @Column()
   longitude: number;
 
-  @Column({ type: 'jsonb', nullable: false })
-  categories: string[] = [];
+  @Column({ type: 'text', nullable: false })
+  category: string;
 
   @Column({ type: 'text', nullable: true })
   image_rul?: string;
