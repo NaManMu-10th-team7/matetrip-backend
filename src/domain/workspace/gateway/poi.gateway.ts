@@ -21,6 +21,7 @@ import { PoiRemoveReqDto } from '../dto/poi/poi-remove-req.dto.js';
 import { PoiResDto } from '../dto/poi/poi-res.dto.js';
 import { PoiAddScheduleReqDto } from '../dto/poi/poi-add-schedule-req.dto.js';
 import { PoiReorderReqDto } from '../dto/poi/poi-reorder-req.dto.js';
+import { CursorMoveDto } from '../dto/poi/cursor-move.dto.js';
 
 const PoiSocketEvent = {
   JOIN: 'join',
@@ -43,6 +44,8 @@ const PoiSocketEvent = {
   DISCONNECT: 'disconnect',
   DISCONNECTED: 'disconnected',
   POIDRAG: 'drag',
+  CURSOR_MOVE: 'cursorMove',
+  CURSOR_MOVED: 'cursorMoved',
 } as const;
 
 @UsePipes(new ValidationPipe())
@@ -293,6 +296,28 @@ export class PoiGateway {
     } catch (error) {
       this.logger.error(
         `Socket ${socket.id} failed to reorder POIs in planDay ${data.planDayId}`,
+        error,
+      );
+    }
+  }
+
+  @SubscribeMessage(PoiSocketEvent.CURSOR_MOVE)
+  async handleCursorMove(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: CursorMoveDto,
+  ) {
+    try {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      this.validateRoomAuth(roomName, socket);
+
+      socket.to(roomName).emit(PoiSocketEvent.CURSOR_MOVED, data);
+
+      this.logger.debug(
+        `Socket ${socket.id} moved cursor in workspace ${data.workspaceId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Socket ${socket.id} failed to move cursor in workspace ${data.workspaceId}`,
         error,
       );
     }
