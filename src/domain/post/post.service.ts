@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -7,7 +8,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Post } from './entities/post.entity.js';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Not, Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto.js';
 import { PostsPageQueryDto } from './dto/list-posts-query.dto.js';
@@ -17,6 +18,8 @@ import { PostParticipation } from '../post-participation/entities/post-participa
 import { PostParticipationStatus } from '../post-participation/entities/post-participation-status';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { Workspace } from '../workspace/entities/workspace.entity.js';
+import { BinaryContent } from '../binary-content/entities/binary-content.entity';
+import { BinaryContentService } from '../binary-content/binary-content.service';
 
 @Injectable()
 export class PostService {
@@ -27,6 +30,9 @@ export class PostService {
     private readonly workspaceRepository: Repository<Workspace>,
     @InjectRepository(PostParticipation)
     private readonly postParticipationRepository: Repository<PostParticipation>,
+    @InjectRepository(BinaryContent)
+    private readonly binaryContentRepository: Repository<BinaryContent>,
+    private readonly binaryContentService: BinaryContentService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -135,15 +141,63 @@ export class PostService {
   async update(id: string, userId: string, dto: UpdatePostDto) {
     const post = await this.postRepository.findOne({
       where: { id: id, writer: { id: userId } },
+      relations: ['image'],
     });
     if (!post) {
       throw new NotFoundException('Post update failed');
     }
 
-    // dto의 내용을 post 엔티티에 병합합니다.
-    this.postRepository.merge(post, dto);
-    // 변경된 엔티티를 저장합니다.
-    await this.postRepository.save(post);
+    const { imageId, ...textData } = dto;
+
+    // 텍스트/기타 필드 먼저 병합
+    this.postRepository.merge(post, textData);
+
+    const oldImageId = post.image?.id ?? null;
+
+    if (imageId !== undefined) {
+      if (imageId === null) {
+        post.image = null;
+      } else if (imageId !== oldImageId) {
+        const newImage = await this.binaryContentRepository.findOne({
+          where: { id: imageId },
+        });
+
+        if (!newImage) {
+          throw new NotFoundException(
+            `BinaryContent (Image) with ID ${imageId} not found`,
+          );
+        }
+
+        const otherPostUsingImage = await this.postRepository.findOne({
+          where: {
+            image: { id: imageId },
+            id: Not(post.id),
+          },
+        });
+
+        if (otherPostUsingImage) {
+          throw new ForbiddenException(
+            `BinaryContent (Image) with ID ${imageId} is already linked to another post`,
+          );
+        }
+
+        post.image = newImage;
+      }
+      // imageId가 기존 값과 동일하면 아무 작업도 하지 않음
+    }
+
+    const updatedPost = await this.postRepository.save(post);
+
+    if (oldImageId && oldImageId !== updatedPost.image?.id) {
+      const remainingReferences = await this.postRepository.count({
+        where: { image: { id: oldImageId } },
+      });
+
+      if (remainingReferences === 0) {
+        await this.binaryContentService.deleteFile(oldImageId);
+      }
+    }
+
     // writer 정보를 포함하여 다시 조회한 후 DTO로 변환하여 반환합니다.
     return this.findOne(id);
   }
