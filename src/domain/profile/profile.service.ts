@@ -26,6 +26,7 @@ export interface ProfileResponseDto {
   id: string; // Profile ID
   nickname: string;
   gender: GENDER;
+  mannerTemperature: number;
   description: string;
   travelStyles: TravelStyleType[];
   tendency: TendencyType[];
@@ -65,6 +66,7 @@ export class ProfileService {
       id: profile.id,
       nickname: profile.nickname,
       gender: profile.gender,
+      mannerTemperature: profile.mannerTemperature,
       description: profile.description,
       travelStyles: profile.travelStyles,
       tendency: profile.tendency,
