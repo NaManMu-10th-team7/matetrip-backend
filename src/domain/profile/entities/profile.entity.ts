@@ -49,6 +49,15 @@ export class Profile extends BaseTimestampEntity {
   @Column({ type: 'text', name: 'description', nullable: true })
   description: string;
 
+  @Column({
+    type: 'numeric',
+    name: 'manner_temperature',
+    precision: 4,
+    scale: 1,
+    default: () => '36.5',
+  })
+  mannerTemperature: number;
+
   /*travel_style*/
   @Column({
     type: 'enum',

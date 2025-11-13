@@ -15,8 +15,9 @@ export class EmbeddingMatchingProfileDto {
   @IsUUID()
   userId?: string;
 
+  @IsOptional()
   @IsString()
-  description: string;
+  description?: string;
 
   // @IsOptional()
   // @IsArray()

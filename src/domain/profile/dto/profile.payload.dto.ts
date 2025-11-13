@@ -4,6 +4,7 @@ import {
   IsEmail,
   IsEnum,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -30,6 +31,11 @@ export class ProfilePayloadDto {
   @Expose()
   @IsEnum(GENDER)
   gender: GENDER;
+
+  @Expose()
+  @IsNumber()
+  @IsOptional()
+  mannerTemperature: number;
 
   @Expose()
   @IsString()
