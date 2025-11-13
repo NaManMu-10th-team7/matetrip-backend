@@ -111,14 +111,14 @@ const TRAVEL_TENDENCY_CATEGORY_MAP: Record<TendencyType, CategoryMeta> = {
   [TendencyType.CYCLING]: { group: '야외 액티비티-자전거', label: '자전거' },
   [TendencyType.SURFING]: { group: '워터 액티비티-서핑', label: '서핑' },
   [TendencyType.SNORKELING]: {
-    group: '워터 액티비티-다이빙',
+    group: '워터 액티비티-바다안에서',
     label: '스노클링',
   },
   [TendencyType.FREEDIVING]: {
-    group: '워터 액티비티-다이빙',
+    group: '워터 액티비티-바다안에서',
     label: '프리다이빙',
   },
-  [TendencyType.FISHING]: { group: '워터 액티비티-낚시', label: '낚시' },
+  [TendencyType.FISHING]: { group: '워터 액티비티-바다밖에서', label: '낚시' },
   [TendencyType.SKIING]: { group: '겨울 액티비티', label: '스키' },
   [TendencyType.SNOWBOARDING]: { group: '겨울 액티비티', label: '스노보드' },
   [TendencyType.GOLF]: { group: '필드 액티비티', label: '골프' },
@@ -228,10 +228,10 @@ const TRAVEL_TENDENCY_CATEGORY_MAP: Record<TendencyType, CategoryMeta> = {
     label: '풍경촬영',
   },
 
-  [TendencyType.NON_SMOKER]: { group: '무흡연', label: '비흡연' },
-  [TendencyType.SMOKER]: { group: '흡연', label: '흡연' },
-  [TendencyType.NON_DRINKING]: { group: '비음주', label: '비음주' },
-  [TendencyType.DRINKS_ALCOHOL]: { group: '음주', label: '음주' },
+  [TendencyType.NON_SMOKER]: { group: '흡연여부-비흡연', label: '비흡연' },
+  [TendencyType.SMOKER]: { group: '흡연여부-흡연', label: '흡연' },
+  [TendencyType.NON_DRINKING]: { group: '음주여부-비음주', label: '비음주' },
+  [TendencyType.DRINKS_ALCOHOL]: { group: '음주여부-음주', label: '음주' },
 
   [TendencyType.SMALL_GROUP_PREFERRED]: {
     group: '조용소규모',
