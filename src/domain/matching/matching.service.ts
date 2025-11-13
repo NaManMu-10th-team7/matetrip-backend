@@ -44,6 +44,9 @@ const VECTOR_WEIGHT = 0.3;
 const STYLE_WEIGHT = 0.25;
 const MBTI_WEIGHT = 0.25;
 const TENDENCY_WEIGHT = 0.2;
+const SCORE_OFFSET = 0.3;
+const SCORE_CAP = 0.99;
+const MAX_TENDENCY_OVERLAPS = 5;
 const SUMMARY_CHAR_LIMIT = 500;
 
 interface CategoryMeta {
@@ -457,8 +460,8 @@ export class MatchingService {
       vectorScore: vectorScore,
       styleScore: styleScore,
       tendencyScore: tendencyScore,
-      overlappingTravelTendencyTypes: styleOverlap,
-      overlappingTravelTendencies: tendencyOverlap,
+      overlappingTravelStyles: styleOverlap,
+      overlappingTendencies: tendencyOverlap.slice(0, MAX_TENDENCY_OVERLAPS),
       mbtiMatchScore: mbtiScore,
     };
   }
@@ -547,12 +550,13 @@ export class MatchingService {
     tendencyScore: number,
     mbtiScore: number,
   ): number {
-    return (
+    const weightedScore =
       VECTOR_WEIGHT * vectorScore +
       STYLE_WEIGHT * styleScore +
       TENDENCY_WEIGHT * tendencyScore +
-      MBTI_WEIGHT * mbtiScore
-    );
+      MBTI_WEIGHT * mbtiScore;
+    const adjustedScore = weightedScore + SCORE_OFFSET;
+    return Math.min(adjustedScore, SCORE_CAP);
   }
 
   /**
