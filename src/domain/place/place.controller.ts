@@ -11,6 +11,7 @@ export class PlaceController {
   getPlacesInBounds(
     @Query() dto: GetPlacesInboundsReqDto,
   ): Promise<GetPlacesInboundsResDto[]> {
+    console.log('dto', dto);
     return this.placeService.getPlacesInBounds(dto);
   }
 

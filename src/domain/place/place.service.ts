@@ -26,6 +26,7 @@ export class PlaceService {
         latitude: Between(southWestLatitude, northEastLatitude),
         longitude: Between(southWestLongitude, northEastLongitude),
       },
+      take: 20,
     });
     return places.map((place) => GetPlacesInboundsResDto.from(place));
   }
