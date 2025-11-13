@@ -80,12 +80,16 @@ export class ChatGateway {
         // 4. AI 응답을 ChatMessageResDto 형식으로 만듦
         const aiMessagePayload = ChatMessageResDto.of(
           AGENT_NAME,
-          aiResponse.response, // ai.service.ts의 응답 형식에 따라 'output' 필드 사용
+          aiResponse.response, // ai.service.ts의 응답 형식에 따라 'response' 필드 사용
           AGENT_USER_ID, // AI 에이전트의 고유 ID 사용
+          aiResponse.tool_data, // tool_data 전달
         );
 
         // 5. 채팅방에 AI 메시지 전송
         this.server.to(roomName).emit(ChatEvent.MESSAGE, aiMessagePayload);
+        this.logger.log(
+          `[AI_MESSAGE] Emitting to room: ${roomName}, Payload: ${JSON.stringify(aiMessagePayload)}`,
+        );
       } catch (error) {
         this.logger.error(`Error getting AI response: ${error.message}`);
       }

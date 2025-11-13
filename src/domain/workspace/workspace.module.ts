@@ -18,6 +18,8 @@ import { ChatMessageService } from './service/chat-message.service.js';
 import { ChatMessage } from './entities/chat-message.entity.js';
 import { ReviewModule } from '../review/review.module.js';
 import { AiModule } from '../../ai/ai.module.js';
+import { HttpModule } from '@nestjs/axios';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { AiModule } from '../../ai/ai.module.js';
     RedisModule,
     ReviewModule, // ReviewService를 사용하기 위해 ReviewModule을 import
     AiModule,
+    HttpModule,
+    ConfigModule,
   ],
   controllers: [WorkspaceController],
   providers: [

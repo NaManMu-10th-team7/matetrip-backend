@@ -7,6 +7,7 @@ import {
   Delete,
   UseGuards,
   Req,
+  Query,
 } from '@nestjs/common';
 import { WorkspaceService } from './service/workspace.service';
 import { CreateWorkspaceReqDto } from './dto/create-workspace-req.dto';
@@ -15,6 +16,7 @@ import { CreateReviewDto } from '../review/dto/create-review.dto';
 import { ReviewService } from '../review/review.service';
 import { PoiGateway } from './gateway/poi.gateway.js';
 import { PoiOptimizeReqDto } from './dto/poi/poi-optimize-req.dto.js';
+import { KeywordType } from '../post/entities/keywords-type.enum';
 
 @Controller('workspace')
 export class WorkspaceController {
@@ -59,11 +61,15 @@ export class WorkspaceController {
     };
   }
 
+  @Get('search')
+  async searchLocation(@Query('keyword') keyword: string) {
+    return this.workspaceService.searchPlaces(keyword);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.workspaceService.findOne(id);
   }
-
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.workspaceService.remove(id);

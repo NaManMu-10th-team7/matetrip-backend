@@ -11,7 +11,7 @@ export class AiService {
   ) {}
 
   async getAgentResponse(query: string, sessionId: string) {
-    const url = `${this.configService.get<string>('AI_API_SERVER_URL')}/invoke`;
+    const url = `${this.configService.get<string>('AI_API_SERVER_URL')}/chat`;
 
     try {
       const response = await firstValueFrom(
