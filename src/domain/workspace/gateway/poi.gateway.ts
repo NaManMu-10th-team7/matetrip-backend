@@ -21,6 +21,9 @@ import { PoiRemoveReqDto } from '../dto/poi/poi-remove-req.dto.js';
 import { PoiResDto } from '../dto/poi/poi-res.dto.js';
 import { PoiAddScheduleReqDto } from '../dto/poi/poi-add-schedule-req.dto.js';
 import { PoiReorderReqDto } from '../dto/poi/poi-reorder-req.dto.js';
+import { CursorMoveDto } from '../dto/poi/cursor-move.dto.js';
+import { PoiHoverReqDto } from '../dto/poi/poi-hover-req.dto.js';
+import { MapClickReqDto } from '../dto/poi/map-click-req.dto.js';
 
 const PoiSocketEvent = {
   JOIN: 'join',
@@ -43,9 +46,20 @@ const PoiSocketEvent = {
   DISCONNECT: 'disconnect',
   DISCONNECTED: 'disconnected',
   POIDRAG: 'drag',
+  CURSOR_MOVE: 'cursorMove',
+  CURSOR_MOVED: 'cursorMoved',
+  POI_HOVER: 'poi:hover',
+  POI_HOVERED: 'poi:hovered',
+  MAP_CLICK: 'map:click',
+  MAP_CLICKED: 'map:clicked',
 } as const;
 
-@UsePipes(new ValidationPipe())
+@UsePipes(
+  new ValidationPipe({
+    transform: true, // 들어오는 데이터를 DTO 타입으로 자동 변환
+    forbidNonWhitelisted: true, // DTO에 정의되지 않은 속성이 있으면 요청 거부
+  }),
+)
 @WebSocketGateway(3003, {
   namespace: 'poi',
   cors: {
@@ -292,6 +306,91 @@ export class PoiGateway {
     } catch (error) {
       this.logger.error(
         `Socket ${socket.id} failed to reorder POIs in planDay ${data.planDayId}`,
+        error,
+      );
+    }
+  }
+
+  @SubscribeMessage(PoiSocketEvent.CURSOR_MOVE)
+  handleCursorMove(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: CursorMoveDto,
+  ) {
+    try {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      this.validateRoomAuth(roomName, socket);
+
+      socket.to(roomName).emit(PoiSocketEvent.CURSOR_MOVED, data);
+
+      this.logger.debug(
+        `Socket ${socket.id} moved cursor in workspace ${data.workspaceId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Socket ${socket.id} failed to move cursor in workspace ${data.workspaceId}`,
+        error,
+      );
+    }
+  }
+
+  @SubscribeMessage(PoiSocketEvent.POI_HOVER)
+  handlePoiHover(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: PoiHoverReqDto,
+  ) {
+    try {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      this.validateRoomAuth(roomName, socket);
+
+      this.logger.debug(
+        `[POI_HOVER] Received from socket ${socket.id} for workspace ${data.workspaceId}. POI ID: ${data.poiId}, User ID: ${data.userId}`,
+      );
+
+      // 자신을 제외한 다른 클라이언트에게만 이벤트 전송
+      const payload = {
+        poiId: data.poiId,
+        userId: data.userId,
+      };
+      socket.to(roomName).emit(PoiSocketEvent.POI_HOVERED, payload);
+
+      this.logger.debug(
+        `[POI_HOVERED] Emitted to room ${roomName}. Payload: ${JSON.stringify(payload)}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Socket ${socket.id} failed to handle POI hover in workspace ${data.workspaceId}`,
+        error,
+      );
+    }
+  }
+
+  @SubscribeMessage(PoiSocketEvent.MAP_CLICK)
+  handleMapClick(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: MapClickReqDto,
+  ) {
+    try {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      this.validateRoomAuth(roomName, socket);
+
+      // 자신을 제외한 다른 클라이언트에게만 이벤트 전송
+      const payload = {
+        position: data.position,
+        userId: data.userId,
+        userColor: data.userColor,
+        userName: data.userName,
+      };
+      socket.to(roomName).emit(PoiSocketEvent.MAP_CLICKED, payload);
+
+      this.logger.debug(
+        `[MAP_CLICK] Received from socket ${socket.id} for workspace ${data.workspaceId}. User: ${data.userName}`,
+      );
+      this.logger.debug(
+        `[MAP_CLICKED] Emitted to room ${roomName}. Payload: ${JSON.stringify(payload)}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Socket ${socket.id} failed to handle map click in workspace ${data.workspaceId}`,
         error,
       );
     }
