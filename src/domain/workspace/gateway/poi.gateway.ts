@@ -359,6 +359,57 @@ export class PoiGateway {
     @MessageBody() data: PoiSocketDto,
   ) {}
 
+  /**
+   * Python AI 서버 등 외부에서 호출 가능한 broadcast 메서드
+   * Socket 연결 없이 특정 workspace의 모든 클라이언트에게 REORDER 이벤트 전파
+   * @param workspaceId - 워크스페이스 ID
+   * @param planDayId - 일정 day ID
+   * @param poiIds - 최적화된 POI ID 순서
+   * @param apiKey - AI 서버 인증용 API Key (선택)
+   */
+  public async broadcastPoiReorder(
+    workspaceId: string,
+    planDayId: string,
+    poiIds: string[],
+    apiKey?: string,
+  ) {
+    try {
+      // API Key 검증 (환경변수 설정 시에만)
+      const expectedApiKey = process.env.AI_SERVER_API_KEY;
+      if (expectedApiKey && apiKey !== expectedApiKey) {
+        this.logger.warn(
+          `Invalid API key attempt for workspace ${workspaceId}`,
+        );
+        throw new UnauthorizedException('Invalid API key');
+      }
+
+      const roomName = this.getPoiRoomName(workspaceId);
+
+      // Redis List 순서 업데이트
+      await this.poiCacheService.reorderScheduledPois(
+        workspaceId,
+        planDayId,
+        poiIds,
+      );
+
+      // 같은 room의 모든 클라이언트에게 순서 변경 알림
+      this.server.to(roomName).emit(PoiSocketEvent.REORDER, {
+        planDayId,
+        poiIds,
+      });
+
+      this.logger.debug(
+        `[AI Optimize] Broadcasted POI reorder in planDay ${planDayId}: ${poiIds.join(', ')}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to broadcast POI reorder in planDay ${planDayId}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
   private getPoiRoomName(workspaceId: string) {
     return `poi:${workspaceId}`;
   }

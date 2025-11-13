@@ -8,13 +8,13 @@ services:
     volumes:
       - redis_data:/data
 
-  openvidu-server:
-    image: openvidu/openvidu-server-kms:latest
-    ports:
-      - '4443:4443'
-    environment:
-      - OPENVIDU_SECRET=${OPENVIDU_SECRET}
-      - OPENVIDU_URL=${OPENVIDU_URL}
+  # openvidu-server:
+  #   image: openvidu/openvidu-server-kms:latest
+  #   ports:
+  #     - '4443:4443'
+  #   environment:
+  #     - OPENVIDU_SECRET=${OPENVIDU_SECRET}
+  #     - OPENVIDU_URL=${OPENVIDU_URL}
 
 volumes:
   redis_data:
