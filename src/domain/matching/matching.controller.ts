@@ -27,10 +27,7 @@ export class MatchingController {
     @Req() req: RequestWithUser,
     @Body() matchRequestDto: MatchRequestDto,
   ) {
-    return this.matchingService.findMatchesWithRecruitingPosts(
-      req.user.id,
-      matchRequestDto,
-    );
+    return this.matchingService.findMatches(req.user.id, matchRequestDto);
   }
 
   @Post('profile/embedding')
