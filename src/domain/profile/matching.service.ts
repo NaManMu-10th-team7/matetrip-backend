@@ -721,10 +721,6 @@ export class MatchingService {
     const summarized = await this.novaService.summarizeDescription(normalized);
     const cleaned = this.normalizeWhitespace(summarized);
 
-    if (!cleaned) {
-      return normalized.slice(0, SUMMARY_CHAR_LIMIT);
-    }
-
     return cleaned;
   }
 
