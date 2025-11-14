@@ -15,6 +15,8 @@ import { ProfilePayloadDto } from './dto/profile.payload.dto'; // 변경된 DTO 
 import { plainToInstance } from 'class-transformer';
 import { BinaryContentService } from '../binary-content/binary-content.service';
 import { BinaryContent } from '../binary-content/entities/binary-content.entity';
+import { RabbitmqProducer } from '../../infra/rabbitmq/rabbitmq.producer.js';
+import { Transactional } from 'typeorm-transactional';
 
 /**
  * 클라이언트에 반환되는 프로필 정보 형태
@@ -46,6 +48,7 @@ export class ProfileService {
     private readonly binaryContentService: BinaryContentService,
     @InjectRepository(BinaryContent)
     private readonly binaryContentRepository: Repository<BinaryContent>,
+    private readonly rabbitMQProducer: RabbitmqProducer,
   ) {}
 
   /**
@@ -187,6 +190,7 @@ export class ProfileService {
    *    (Object.assign을 통해 updateProfileDto에 들어있는 필드만 변경됩니다.)
    * 4. save() 메서드를 통해 변경된 엔티티를 DB에 저장하고, DTO 형태로 반환합니다.
    */
+  @Transactional()
   async update(
     userId: string,
     updateProfileDto: UpdateProfileDto,
@@ -264,9 +268,9 @@ export class ProfileService {
         await this.binaryContentService.deleteFile(oldImageId);
       }
     }
-
     //return this.toResponseDto(updatedProfile);
     // DTO로 변환하여 반환
+    this.rabbitMQProducer.enqueueProfileEmbedding(userId);
     return this.toProfilePayloadDto(updatedProfile);
   }
   /**

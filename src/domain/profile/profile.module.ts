@@ -7,11 +7,13 @@ import { BinaryContentModule } from '../binary-content/binary-content.module';
 
 import { ProfileService } from './profile.service';
 import { ProfileController } from './profile.controller';
+import { RabbitmqModule } from '../../infra/rabbitmq/rabbitmq.module.js';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Profile, Users, BinaryContent]),
     BinaryContentModule,
+    RabbitmqModule,
   ],
   controllers: [ProfileController],
   providers: [ProfileService],
