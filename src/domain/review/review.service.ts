@@ -262,9 +262,7 @@ export class ReviewService {
 
   private attachProfileImageId(profile?: Profile): Profile {
     if (!profile) {
-      throw new BadRequestException(
-        'Profile information is required to attach profileImageId.',
-      );
+      throw new NotFoundException('Profile not found for the reviewer.');
     }
     return Object.assign(profile, {
       profileImageId: profile.profileImage?.id ?? null,
