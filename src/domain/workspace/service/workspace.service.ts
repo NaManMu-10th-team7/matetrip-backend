@@ -173,7 +173,8 @@ export class WorkspaceService {
   // }
 
   async searchPlaces(query: string) {
-    const kakaoKey = this.configService.get<string>('KAKAOMAP_REST_API_KEY');
+    console.log(`AI가 searchPlaces 를 호출했다!`);
+    const kakaoKey = this.configService.get<string>('KAKAO_REST_API_KEY');
     const url = 'https://dapi.kakao.com/v2/local/search/keyword.json';
 
     try {

@@ -18,7 +18,7 @@ export class AiService {
         this.httpService.post(url, { query, session_id: sessionId }),
       );
 
-      console.log(response);
+      // console.log(response);
 
       return response.data;
     } catch (error) {
