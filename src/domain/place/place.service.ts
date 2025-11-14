@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { GetPlacesInboundsReqDto } from './dto/get-places-inbounds-req.dto.js';
+import { GetPlacesReqDto } from './dto/get-places-req.dto.js';
 import { Place } from './entities/place.entity.js';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
-import { GetPlacesInboundsResDto } from './dto/get-places-inbounds-res.dto.js';
+import { GetPlacesResDto as GetPlacesResDto } from './dto/get-places-res.dto.js';
 import { GetPersonalizedPlacesByRegionReqDto } from './dto/get-personalized-places-by-region-req-dto.js';
 import { ProfileService } from '../profile/profile.service.js';
 import { Transactional } from 'typeorm-transactional';
+import { toSql } from 'pgvector';
 
 @Injectable()
 export class PlaceService {
@@ -15,9 +16,7 @@ export class PlaceService {
     private readonly placeRepo: Repository<Place>,
     private readonly profileService: ProfileService,
   ) {}
-  async getPlacesInBounds(
-    dto: GetPlacesInboundsReqDto,
-  ): Promise<GetPlacesInboundsResDto[]> {
+  async getPlacesInBounds(dto: GetPlacesReqDto): Promise<GetPlacesResDto[]> {
     const {
       southWestLatitude,
       southWestLongitude,
@@ -37,7 +36,7 @@ export class PlaceService {
       take: 20,
     });
     console.log('가져온 개수 = ', places.length);
-    return places.map((place) => GetPlacesInboundsResDto.from(place));
+    return places.map((place) => GetPlacesResDto.from(place));
   }
 
   @Transactional()
@@ -53,14 +52,17 @@ export class PlaceService {
       throw new Error('임베딩 벡터를 찾을 수 없습니다.');
     }
 
-    const embeddingString = `[${embeddingValue.join(', ')}]`;
+    // const embeddingString = `[${mbeddingValue.join(', ')}]`;
 
     console.log(`profileEmbedding[0] = ${embeddingValue[0]}`);
-    return this.placeRepo
+    const places: Place[] = await this.placeRepo
       .createQueryBuilder('p')
       .where('p.region = :region', { region })
-      .orderBy(`p.embedding <=> '${embeddingString}'`, 'ASC')
+      .orderBy('p.embedding <=> :embedding', 'ASC')
+      .setParameters({ embedding: embeddingValue })
       .limit(50)
       .getMany();
+
+    return places.map((place) => GetPlacesResDto.from(place));
   }
 }

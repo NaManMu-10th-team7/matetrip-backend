@@ -10,9 +10,6 @@ export class RabbitmqProducer {
 
   // 필요한 DTO
   sendProfileEmbedding(userId: string) {
-    this.profile_embedding_client.emit(
-      'profile_embedding',
-      JSON.stringify(userId),
-    );
+    this.profile_embedding_client.emit('profile_embedding', userId);
   }
 }

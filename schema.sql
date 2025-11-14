@@ -304,7 +304,7 @@ CREATE TABLE places
     longitude double precision NOT NULL,
     latitude double precision NOT NULL,
     embedding vector (1024) NULL, -- 장소 대표 임베딩 (리뷰 기반),
-    si created_at TIMESTAMP DEFAULT now () NOT NULL,
+    created_at TIMESTAMP DEFAULT now () NOT NULL,
     updated_at TIMESTAMP DEFAULT now () NOT NULL
 );
 
@@ -346,8 +346,8 @@ ALTER TABLE profile_embedding
 ALTER TABLE post
     ADD CONSTRAINT fk_post_writer
         FOREIGN KEY (writer_id) REFERENCES users (id) ON DELETE RESTRICT;
--- ADD CONSTRAINT fk_post_image 나중에 추가하기
---     FOREIGN KEY (image_id) REFERENCES binary_content (id) ON DELETE SET NULL;
+    ADD CONSTRAINT fk_post_image
+        FOREIGN KEY (image_id) REFERENCES binary_content (id) ON DELETE SET NULL;
 
 ALTER TABLE workspace
     ADD CONSTRAINT fk_workspace_post
