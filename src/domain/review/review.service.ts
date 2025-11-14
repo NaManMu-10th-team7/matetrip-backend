@@ -131,14 +131,25 @@ export class ReviewService {
   async getReviewsByReceiverId(userId: string): Promise<Review[]> {
     const reviews = await this.reviewRepo.find({
       where: { reviewee: { id: userId } },
-      relations: ['reviewer', 'reviewer.profile'], // 리뷰를 작성한 사용자 정보를 함께 로드합니다.
+      relations: {
+        reviewer: {
+          profile: { profileImage: true },
+        },
+      },
     });
 
     if (!reviews || reviews.length === 0) {
       return [];
     }
 
-    return reviews;
+    return reviews.map((review) => {
+      if (review.reviewer?.profile) {
+        review.reviewer.profile = this.attachProfileImageId(
+          review.reviewer.profile,
+        );
+      }
+      return review;
+    });
   }
 
   async update(
@@ -247,5 +258,16 @@ export class ReviewService {
       }
     }
     return DEFAULT_MANNER_TEMPERATURE;
+  }
+
+  private attachProfileImageId(profile?: Profile): Profile {
+    if (!profile) {
+      throw new BadRequestException(
+        'Profile information is required to attach profileImageId.',
+      );
+    }
+    return Object.assign(profile, {
+      profileImageId: profile.profileImage?.id ?? null,
+    });
   }
 }

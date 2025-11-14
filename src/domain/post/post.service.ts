@@ -451,13 +451,12 @@ export class PostService {
     );
   }
 
-  private attachProfileImageId(profile?: Profile | null) {
+  private attachProfileImageId(profile?: Profile | null): Profile {
     if (!profile) {
-      return profile;
+      throw new BadRequestException('Profile information is missing.');
     }
-    return {
-      ...profile,
+    return Object.assign(profile, {
       profileImageId: profile.profileImage?.id ?? null,
-    };
+    });
   }
 }
