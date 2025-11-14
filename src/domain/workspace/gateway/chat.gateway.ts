@@ -54,7 +54,7 @@ export class ChatGateway {
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: CreateMessageReqDto,
   ) {
-    const { workspaceId, message, username, userId } = data;
+    const { workspaceId, message, username, userId, tempId } = data;
     const roomName = this.getChatRoomName(workspaceId);
 
     let savedMessage;
@@ -75,6 +75,7 @@ export class ChatGateway {
       message,
       userId,
       role: 'user' as const, // 사용자 역할 명시
+      tempId, // [추가] 클라이언트가 보낸 임시 ID를 다시 전달
     };
 
     this.logger.log(
@@ -87,6 +88,22 @@ export class ChatGateway {
       const prompt = message.replace(AGENT_NAME, '').trim();
       const sessionId = workspaceId;
 
+      // 3-1. [추가] "AI 응답 생성 중..." 메시지를 즉시 전송
+      const aiLoadingPayload = {
+        id: `ai-loading-${Date.now()}`, // 임시 로딩 ID
+        username: AGENT_NAME,
+        message: 'AI가 응답을 생성하고 있습니다...',
+        userId: AGENT_USER_ID,
+        role: 'ai' as const,
+        isLoading: true, // 로딩 상태임을 명시
+      };
+      this.server.to(roomName).emit(ChatEvent.MESSAGE, aiLoadingPayload);
+      this.logger.log(
+        `[AI_LOADING] Emitting to room: ${roomName}, Payload: ${JSON.stringify(
+          aiLoadingPayload,
+        )}`,
+      );
+
       try {
         const aiResponse = await this.aiService.getAgentResponse(
           prompt,
@@ -97,9 +114,9 @@ export class ChatGateway {
           `[DEBUG] Full AI Response:`,
           JSON.stringify(aiResponse, null, 2),
         );
-        // 3-1. AI 응답은 DB에 저장하지 않습니다.
+        // 3-2. AI 응답은 DB에 저장하지 않습니다.
 
-        // 3-2. 클라이언트로 전송할 AI 페이로드 생성 (role, toolData 포함)
+        // 3-3. 클라이언트로 전송할 최종 AI 페이로드 생성 (role, toolData 포함)
         const aiMessagePayload = {
           id: `ai-${Date.now()}`, // DB에 저장하지 않으므로 임시 ID 생성
           username: AGENT_NAME,
@@ -107,6 +124,7 @@ export class ChatGateway {
           userId: AGENT_USER_ID,
           role: 'ai' as const, // AI 역할 명시
           toolData: aiResponse.tool_data, // 프론트엔드 액션을 위한 toolData
+          isLoading: false, // [추가] 로딩이 완료되었음을 명시
         };
 
         // AI 채팅 메시지를 먼저 클라이언트에게 전송합니다.

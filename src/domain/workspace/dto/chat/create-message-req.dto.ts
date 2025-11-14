@@ -16,4 +16,7 @@ export class CreateMessageReqDto {
   @IsNotEmpty()
   @IsString()
   message: string;
+
+  @IsString()
+  tempId?: string;
 }
