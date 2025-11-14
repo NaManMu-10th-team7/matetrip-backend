@@ -14,6 +14,10 @@ import { CachedPoi, buildCachedPoiFromCreateDto } from '../types/cached-poi.js';
 import { PlanDayService } from './plan-day.service.js';
 import { PoiService } from './poi.service.js';
 import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
+import { lastValueFrom } from 'rxjs';
+import { AxiosError } from 'axios';
 
 @Injectable()
 export class WorkspaceService {
@@ -26,6 +30,8 @@ export class WorkspaceService {
     private readonly poiCacheService: PoiCacheService,
     private readonly poiService: PoiService,
     private readonly planDayService: PlanDayService,
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Transactional()
@@ -165,4 +171,36 @@ export class WorkspaceService {
   //     workspaceId,
   //   );
   // }
+
+  async searchPlaces(query: string) {
+    const kakaoKey = this.configService.get<string>('KAKAOMAP_REST_API_KEY');
+    const url = 'https://dapi.kakao.com/v2/local/search/keyword.json';
+
+    try {
+      const response = await lastValueFrom(
+        this.httpService.get(url, {
+          headers: { Authorization: `KakaoAK ${kakaoKey}` },
+          params: { query: query, size: 10 },
+        }),
+      );
+
+      console.log('API 호출 성공 ^^!');
+
+      return response.data.documents.map((place) => ({
+        name: place.place_name,
+        address: place.address_name,
+        road_address: place.road_address_name,
+        phone: place.phone,
+        x: parseFloat(place.x),
+        y: parseFloat(place.y),
+        url: place.place_url,
+        category: place.category_name,
+      }));
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        console.error('Kakao API Error:', error.response?.data);
+      }
+      throw new Error('Kakao API를 호출하는 중 오류가 발생했습니다.');
+    }
+  }
 }

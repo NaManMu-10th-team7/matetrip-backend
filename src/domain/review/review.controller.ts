@@ -1,19 +1,16 @@
-// review.controller.ts
 import {
-  Controller,
-  Post,
   Body,
-  HttpCode,
-  Req,
+  Controller,
   Get,
-  UseGuards,
   Param,
-  ParseUUIDPipe /*, UseGuards*/,
+  ParseUUIDPipe,
+  Patch,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { ReviewService } from './review.service';
-import { CreateReviewDto } from './dto/create-review.dto';
+import { UpdateReviewDto } from './dto/update-review.dto';
 import { AuthGuard } from '@nestjs/passport';
-// import { JwtAuthGuard } from '../auth/guards/jwt.guard'; // 인증이 준비되어 있다면 사용
 
 @Controller('reviews')
 export class ReviewController {
@@ -22,5 +19,15 @@ export class ReviewController {
   @Get('user/:userId')
   async getReviewsForUser(@Param('userId', ParseUUIDPipe) userId: string) {
     return this.reviewService.getReviewsByReceiverId(userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Patch(':reviewId')
+  async updateReview(
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
+    @Body() dto: UpdateReviewDto,
+    @Req() req: { user: { id: string } },
+  ) {
+    return this.reviewService.update(reviewId, req.user.id, dto);
   }
 }
