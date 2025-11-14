@@ -16,7 +16,6 @@ export const RabbitMQConfig = ClientsModule.registerAsync([
         queueOptions: {
           durable: true,
         },
-        noAck: false,
         prefetchCount: 1,
       },
     }),
@@ -36,7 +35,6 @@ export const RabbitMQConfig = ClientsModule.registerAsync([
         queueOptions: {
           durable: true,
         },
-        noAck: false,
         prefetchCount: 1,
       },
     }),
