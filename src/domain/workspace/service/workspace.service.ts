@@ -18,6 +18,7 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { lastValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
+import { KakaoResponse } from '../types/kakao-document.js';
 
 @Injectable()
 export class WorkspaceService {
@@ -178,7 +179,7 @@ export class WorkspaceService {
 
     try {
       const response = await lastValueFrom(
-        this.httpService.get(url, {
+        this.httpService.get<KakaoResponse>(url, {
           headers: { Authorization: `KakaoAK ${kakaoKey}` },
           params: { query: query, size: 10 },
         }),
