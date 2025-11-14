@@ -13,5 +13,5 @@ export class UserResponseDto {
 
   @Expose()
   @Type(() => ProfilePayloadDto)
-  profile: ProfilePayloadDto;
+  profile: ProfilePayloadDto | null; //게시물 작성때 오류가 나서.. null 값도 허용
 }

@@ -11,12 +11,12 @@ import {
   MatchRecruitingPostDto,
   MatchResponseDto,
 } from './dto/match-response.dto';
-import { Profile } from '../profile/entities/profile.entity';
-import { TravelStyleType } from '../profile/entities/travel-style-type.enum';
-import { TendencyType } from '../profile/entities/tendency-type.enum';
+import { Profile } from './entities/profile.entity';
+import { TravelStyleType } from './entities/travel-style-type.enum';
+import { TendencyType } from './entities/tendency-type.enum';
 import { Post } from '../post/entities/post.entity';
 import { PostStatus } from '../post/entities/post-status.enum';
-import { MBTI_TYPES } from '../profile/entities/mbti.enum';
+import { MBTI_TYPES } from './entities/mbti.enum';
 import { EmbeddingMatchingProfileDto } from './dto/embedding-matching-profile.dto';
 import { NovaService } from '../../ai/summaryLLM.service';
 import { TitanEmbeddingService } from '../../ai/titan-embedding.service';
