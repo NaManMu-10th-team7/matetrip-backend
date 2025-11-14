@@ -14,6 +14,8 @@ DROP TABLE IF EXISTS post;
 DROP TABLE IF EXISTS profile;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS binary_content;
+DROP TABLE IF EXISTS place_review;
+DROP TABLE IF EXISTS places;
 
 DROP TYPE IF EXISTS keyword_type;
 DROP TYPE IF EXISTS gender;
@@ -24,7 +26,17 @@ DROP TYPE IF EXISTS travel_style_type;
 DROP TYPE IF EXISTS poi_status;
 DROP TYPE if exists mbti_type;
 
-
+CREATE TYPE region_group_type AS ENUM (
+    '서울',
+    '경기도',
+    '인천',
+    '강원',
+    '부산',
+    '경상',
+    '전라도',
+    '충청',
+    '제주도'
+);
 CREATE TYPE keyword_type AS ENUM (
     '도심/야경 위주',
     '자연 위주',
@@ -172,7 +184,7 @@ CREATE TABLE IF NOT EXISTS post
     id               UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
     writer_id        UUID        NOT NULL,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    -- image_id  UUID ON DELETE SET NULL,
+    image_id  UUID   ON DELETE SET NULL,
     title            TEXT        NOT NULL,
     content          TEXT        NOT NULL,
     status           post_status NOT NULL DEFAULT '모집중',
@@ -278,6 +290,36 @@ CREATE TABLE IF NOT EXISTS follow
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+
+CREATE TABLE places 
+(
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    title text NOT NULL,
+    address text NOT NULL,
+    region_group region_group_type NOT NULL,
+    category text NULL,
+    tags jsonb NULL, -- Optional[list[str]] → jsonb (AI 생성 태그)
+    summary text NULL, -- 리뷰 기반 AI 요약
+    image_url text NULL, -- 장소 대표 이미지 URL
+    longitude double precision NOT NULL,
+    latitude double precision NOT NULL,
+    embedding vector (1024) NULL, -- 장소 대표 임베딩 (리뷰 기반),
+    created_at TIMESTAMP DEFAULT now () NOT NULL,
+    updated_at TIMESTAMP DEFAULT now () NOT NULL
+);
+
+-- 리뷰 테이블
+CREATE TABLE place_review 
+(
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    place_id uuid NOT NULL REFERENCES places (id) ON DELETE CASCADE,
+    content text NOT NULL,
+    source_url text NOT NULL,
+    embedding vector (1024) NULL, -- 리뷰 임베딩 (검색 정확도 향상용)
+    is_deleted boolean DEFAULT false NOT NULL,
+    created_at TIMESTAMP DEFAULT now () NOT NULL
+);
+
 -- ========= 2) ALTER TABLE: UNIQUE  =========
 ALTER TABLE users
     ADD CONSTRAINT uq_users_email UNIQUE (email);
@@ -304,8 +346,8 @@ ALTER TABLE profile_embedding
 ALTER TABLE post
     ADD CONSTRAINT fk_post_writer
         FOREIGN KEY (writer_id) REFERENCES users (id) ON DELETE RESTRICT;
--- ADD CONSTRAINT fk_post_image 나중에 추가하기
---     FOREIGN KEY (image_id) REFERENCES binary_content (id) ON DELETE SET NULL;
+    ADD CONSTRAINT fk_post_image
+        FOREIGN KEY (image_id) REFERENCES binary_content (id) ON DELETE SET NULL;
 
 ALTER TABLE workspace
     ADD CONSTRAINT fk_workspace_post

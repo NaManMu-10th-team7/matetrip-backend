@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
-import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Profile } from './entities/profile.entity';
 import { Users } from '../users/entities/users.entity';
@@ -365,6 +364,27 @@ export class ProfileService {
     }
 
     return this.toProfilePayloadDto(profile);
+  }
+
+  async getUserEmbeddingValueByUserId(userId: string) {
+    const profile = await this.profileRepository.findOne({
+      where: {
+        user: {
+          id: userId,
+        },
+      },
+    });
+
+    if (!profile) {
+      throw new NotFoundException('해당 유저의 프로필을 찾을 수 없습니다.');
+    }
+    if (!profile.profileEmbedding) {
+      throw new NotFoundException(
+        '해당 유저의 임베딩 벡터를 찾을 수 없습니다.',
+      );
+    }
+
+    return profile.profileEmbedding;
   }
 
   /**

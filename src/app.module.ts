@@ -12,12 +12,13 @@ import { PostParticipationModule } from './domain/post-participation/post-partic
 import { ReviewModule } from './domain/review/review.module';
 import { WorkspaceModule } from './domain/workspace/workspace.module';
 import { AuthModule } from './domain/auth/auth.module';
-import { RedisModule } from './redis/redis.module';
+import { RedisModule } from './infra/redis/redis.module';
 import { NotificationsModule } from './domain/notifications/notifications.module';
 // import { OpenviduModule } from './openvidu/openvidu.module';
 import { AiModule } from './ai/ai.module';
 import { HttpModule } from '@nestjs/axios';
 import { PlaceModule } from './domain/place/place.module';
+import { RabbitmqModule } from './infra/rabbitmq/rabbitmq.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { PlaceModule } from './domain/place/place.module';
     // OpenviduModule,
     AiModule,
     PlaceModule,
+    RabbitmqModule,
   ],
   controllers: [AppController],
   providers: [AppService],
