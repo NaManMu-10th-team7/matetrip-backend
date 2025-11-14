@@ -62,6 +62,11 @@ export class PostResponseDto {
   endDate?: string | null;
 
   @Expose()
+  @IsOptional()
+  @IsUUID()
+  imageId?: string;
+
+  @Expose()
   @Type(() => SimplePostParticipationResponseDto)
   @ValidateNested({ each: true })
   @IsArray()

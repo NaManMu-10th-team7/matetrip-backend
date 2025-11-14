@@ -20,6 +20,8 @@ import { UserResponseDto } from '../users/dto/user-response.dto';
 import { Workspace } from '../workspace/entities/workspace.entity.js';
 import { BinaryContent } from '../binary-content/entities/binary-content.entity';
 import { BinaryContentService } from '../binary-content/binary-content.service';
+import { Profile } from '../profile/entities/profile.entity';
+import { Users } from '../users/entities/users.entity';
 
 @Injectable()
 export class PostService {
@@ -37,10 +39,18 @@ export class PostService {
   ) {}
 
   async create(createPostDto: CreatePostDto, userId: string) {
+    const { imageId, ...rest } = createPostDto;
     const post = this.postRepository.create({
-      ...createPostDto,
+      ...rest,
       writer: { id: userId },
     });
+
+    if (imageId) {
+      const image = await this.binaryContentRepository.findOneBy({
+        id: imageId,
+      });
+      post.image = image; // 여기서 관계를 직접 세팅해야 image_id FK가 들어감
+    }
 
     const savedPost = await this.postRepository.save(post);
     // todo : 워크스페이스 생성
@@ -52,9 +62,15 @@ export class PostService {
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.writer', 'writer')
       .leftJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('profile.profileImage', 'profileImage')
+      .leftJoinAndSelect('post.image', 'image')
       .leftJoinAndSelect('post.participations', 'participations')
       .leftJoinAndSelect('participations.requester', 'requester')
       .leftJoinAndSelect('requester.profile', 'requesterProfile')
+      .leftJoinAndSelect(
+        'requesterProfile.profileImage',
+        'requesterProfileImage',
+      )
       .orderBy('post.createdAt', 'DESC')
       .getMany();
 
@@ -65,10 +81,11 @@ export class PostService {
     const foundedPost = await this.postRepository.findOne({
       where: { id },
       relations: {
-        writer: { profile: true },
+        image: true,
+        writer: { profile: { profileImage: true } },
         participations: {
           requester: {
-            profile: true,
+            profile: { profileImage: true },
           },
         },
       },
@@ -90,12 +107,13 @@ export class PostService {
     const result = await this.postRepository.find({
       where: { writer: { id: userId } },
       relations: {
+        image: true,
         writer: {
-          profile: true,
+          profile: { profileImage: true },
         },
         participations: {
           requester: {
-            profile: true,
+            profile: { profileImage: true },
           },
         },
       },
@@ -112,19 +130,26 @@ export class PostService {
     const writtenPosts = await this.postRepository.find({
       where: { writer: { id: userId } },
       relations: {
-        writer: { profile: true },
-        participations: { requester: { profile: true } },
+        image: true,
+        writer: { profile: { profileImage: true } },
+        participations: { requester: { profile: { profileImage: true } } },
       },
     });
 
     const participatedPosts = await this.postParticipationRepository
       .createQueryBuilder('participation')
       .leftJoinAndSelect('participation.post', 'post')
+      .leftJoinAndSelect('post.image', 'postImage')
       .leftJoinAndSelect('post.writer', 'writer')
       .leftJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('profile.profileImage', 'writerProfileImage')
       .leftJoinAndSelect('post.participations', 'postParticipations')
       .leftJoinAndSelect('postParticipations.requester', 'requester')
       .leftJoinAndSelect('requester.profile', 'requesterProfile')
+      .leftJoinAndSelect(
+        'requesterProfile.profileImage',
+        'requesterProfileImage',
+      )
       .where('participation.requester.id = :userId', { userId })
       .getMany();
 
@@ -187,7 +212,7 @@ export class PostService {
     }
 
     const updatedPost = await this.postRepository.save(post);
-
+    //기존의 이미지 지우는 작업
     if (oldImageId && oldImageId !== updatedPost.image?.id) {
       const remainingReferences = await this.postRepository.count({
         where: { image: { id: oldImageId } },
@@ -203,9 +228,12 @@ export class PostService {
   }
 
   async remove(id: string, userId: string) {
+    let orphanImageId: string | null = null;
+
     await this.dataSource.transaction(async (transactionalEntityManager) => {
       const post = await transactionalEntityManager.findOne(Post, {
         where: { id, writer: { id: userId } },
+        relations: ['image'],
       });
 
       if (!post) {
@@ -213,6 +241,8 @@ export class PostService {
           'Post delete failed: Post not found or user not authorized',
         );
       }
+
+      const imageId = post.image?.id ?? null;
 
       await transactionalEntityManager.delete(PostParticipation, {
         post: { id },
@@ -226,7 +256,25 @@ export class PostService {
       if (result.affected === 0) {
         throw new NotFoundException('Post delete failed');
       }
+
+      if (imageId) {
+        // 같은 이미지를 다른 게시글이 참조하고 있는지 확인
+        const remainingReferences = await transactionalEntityManager.count(
+          Post,
+          { where: { image: { id: imageId } } },
+        );
+
+        if (remainingReferences === 0) {
+          // 트랜잭션이 끝난 뒤 실제 S3/BinaryContent 정리를 진행한다.
+          orphanImageId = imageId;
+        }
+      }
     });
+
+    if (orphanImageId) {
+      //s3와 binary 에서 삭제 한다
+      await this.binaryContentService.deleteFile(orphanImageId);
+    }
   }
 
   private toPostResponseDto(post: Post | null) {
@@ -246,13 +294,22 @@ export class PostService {
       writer: {
         id: post.writer.id,
         email: post.writer.email,
-        profile: post.writer.profile,
+        profile: this.attachProfileImageId(post.writer.profile),
       },
-      participations: post.participations?.map((p) =>
-        plainToInstance(SimplePostParticipationResponseDto, p, {
-          excludeExtraneousValues: true,
-        }),
-      ),
+      imageId: post.image?.id ?? null,
+      participations: post.participations?.map((p) => {
+        const requesterWithProfileImage = {
+          ...p.requester,
+          profile: this.attachProfileImageId(p.requester?.profile),
+        };
+        return plainToInstance(
+          SimplePostParticipationResponseDto,
+          { ...p, requester: requesterWithProfileImage },
+          {
+            excludeExtraneousValues: true,
+          },
+        );
+      }),
     };
     return plainToInstance(PostResponseDto, postResponse, {
       excludeExtraneousValues: true,
@@ -285,6 +342,8 @@ export class PostService {
     const posts = await queryBuilder
       .leftJoinAndSelect('post.writer', 'writer')
       .leftJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('profile.profileImage', 'writerProfileImage')
+      .leftJoinAndSelect('post.image', 'image')
       .orderBy('post.createdAt', 'DESC')
       // .skip((page - 1) * limit)
       // .take(limit)
@@ -340,7 +399,11 @@ export class PostService {
   async getPostMembers(postId: string): Promise<UserResponseDto[]> {
     const post = await this.postRepository.findOne({
       where: { id: postId },
-      relations: ['writer', 'writer.profile'],
+      relations: {
+        writer: {
+          profile: { profileImage: true },
+        },
+      },
     });
 
     if (!post) {
@@ -352,7 +415,11 @@ export class PostService {
         post: { id: postId },
         status: PostParticipationStatus.APPROVED,
       },
-      relations: ['requester', 'requester.profile'],
+      relations: {
+        requester: {
+          profile: { profileImage: true },
+        },
+      },
     });
 
     const author = post.writer;
@@ -362,7 +429,7 @@ export class PostService {
 
     // 작성자와 참여자 목록을 합치고 중복을 제거합니다.
     // Map을 사용하여 id를 키로 중복을 효율적으로 제거합니다.
-    const membersMap = new Map<string, any>();
+    const membersMap = new Map<string, Users>();
     if (author) {
       membersMap.set(author.id, author);
     }
@@ -372,12 +439,25 @@ export class PostService {
       }
     });
 
-    const members = Array.from(membersMap.values());
+    const members = Array.from(membersMap.values()).map((member) => ({
+      ...member,
+      profile: this.attachProfileImageId(member.profile),
+    }));
 
     return members.map((member) =>
       plainToInstance(UserResponseDto, member, {
         excludeExtraneousValues: true,
       }),
     );
+  }
+
+  private attachProfileImageId(profile?: Profile | null) {
+    if (!profile) {
+      return profile;
+    }
+    return {
+      ...profile,
+      profileImageId: profile.profileImage?.id ?? null,
+    };
   }
 }

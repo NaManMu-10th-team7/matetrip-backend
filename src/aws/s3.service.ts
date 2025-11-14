@@ -25,6 +25,7 @@ export class S3Service {
     'image/png',
     'image/gif',
     'image/webp',
+    'image/avif',
   ];
 
   constructor(private readonly configService: ConfigService) {

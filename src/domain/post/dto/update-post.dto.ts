@@ -22,10 +22,6 @@ export class UpdatePostDto extends PartialType(CreatePostDto) {
   @IsOptional()
   @IsEnum(PostStatus)
   status?: PostStatus;
-
-  @IsOptional()
-  @IsUUID()
-  imageId?: string | null;
 }
 
 // @IsArray()
