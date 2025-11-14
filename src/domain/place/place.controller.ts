@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Query } from '@nestjs/common';
 import { PlaceService } from './place.service';
 import { GetPlacesReqDto } from './dto/get-places-req.dto.js';
 import { GetPlacesResDto } from './dto/get-places-res.dto.js';
@@ -15,10 +15,11 @@ export class PlaceController {
     return this.placeService.getPlacesInBounds(dto);
   }
 
-  @Post('/recommendation')
+  @Get('/recommendation')
   async getPersonalizedPlaces(
-    @Body() dto: GetPersonalizedPlacesByRegionReqDto,
+    @Query() dto: GetPersonalizedPlacesByRegionReqDto,
   ): Promise<GetPlacesResDto[]> {
+    console.log('테스트');
     return this.placeService.getPersonalizedPlaces(dto);
   }
 }

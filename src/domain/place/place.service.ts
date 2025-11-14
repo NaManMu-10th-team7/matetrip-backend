@@ -39,21 +39,15 @@ export class PlaceService {
 
   async getPersonalizedPlaces(dto: GetPersonalizedPlacesByRegionReqDto) {
     const { userId, region } = dto;
-    const embeddingValue =
+    const embeddingValue: number[] =
       await this.profileService.getUserEmbeddingValueByUserId(userId);
-
-    if (!embeddingValue || !embeddingValue[0]) {
-      throw new Error('임베딩 벡터를 찾을 수 없습니다.');
-    }
-
     // const embeddingString = `[${mbeddingValue.join(', ')}]`;
-
-    console.log(`profileEmbedding[0] = ${embeddingValue[0]}`);
+    const embeddingString = `[${embeddingValue.join(', ')}]`;
     const places: Place[] = await this.placeRepo
       .createQueryBuilder('p')
       .where('p.region = :region', { region })
       .orderBy('p.embedding <=> :embedding', 'ASC')
-      .setParameters({ embedding: embeddingValue })
+      .setParameters({ embedding: embeddingString })
       .limit(50)
       .getMany();
 
