@@ -2,14 +2,24 @@ import { Column, Entity } from 'typeorm';
 import type { ColumnType } from 'typeorm';
 import { BaseTimestampEntity } from '../../base.entity.js';
 import { vectorTransformer } from '../../../common/transformers/vector-transformer.js';
+import { RegionGroup } from './region_group.enum.js';
 
 @Entity('places')
 export class Place extends BaseTimestampEntity {
-  @Column()
+  @Column({ type: 'text', nullable: false })
   title: string;
 
-  @Column()
+  @Column({ type: 'text', nullable: false })
   address: string;
+
+  @Column({
+    type: 'enum',
+    name: 'region',
+    enum: RegionGroup,
+    enumName: 'region',
+    nullable: true, // 임시로 true
+  })
+  region: RegionGroup;
 
   @Column({ type: 'float', nullable: false })
   latitude: number;
