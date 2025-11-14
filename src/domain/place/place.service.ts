@@ -6,8 +6,6 @@ import { Between, Repository } from 'typeorm';
 import { GetPlacesResDto as GetPlacesResDto } from './dto/get-places-res.dto.js';
 import { GetPersonalizedPlacesByRegionReqDto } from './dto/get-personalized-places-by-region-req-dto.js';
 import { ProfileService } from '../profile/profile.service.js';
-import { Transactional } from 'typeorm-transactional';
-import { toSql } from 'pgvector';
 
 @Injectable()
 export class PlaceService {
@@ -39,11 +37,7 @@ export class PlaceService {
     return places.map((place) => GetPlacesResDto.from(place));
   }
 
-  @Transactional()
   async getPersonalizedPlaces(dto: GetPersonalizedPlacesByRegionReqDto) {
-    /**
-     * userid기반으로
-     */
     const { userId, region } = dto;
     const embeddingValue =
       await this.profileService.getUserEmbeddingValueByUserId(userId);
