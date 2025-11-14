@@ -509,6 +509,30 @@ export class PoiGateway {
     }
   }
 
+  /**
+   * 특정 워크스페이스의 모든 클라이언트에게 현재 POI 목록 전체를 브로드캐스트합니다.
+   * @param workspaceId 동기화할 워크스페이스 ID
+   */
+  async broadcastSync(workspaceId: string) {
+    try {
+      const roomName = this.getPoiRoomName(workspaceId);
+      const pois: PoiResDto[] = await this.poiService.getWorkspacePois(
+        workspaceId,
+      );
+
+      this.server.to(roomName).emit(PoiSocketEvent.SYNC, { pois });
+
+      this.logger.log(
+        `[BROADCAST_SYNC] Synced ${pois.length} POIs to room: ${roomName}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to broadcast sync for workspace ${workspaceId}`,
+        error,
+      );
+    }
+  }
+
   private getPoiRoomName(workspaceId: string) {
     return `poi:${workspaceId}`;
   }

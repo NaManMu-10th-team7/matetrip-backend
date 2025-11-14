@@ -15,6 +15,7 @@ import { LeaveChatReqDto } from '../dto/chat/leave-chat-req.dto.js';
 import { ChatConnectionReqDto } from '../dto/chat/connect-chat-req.dto.js';
 import { AiService } from '../../../ai/ai.service.js';
 import { ChatMessageService } from '../service/chat-message.service.js';
+import { PoiGateway } from './poi.gateway.js';
 
 const ChatEvent = {
   JOIN: 'join',
@@ -42,6 +43,7 @@ export class ChatGateway {
     private readonly workspaceService: WorkspaceService,
     private readonly aiService: AiService,
     private readonly chatMessageService: ChatMessageService,
+    private readonly poiGateway: PoiGateway,
   ) {}
 
   @WebSocketServer()
@@ -91,6 +93,10 @@ export class ChatGateway {
           sessionId,
         );
 
+        this.logger.debug(
+          `[DEBUG] Full AI Response:`,
+          JSON.stringify(aiResponse, null, 2),
+        );
         // 3-1. AI 응답은 DB에 저장하지 않습니다.
 
         // 3-2. 클라이언트로 전송할 AI 페이로드 생성 (role, toolData 포함)
@@ -103,10 +109,40 @@ export class ChatGateway {
           toolData: aiResponse.tool_data, // 프론트엔드 액션을 위한 toolData
         };
 
+        // AI 채팅 메시지를 먼저 클라이언트에게 전송합니다.
         this.server.to(roomName).emit(ChatEvent.MESSAGE, aiMessagePayload);
         this.logger.log(
           `[AI_MESSAGE] Emitting to room: ${roomName}, Payload: ${JSON.stringify(aiMessagePayload)}`,
         );
+
+        // 4. [핵심] AI가 장소 검색 결과를 반환했는지 확인하고 백엔드에서 처리
+        const toolData = aiResponse.tool_data?.[0];
+        if (
+          toolData &&
+          toolData.tool_name === 'search_places' &&
+          toolData.tool_output
+        ) {
+          this.logger.log(`[AI_TOOL] Processing 'search_places' tool result.`);
+          try {
+            // 4-1. AI가 반환한 문자열을 JSON 배열로 파싱합니다.
+            // Python의 dict 표현식(')을 JSON 표준(")으로 변경합니다.
+            const placesString = toolData.tool_output.replace(/'/g, '"');
+            const places = JSON.parse(placesString);
+
+            if (Array.isArray(places) && places.length > 0) {
+              // 4-2. 검색된 장소들을 POI로 생성 및 캐시 저장
+              await this.workspaceService.markPoisFromSearch(
+                workspaceId,
+                places,
+              );
+              // 4-3. POI가 추가되었으므로, 모든 클라이언트에게 POI 목록을 다시 동기화
+              await this.poiGateway.broadcastSync(workspaceId);
+            }
+          } catch (parseError) {
+            this.logger.error('Failed to parse tool_output from AI response', parseError);
+          }
+        }
+
       } catch (error) {
         this.logger.error(`Error getting AI response: ${error.message}`);
         // AI 응답 실패 시 클라이언트에게 에러 메시지 전송
