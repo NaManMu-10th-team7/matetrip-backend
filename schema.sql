@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS post
     id               UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
     writer_id        UUID        NOT NULL,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    image_id  UUID   ON DELETE SET NULL,
+    image_id  UUID,
     title            TEXT        NOT NULL,
     content          TEXT        NOT NULL,
     status           post_status NOT NULL DEFAULT '모집중',

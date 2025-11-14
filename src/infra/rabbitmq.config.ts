@@ -5,15 +5,18 @@ export const RabbitMQConfig = ClientsModule.registerAsync([
   {
     name: 'PROFILE_EMBEDDING_CLIENT',
     imports: [ConfigModule],
-    useFactory: () => ({
+    useFactory: (configService: ConfigService) => ({
       transport: Transport.RMQ,
       options: {
-        urls: [process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672'],
-        queue: process.env.RABBITMQ_PROFILE_QUEUE,
+        urls: [
+          configService.get<string>('RABBITMQ_URL') ??
+            'amqp://guest:guest@localhost:5672',
+        ],
+        queue: configService.get<string>('RABBITMQ_PROFILE_QUEUE'),
         queueOptions: {
           durable: true,
         },
-        noAck: true,
+        noAck: false,
         prefetchCount: 1,
       },
     }),
@@ -22,15 +25,18 @@ export const RabbitMQConfig = ClientsModule.registerAsync([
   {
     name: 'BEHAVIOR_EMBEDDING_CLIENT',
     imports: [ConfigModule],
-    useFactory: () => ({
+    useFactory: (configService: ConfigService) => ({
       transport: Transport.RMQ,
       options: {
-        urls: [process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672'],
-        queue: process.env.RABBITMQ_BEHAVIOR_QUEUE,
+        urls: [
+          configService.get<string>('RABBITMQ_URL') ??
+            'amqp://guest:guest@localhost:5672',
+        ],
+        queue: configService.get<string>('RABBITMQ_BEHAVIOR_QUEUE'),
         queueOptions: {
           durable: true,
         },
-        noAck: true,
+        noAck: false,
         prefetchCount: 1,
       },
     }),
