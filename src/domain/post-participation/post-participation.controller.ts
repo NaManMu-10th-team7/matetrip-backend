@@ -1,50 +1,65 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
+  Controller,
+  HttpCode,
+  Get,
+  HttpStatus,
   Param,
-  Delete,
+  Patch,
+  ParseUUIDPipe,
+  Post,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
 import { PostParticipationService } from './post-participation.service';
-import { CreatePostParticipationDto } from './dto/create-post-participation.dto';
+import { PostParticipationResponseDto } from './dto/post-participation-response.dto';
 import { UpdatePostParticipationDto } from './dto/update-post-participation.dto';
 
-@Controller('post-participation')
+@Controller('posts/:postId/participations')
 export class PostParticipationController {
   constructor(
     private readonly postParticipationService: PostParticipationService,
   ) {}
 
   @Post()
-  create(@Body() createPostParticipationDto: CreatePostParticipationDto) {
-    return this.postParticipationService.create(createPostParticipationDto);
-  }
-
-  @Get()
-  findAll() {
-    return this.postParticipationService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.postParticipationService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updatePostParticipationDto: UpdatePostParticipationDto,
-  ) {
-    return this.postParticipationService.update(
-      +id,
-      updatePostParticipationDto,
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.CREATED)
+  async requestParticipation(
+    @Param('postId', ParseUUIDPipe) postId: string,
+    @Req() req: Request & { user: { id: string } },
+  ): Promise<PostParticipationResponseDto> {
+    const requesterId = req.user.id;
+    return this.postParticipationService.requestParticipation(
+      postId,
+      requesterId,
     );
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.postParticipationService.remove(+id);
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  getParticipationsForPost(
+    @Param('postId', ParseUUIDPipe) postId: string,
+  ): Promise<PostParticipationResponseDto[]> {
+    return this.postParticipationService.getParticipationsForPost(postId);
+  }
+
+  @Patch(':participationId')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  updateParticipationStatus(
+    @Param('postId', ParseUUIDPipe) postId: string,
+    @Param('participationId', ParseUUIDPipe) participationId: string,
+    @Req() req: Request & { user: { id: string } },
+    @Body() updatePostParticipationDto: UpdatePostParticipationDto,
+  ): Promise<PostParticipationResponseDto> {
+    const authorId = req.user.id;
+    return this.postParticipationService.updateParticipationStatus(
+      postId,
+      participationId,
+      authorId,
+      updatePostParticipationDto,
+    );
   }
 }

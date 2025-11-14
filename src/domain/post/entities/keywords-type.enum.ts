@@ -1,0 +1,17 @@
+export enum KeywordType {
+  CITY_NIGHT_VIBE = '도심/야경 위주',
+  NATURE_VIBE = '자연 위주',
+  BEACH_RESORT = '바다/리조트 휴양',
+  LOCAL_TOWN_SLOW = '로컬 동네/시골 감성',
+  FOOD_TOUR = '맛집/먹방 중심',
+  CAFE_PHOTO = '카페/포토 스팟 탐방',
+  LIGHT_OUTDOOR = '가벼운 야외활동',
+  HARD_OUTDOOR = '강한 액티비티',
+  CULTURE_FESTIVAL = '전시/유적/축제/공연 중심',
+  PACE_CHILL = '여유로운 일정',
+  PACE_TIGHT = '빡빡한 일정',
+  BUDGET_FRIENDLY_TRIP = '가성비 중시',
+  COMFORT_HEALING_TRIP = '편안한 휴양/힐링 중시',
+  SMALL_CHILL_CREW = '소수/조용한 동행 선호',
+  ACTIVE_SOCIAL_CREW = '활발/수다 많은 동행 선호',
+}

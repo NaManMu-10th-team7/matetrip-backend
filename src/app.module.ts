@@ -11,10 +11,14 @@ import { PostModule } from './domain/post/post.module';
 import { PostParticipationModule } from './domain/post-participation/post-participation.module';
 import { ReviewModule } from './domain/review/review.module';
 import { WorkspaceModule } from './domain/workspace/workspace.module';
-import { ChatMessageModule } from './domain/chat-message/chat-message.module';
-import { PoiModule } from './domain/poi/poi.module';
-import { PoiConnectionModule } from './domain/poi-connection/poi-connection.module';
-import { PlanDayModule } from './domain/plan-day/plan-day.module';
+import { AuthModule } from './domain/auth/auth.module';
+import { RedisModule } from './redis/redis.module';
+import { NotificationsModule } from './domain/notifications/notifications.module';
+// import { OpenviduModule } from './openvidu/openvidu.module';
+import { MatchingModule } from './domain/matching/matching.module';
+import { AiModule } from './ai/ai.module';
+import { HttpModule } from '@nestjs/axios';
+import { PlaceModule } from './domain/place/place.module';
 
 @Module({
   imports: [
@@ -24,6 +28,10 @@ import { PlanDayModule } from './domain/plan-day/plan-day.module';
       inject: [ConfigService],
       useFactory: getTypeOrmConfig,
     }),
+    HttpModule.register({
+      timeout: 5000, // 5초 타임아웃
+      maxRedirects: 5,
+    }),
     BinaryContentModule,
     ProfileModule,
     UsersModule,
@@ -31,10 +39,13 @@ import { PlanDayModule } from './domain/plan-day/plan-day.module';
     PostParticipationModule,
     ReviewModule,
     WorkspaceModule,
-    ChatMessageModule,
-    PoiModule,
-    PoiConnectionModule,
-    PlanDayModule,
+    AuthModule,
+    RedisModule,
+    NotificationsModule,
+    // OpenviduModule,
+    MatchingModule,
+    AiModule,
+    PlaceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

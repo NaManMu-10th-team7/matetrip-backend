@@ -1,34 +1,33 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ReviewService } from './review.service';
-import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
+import { AuthGuard } from '@nestjs/passport';
 
-@Controller('review')
+@Controller('reviews')
 export class ReviewController {
   constructor(private readonly reviewService: ReviewService) {}
 
-  @Post()
-  create(@Body() createReviewDto: CreateReviewDto) {
-    return this.reviewService.create(createReviewDto);
+  @Get('user/:userId')
+  async getReviewsForUser(@Param('userId', ParseUUIDPipe) userId: string) {
+    return this.reviewService.getReviewsByReceiverId(userId);
   }
 
-  @Get()
-  findAll() {
-    return this.reviewService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.reviewService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateReviewDto: UpdateReviewDto) {
-    return this.reviewService.update(+id, updateReviewDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.reviewService.remove(+id);
+  @UseGuards(AuthGuard('jwt'))
+  @Patch(':reviewId')
+  async updateReview(
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
+    @Body() dto: UpdateReviewDto,
+    @Req() req: { user: { id: string } },
+  ) {
+    return this.reviewService.update(reviewId, req.user.id, dto);
   }
 }
