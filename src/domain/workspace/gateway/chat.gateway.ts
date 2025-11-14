@@ -134,30 +134,35 @@ export class ChatGateway {
         );
 
         // 4. [핵심] AI가 장소 검색 결과를 반환했는지 확인하고 백엔드에서 처리
-        const toolData = aiResponse.tool_data?.[0];
-        if (
-          toolData &&
-          toolData.tool_name === 'search_places' &&
-          toolData.tool_output
-        ) {
-          this.logger.log(`[AI_TOOL] Processing 'search_places' tool result.`);
-          try {
-            // 4-1. AI가 반환한 문자열을 JSON 배열로 파싱합니다.
-            // Python의 dict 표현식(')을 JSON 표준(")으로 변경합니다.
-            const placesString = toolData.tool_output.replace(/'/g, '"');
-            const places = JSON.parse(placesString);
-
-            if (Array.isArray(places) && places.length > 0) {
-              // 4-2. 검색된 장소들을 POI로 생성 및 캐시 저장
-              await this.workspaceService.markPoisFromSearch(
-                workspaceId,
-                places,
+        if (aiResponse.tool_data && Array.isArray(aiResponse.tool_data)) {
+          for (const toolData of aiResponse.tool_data) {
+            if (
+              toolData.tool_name === 'search_places' &&
+              toolData.tool_output &&
+              toolData.tool_output.trim().startsWith('[') // tool_output이 배열 형태의 문자열인지 확인
+            ) {
+              this.logger.log(
+                `[AI_TOOL] Processing 'search_places' tool result.`,
               );
-              // 4-3. POI가 추가되었으므로, 모든 클라이언트에게 POI 목록을 다시 동기화
-              await this.poiGateway.broadcastSync(workspaceId);
+              try {
+                // 4-1. AI가 반환한 문자열을 JSON 배열로 파싱합니다.
+                // Python의 dict 표현식(')을 JSON 표준(")으로 변경합니다.
+                const placesString = toolData.tool_output.replace(/'/g, '"');
+                const places = JSON.parse(placesString);
+
+                if (Array.isArray(places) && places.length > 0) {
+                  // 4-2. 검색된 장소들을 POI로 생성 및 캐시 저장
+                  await this.workspaceService.markPoisFromSearch(
+                    workspaceId,
+                    places,
+                  );
+                  // 4-3. POI가 추가되었으므로, 모든 클라이언트에게 POI 목록을 다시 동기화
+                  await this.poiGateway.broadcastSync(workspaceId);
+                }
+              } catch (parseError) {
+                this.logger.error('Failed to parse tool_output from AI response', parseError);
+              }
             }
-          } catch (parseError) {
-            this.logger.error('Failed to parse tool_output from AI response', parseError);
           }
         }
 
