@@ -4,7 +4,6 @@ import { TendencyType } from '../entities/tendency-type.enum';
 
 export interface EmbeddingPayloadSource {
   description?: string | null;
-  intro?: string | null;
   travelStyles?: TravelStyleType[] | null;
   tendency?: TendencyType[] | null;
 }
