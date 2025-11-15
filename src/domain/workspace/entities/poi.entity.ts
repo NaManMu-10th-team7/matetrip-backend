@@ -20,7 +20,7 @@ export class Poi extends BaseTimestampEntity {
   place?: Place;
 
   @Column({ type: 'uuid', name: 'place_id', nullable: true })
-  placeId?: string;
+  placeId?: string; // todo: 중복 없애기 (임시로 해논거)
 
   @Column({ type: 'text', name: 'place_name', nullable: false })
   placeName: string;

@@ -37,6 +37,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.logger.log('Redis clients connected');
     } catch (error) {
       this.logger.error('Failed to connect Redis clients', error);
+      // 연결된 클라이언트 정리
+      await Promise.all(
+        [this.client, this.pubClient, this.subClient].map((instance) =>
+          instance.isOpen ? instance.disconnect() : Promise.resolve(),
+        ),
+      );
+
       throw error;
     }
   }

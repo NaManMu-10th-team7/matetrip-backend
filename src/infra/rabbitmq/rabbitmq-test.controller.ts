@@ -5,6 +5,7 @@ import {
   EnqueueBehaviorEventDto,
 } from './dto/enqueue-behavior-event.dto.js';
 
+// !임시컨트롤러
 @Controller('rabbitmq')
 export class RabbitmqController {
   constructor(private readonly rabbitmqProducer: RabbitmqProducer) {}

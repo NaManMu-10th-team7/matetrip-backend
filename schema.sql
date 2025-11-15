@@ -304,9 +304,9 @@ CREATE TABLE places
     image_url text NULL, -- 장소 대표 이미지 URL
     longitude double precision NOT NULL,
     latitude double precision NOT NULL,
-    embedding vector (1024) NULL, -- 장소 대표 임베딩 (리뷰 기반),
-    created_at TIMESTAMP DEFAULT now () NOT NULL,
-    updated_at TIMESTAMP DEFAULT now () NOT NULL
+    embedding VECTOR(1024) NULL, -- 장소 대표 임베딩 (리뷰 기반),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now () ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now ()
 );
 
 -- 리뷰 테이블
@@ -428,7 +428,7 @@ CREATE TABLE user_behavior_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     workspace_id UUID,
-    place_id UUID REFERENCES places(id) ON DELETE SET NULL
+    place_id UUID REFERENCES places(id) ON DELETE SET NULL,
     event_type TEXT NOT NULL,  -- POI_MARK, POI_SCHEDULE, POI_UNMARK, POI_UNSCHEDULE
     weight NUMERIC(5, 2) NOT NULL,    -- 행동 가중치
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
