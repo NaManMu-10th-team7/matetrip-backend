@@ -10,7 +10,12 @@ import { BinaryContentModule } from '../binary-content/binary-content.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Post, PostParticipation, Workspace, BinaryContent]),
+    TypeOrmModule.forFeature([
+      Post,
+      PostParticipation,
+      Workspace,
+      BinaryContent,
+    ]),
     BinaryContentModule,
   ],
   controllers: [PostController],

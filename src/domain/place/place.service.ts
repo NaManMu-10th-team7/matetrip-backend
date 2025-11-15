@@ -37,7 +37,9 @@ export class PlaceService {
     return places.map((place) => GetPlacesResDto.from(place));
   }
 
-  async getPersonalizedPlaces(dto: GetPersonalizedPlacesByRegionReqDto) {
+  async getPersonalizedPlaces(
+    dto: GetPersonalizedPlacesByRegionReqDto,
+  ): Promise<GetPlacesResDto[]> {
     const { userId, region } = dto;
     const embeddingValue: number[] =
       await this.profileService.getUserEmbeddingValueByUserId(userId);

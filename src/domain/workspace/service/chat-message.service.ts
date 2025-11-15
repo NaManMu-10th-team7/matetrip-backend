@@ -35,11 +35,9 @@ export class ChatMessageService {
       const savedMessage = await this.chatMessageRepository.save(message);
       this.logger.log(`Message saved successfully with id: ${savedMessage.id}`);
       return savedMessage;
-    } catch (error) {
-      this.logger.error(
-        `Failed to save message for user ${dto.userId}. Error: ${error.message}`,
-      );
-      throw error; // 에러를 다시 던져서 호출한 쪽에서 처리할 수 있도록 함
+    } catch {
+      this.logger.error(`Failed to save message for user ${dto.userId}.`);
+      throw new Error('Failed to save message');
     }
   }
 

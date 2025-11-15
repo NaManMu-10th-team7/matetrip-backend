@@ -2,7 +2,7 @@ import { Place } from '../entities/place.entity.js';
 
 export class GetPlacesResDto {
   id: string;
-  category: string;
+  category: string; // todo : category ENUM으로 변경 (안정화 되면)
   title: string;
   address: string;
   summary?: string; // 요약 설명

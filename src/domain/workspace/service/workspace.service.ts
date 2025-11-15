@@ -26,6 +26,7 @@ import { lastValueFrom } from 'rxjs';
 import { v4 as uuidv4 } from 'uuid';
 import { AxiosError } from 'axios';
 import { KakaoResponse } from '../types/kakao-document.js';
+import { AiSearchPlaceDto } from '../../../ai/dto/ai-search-place.dto.js';
 
 @Injectable()
 export class WorkspaceService {
@@ -112,7 +113,7 @@ export class WorkspaceService {
    */
   async markPoisFromSearch(
     workspaceId: string,
-    places: any[],
+    places: AiSearchPlaceDto[],
   ): Promise<CachedPoi[]> {
     this.logger.log(
       `Marking ${places.length} POIs from AI search in workspace ${workspaceId}`,

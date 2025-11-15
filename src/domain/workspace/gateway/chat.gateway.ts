@@ -14,6 +14,9 @@ import { WorkspaceService } from '../service/workspace.service.js';
 import { LeaveChatReqDto } from '../dto/chat/leave-chat-req.dto.js';
 import { ChatConnectionReqDto } from '../dto/chat/connect-chat-req.dto.js';
 import { AiService } from '../../../ai/ai.service.js';
+import { AiAgentResponseDto } from '../../../ai/dto/ai-response.dto.js';
+import { AiSearchPlaceDto } from '../../../ai/dto/ai-search-place.dto.js';
+import { ChatMessage } from '../entities/chat-message.entity.js';
 import { ChatMessageService } from '../service/chat-message.service.js';
 import { PoiGateway } from './poi.gateway.js';
 
@@ -57,11 +60,11 @@ export class ChatGateway {
     const { workspaceId, message, username, userId, tempId } = data;
     const roomName = this.getChatRoomName(workspaceId);
 
-    let savedMessage;
+    let savedMessage: ChatMessage;
     try {
       // 1. 사용자 메시지를 DB에 저장
       savedMessage = await this.chatMessageService.create(data);
-    } catch (error) {
+    } catch {
       this.logger.error(
         `Could not save user message to DB. Data: ${JSON.stringify(data)}`,
       );
@@ -105,10 +108,8 @@ export class ChatGateway {
       );
 
       try {
-        const aiResponse = await this.aiService.getAgentResponse(
-          prompt,
-          sessionId,
-        );
+        const aiResponse: AiAgentResponseDto =
+          await this.aiService.getAgentResponse(prompt, sessionId);
 
         this.logger.debug(
           `[DEBUG] Full AI Response:`,
@@ -148,7 +149,7 @@ export class ChatGateway {
                 // 4-1. AI가 반환한 문자열을 JSON 배열로 파싱합니다.
                 // Python의 dict 표현식(')을 JSON 표준(")으로 변경합니다.
                 const placesString = toolData.tool_output.replace(/'/g, '"');
-                const places = JSON.parse(placesString);
+                const places = JSON.parse(placesString) as AiSearchPlaceDto[];
 
                 if (Array.isArray(places) && places.length > 0) {
                   // 4-2. 검색된 장소들을 POI로 생성 및 캐시 저장
@@ -160,14 +161,18 @@ export class ChatGateway {
                   await this.poiGateway.broadcastSync(workspaceId);
                 }
               } catch (parseError) {
-                this.logger.error('Failed to parse tool_output from AI response', parseError);
+                this.logger.error(
+                  'Failed to parse tool_output from AI response',
+                  parseError,
+                );
               }
             }
           }
         }
-
       } catch (error) {
-        this.logger.error(`Error getting AI response: ${error.message}`);
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Error getting AI response: ${errorMessage}`);
         // AI 응답 실패 시 클라이언트에게 에러 메시지 전송
         socket.emit(ChatEvent.ERROR, {
           message: 'AI 응답을 가져오는 데 실패했습니다.',
@@ -200,9 +205,10 @@ export class ChatGateway {
 
       // [수정] 1. 입장한 사용자에게 과거 채팅 기록 전송
       // ChatService에서 메시지를 가져온다고 가정합니다.
-      const messageHistory = await this.chatMessageService.getMessagesByWorkspaceId(
-        data.workspaceId,
-      );
+      const messageHistory =
+        await this.chatMessageService.getMessagesByWorkspaceId(
+          data.workspaceId,
+        );
       socket.emit(ChatEvent.JOINED, messageHistory);
       this.logger.log(
         `[HISTORY] Sent ${messageHistory.length} messages to ${data.username}`,
@@ -213,8 +219,10 @@ export class ChatGateway {
         data: `${data.username}`,
       });
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Socket ${socket.id} failed to join workspace ${data.workspaceId}. Error: ${error.message}`,
+        `[${data.username} 접속 실패]Socket failed to join workspace ${data.workspaceId}. Error: ${errorMessage}`,
       );
       // ChatService에서 에러가 발생할 수 있으므로 WsException을 사용
       throw new WsException('채팅방 입장에 실패했습니다.');
@@ -237,9 +245,9 @@ export class ChatGateway {
       socket.broadcast.to(roomName).emit(ChatEvent.LEFT, {
         data: `${data.username}`,
       });
-    } catch (error) {
+    } catch {
       this.logger.error(
-        `Socket ${socket.id} failed to leave workspace ${data.workspaceId}. Error: ${error.message}`,
+        `[${data.username} leave 실패]Socket ${socket.id} failed to leave workspace ${data.workspaceId}`,
       );
     }
   }

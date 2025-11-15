@@ -15,6 +15,8 @@ import { ProfilePayloadDto } from './dto/profile.payload.dto'; // 변경된 DTO 
 import { plainToInstance } from 'class-transformer';
 import { BinaryContentService } from '../binary-content/binary-content.service';
 import { BinaryContent } from '../binary-content/entities/binary-content.entity';
+import { RabbitmqProducer } from '../../infra/rabbitmq/rabbitmq.producer.js';
+import { Transactional } from 'typeorm-transactional';
 import { MatchingService } from './matching.service';
 //상세소개 , 여행 성향, 여행 스타일 얻는 dto 가 아래
 import { buildEmbeddingPayloadFromSource } from './utils/embedding-payload.util';
@@ -49,6 +51,7 @@ export class ProfileService {
     private readonly binaryContentService: BinaryContentService,
     @InjectRepository(BinaryContent)
     private readonly binaryContentRepository: Repository<BinaryContent>,
+    private readonly rabbitMQProducer: RabbitmqProducer,
     private readonly matchingService: MatchingService,
   ) {}
 
@@ -192,6 +195,7 @@ export class ProfileService {
    * 4. save() 메서드를 통해 변경된 엔티티를 DB에 저장하고, DTO 형태로 반환합니다.
    */
 
+  @Transactional()
   async update(
     userId: string,
     updateProfileDto: UpdateProfileDto,
@@ -292,6 +296,7 @@ export class ProfileService {
     }
 
     // DTO로 변환하여 반환
+    this.rabbitMQProducer.enqueueProfileEmbedding(userId);
     return this.toProfilePayloadDto(updatedProfile);
   }
   /**

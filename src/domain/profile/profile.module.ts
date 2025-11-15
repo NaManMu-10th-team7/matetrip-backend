@@ -6,6 +6,7 @@ import { BinaryContent } from '../binary-content/entities/binary-content.entity'
 import { BinaryContentModule } from '../binary-content/binary-content.module';
 import { ProfileService } from './profile.service';
 import { ProfileController } from './profile.controller';
+import { RabbitmqModule } from '../../infra/rabbitmq/rabbitmq.module.js';
 import { MatchingService } from './matching.service';
 import { Post } from '../post/entities/post.entity';
 import { NovaService } from '../../ai/summaryLLM.service';
@@ -15,6 +16,7 @@ import { TitanEmbeddingService } from '../../ai/titan-embedding.service';
   imports: [
     TypeOrmModule.forFeature([Profile, Users, BinaryContent, Post]),
     BinaryContentModule,
+    RabbitmqModule,
   ],
   controllers: [ProfileController],
   providers: [
