@@ -7,6 +7,7 @@ import {
   Delete,
   UseGuards,
   Req,
+  Query,
 } from '@nestjs/common';
 import { WorkspaceService } from './service/workspace.service';
 import { CreateWorkspaceReqDto } from './dto/create-workspace-req.dto';
@@ -16,6 +17,7 @@ import { ReviewService } from '../review/review.service';
 import { PoiGateway } from './gateway/poi.gateway.js';
 import { PoiOptimizeReqDto } from './dto/poi/poi-optimize-req.dto.js';
 import { PlanReqDto } from './dto/workspace-res.dto';
+import { RegionGroup } from '../place/entities/region_group.enum.js';
 
 @Controller('workspace')
 export class WorkspaceController {
@@ -76,5 +78,27 @@ export class WorkspaceController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.workspaceService.remove(id);
+  }
+
+  /**
+   * 워크스페이스에 연결된 게시글의 모든 참여자 ID를 조회합니다.
+   */
+  @Get(':workspaceId/participants')
+  async getParticipantUserIds(@Param('workspaceId') workspaceId: string) {
+    return this.workspaceService.getParticipantUserIds(workspaceId);
+  }
+
+  /**
+   * 워크스페이스 참여자 모두의 성향을 종합하여 장소를 추천합니다.
+   */
+  @Get(':workspaceId/recommendations')
+  async getConsensusRecommendations(
+    @Param('workspaceId') workspaceId: string,
+    @Query('region') region: RegionGroup,
+  ) {
+    return this.workspaceService.getConsensusRecommendations(
+      workspaceId,
+      region,
+    );
   }
 }

@@ -335,4 +335,55 @@ export class WorkspaceService {
     // 4단계 : AI가 생성한 텍스트와 원본 장소 데이터를 함께 반환
     return finalResponse;
   }
+
+  /**
+   * 워크스페이스 ID를 기반으로 해당 게시글에 참여중인 모든 사용자의 ID 목록을 반환합니다.
+   * @param workspaceId - 워크스페이스의 ID
+   * @returns 사용자 ID의 배열
+   */
+  async getParticipantUserIds(workspaceId: string): Promise<string[]> {
+    this.logger.log(
+      `Fetching participant user IDs for workspace: ${workspaceId}`,
+    );
+
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspaceId },
+      relations: ['post'], // 'post' 관계를 함께 로드합니다.
+    });
+
+    if (!workspace || !workspace.post) {
+      throw new NotFoundException(
+        `Workspace with ID ${workspaceId} or its associated post not found.`,
+      );
+    }
+
+    // PostService를 통해 해당 게시글의 참여자 ID 목록을 가져옵니다.
+    // PostService에 getParticipantIds와 같은 메서드가 구현되어 있어야 합니다.
+    return this.postService.getParticipantIds(workspace.post.id);
+  }
+
+  /**
+   * 워크스페이스의 모든 참여자 성향을 종합하여 장소를 추천합니다.
+   * @param workspaceId - 워크스페이스의 ID
+   * @returns 추천 장소 DTO의 배열
+   */
+  async getConsensusRecommendations(workspaceId: string, region: RegionGroup) {
+    this.logger.log(
+      `Fetching consensus recommendations for workspace: ${workspaceId}`,
+    );
+
+    // 1. 워크스페이스의 모든 참여자 ID를 가져옵니다.
+    const participantUserIds = await this.getParticipantUserIds(workspaceId);
+
+    if (participantUserIds.length === 0) {
+      this.logger.warn(`No participants found for workspace: ${workspaceId}`);
+      return [];
+    }
+
+    // 2. PlaceService에 사용자 ID 목록을 전달하여 종합 추천 장소를 요청합니다.
+    return this.placesService.getConsensusRecommendedPlaces(
+      participantUserIds,
+      region,
+    );
+  }
 }
