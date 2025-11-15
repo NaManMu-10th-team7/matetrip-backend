@@ -113,11 +113,7 @@ export class WorkspaceService {
    */
   async markPoisFromSearch(
     workspaceId: string,
-<<<<<<< HEAD
     places: AiSearchPlaceDto[],
-=======
-    places: any[],
->>>>>>> 4d3ebd168e93594f7d290872abecd34575f70a9f
   ): Promise<CachedPoi[]> {
     this.logger.log(
       `Marking ${places.length} POIs from AI search in workspace ${workspaceId}`,
