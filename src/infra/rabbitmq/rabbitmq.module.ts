@@ -7,5 +7,6 @@ import { RabbitMQConfig } from '../rabbitmq.config.js';
   imports: [RabbitMQConfig],
   controllers: [RabbitmqController],
   providers: [RabbitmqProducer],
+  exports: [RabbitmqProducer],
 })
 export class RabbitmqModule {}

@@ -321,10 +321,6 @@ export class PoiGateway {
       this.validateRoomAuth(roomName, socket);
 
       socket.to(roomName).emit(PoiSocketEvent.CURSOR_MOVED, data);
-
-      this.logger.debug(
-        `Socket ${socket.id} moved cursor in workspace ${data.workspaceId}`,
-      );
     } catch (error) {
       this.logger.error(
         `Socket ${socket.id} failed to move cursor in workspace ${data.workspaceId}`,
@@ -342,20 +338,12 @@ export class PoiGateway {
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
 
-      this.logger.debug(
-        `[POI_HOVER] Received from socket ${socket.id} for workspace ${data.workspaceId}. POI ID: ${data.poiId}, User ID: ${data.userId}`,
-      );
-
       // 자신을 제외한 다른 클라이언트에게만 이벤트 전송
       const payload = {
         poiId: data.poiId,
         userId: data.userId,
       };
       socket.to(roomName).emit(PoiSocketEvent.POI_HOVERED, payload);
-
-      this.logger.debug(
-        `[POI_HOVERED] Emitted to room ${roomName}. Payload: ${JSON.stringify(payload)}`,
-      );
     } catch (error) {
       this.logger.error(
         `Socket ${socket.id} failed to handle POI hover in workspace ${data.workspaceId}`,

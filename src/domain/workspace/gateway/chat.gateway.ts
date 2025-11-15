@@ -122,7 +122,7 @@ export class ChatGateway {
       this.logger.log(`${data.username}님이 채팅방에 들어왔습니다.`);
     } catch (error) {
       this.logger.error(
-        `Socket ${socket.id} failed to join workspace ${data.workspaceId}. Error: ${error.message}`,
+        `[${data.username} 접속 실패]Socket failed to join workspace ${data.workspaceId}. Error: ${error.message}`,
       );
     }
   }
@@ -142,7 +142,7 @@ export class ChatGateway {
       console.log(`${data.username}님이 채팅방에서 나갔습니다.`);
     } catch {
       this.logger.error(
-        `Socket ${socket.id} failed to leave workspace ${data.workspaceId}`,
+        `[${data.username} leave 실패]Socket ${socket.id} failed to leave workspace ${data.workspaceId}`,
       );
     }
   }

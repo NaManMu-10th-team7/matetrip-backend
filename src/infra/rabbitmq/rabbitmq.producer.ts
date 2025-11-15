@@ -12,7 +12,9 @@ export class RabbitmqProducer {
 
   // 필요한 DTO
   enqueueProfileEmbedding(userId: string) {
-    if (isUUID(userId) == false) return;
+    if (isUUID(userId) == false) {
+      throw new Error('Invalid user id');
+    }
     console.log(`sendProfileEmbedding: ${userId}`);
     this.profile_embedding_client.emit(
       'profile_embedding',

@@ -7,7 +7,9 @@ export class RabbitmqController {
 
   @Get()
   getHello(): string {
-    this.rabbitmqProducer.enqueueProfileEmbedding('ㅎㅇ');
+    this.rabbitmqProducer.enqueueProfileEmbedding(
+      '0c77142e-5fa1-41f4-9a6a-07d80709b660',
+    );
     return 'Hello World!';
   }
 }

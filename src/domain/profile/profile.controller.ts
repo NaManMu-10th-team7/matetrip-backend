@@ -1,13 +1,11 @@
 import {
   Controller,
   Get,
-  Post,
   Body,
   Patch,
   Param,
   HttpCode,
   HttpStatus,
-  Delete,
   Req,
   UseGuards,
   UnauthorizedException,
