@@ -385,69 +385,6 @@ export class PoiGateway {
       );
     }
   }
-
-  // @SubscribeMessage(PoiSocketEvent.POI_CONNECT)
-  // async handlePoiConnection(
-  //   @ConnectedSocket() socket: Socket,
-  //   @MessageBody() data: CreatePoiConnectionReqDto,
-  // ) {
-  //   try {
-  //     const roomName = this.getPoiRoomName(data.workspaceId);
-  //     if (!socket.rooms.has(roomName)) {
-  //       this.logger.warn(
-  //         `Socket ${socket.id} tried to connect without joining ${data.workspaceId}`,
-  //       );
-  //       return;
-  //     }
-
-  //     const cachedPoiConnection =
-  //       await this.workspaceService.cachePoiConnection(data);
-
-  //     this.server
-  //       .to(roomName)
-  //       .emit(PoiSocketEvent.CONNECTED, cachedPoiConnection);
-
-  //     this.logger.debug(
-  //       `Socket ${socket.id} connected to POI connection ${cachedPoiConnection.id}`,
-  //     );
-  //   } catch {
-  //     this.logger.error(
-  //       `Socket ${socket.id} failed to connect to POI connection`,
-  //     );
-  //   }
-  // }
-
-  // @SubscribeMessage(PoiSocketEvent.POI_DISCONNECT)
-  // async handlePoiDisConnection(
-  //   @ConnectedSocket() socket: Socket,
-  //   @MessageBody() data: RemovePoiConnectionReqDto,
-  // ) {
-  //   try {
-  //     const roomName = this.getPoiRoomName(data.workspaceId);
-  //     if (!socket.rooms.has(roomName)) {
-  //       this.logger.warn(
-  //         `Socket ${socket.id} tried to disconnect without joining ${data.workspaceId}`,
-  //       );
-  //       return;
-  //     }
-
-  //     // this.server.to(roomName).emit(PoiSocketEvent.DISCONNECTED, removedId);
-  //   } catch {
-  //     this.logger.error(
-  //       `Socket ${socket.id} failed to disconnect from POI connection`,
-  //     );
-  //   }
-  // }
-
-  /**
-   * Poi 위치를 드래그앤 드랍으로 바꾸는 경우
-   */
-  @SubscribeMessage(PoiSocketEvent.POIDRAG)
-  async handlePoiDrag(
-    @ConnectedSocket() socket: Socket,
-    @MessageBody() data: PoiSocketDto,
-  ) {}
-
   /**
    * Python AI 서버 등 외부에서 호출 가능한 broadcast 메서드
    * Socket 연결 없이 특정 workspace의 모든 클라이언트에게 REORDER 이벤트 전파
