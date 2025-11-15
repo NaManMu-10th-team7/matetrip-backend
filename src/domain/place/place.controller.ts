@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { PlaceService } from './place.service';
 import { GetPlacesReqDto } from './dto/get-places-req.dto.js';
 import { GetPlacesResDto } from './dto/get-places-res.dto.js';
@@ -21,5 +21,15 @@ export class PlaceController {
   ): Promise<GetPlacesResDto[]> {
     console.log('테스트');
     return this.placeService.getPersonalizedPlaces(dto);
+  }
+
+  /**
+   * @description 지역 그룹 목록을 조회합니다.
+   * @author Hugo
+   * @returns { { key: string; value: string }[] } 지역 그룹 목록
+   */
+  @Get('regions')
+  getRegionGroups(): { key: string; value: string }[] {
+    return this.placeService.getRegionGroups();
   }
 }

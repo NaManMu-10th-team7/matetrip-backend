@@ -96,6 +96,9 @@ export class WorkspaceController {
     @Param('workspaceId') workspaceId: string,
     @Query('region') region: RegionGroup,
   ) {
+    // TODO: 현재 post에는 region 이 아니라 location 으로 되어 있음.
+    // - 추후에 location을 region 중에서 선택하게 할 것이므로
+    // - 일단은 workspaceId 로 post 를 검색하고, 그 post에 있는 location 을 region 으로 전달해서 처리하기
     return this.workspaceService.getConsensusRecommendations(
       workspaceId,
       region,
