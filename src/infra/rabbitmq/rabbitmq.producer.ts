@@ -1,13 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { EnqueueProfileEmbeddingDto } from './dto/create-rabbitmq.dto.js';
+
 import { isUUID } from 'class-validator';
+import { EnqueueProfileEmbeddingDto } from './dto/create-rabbitmq.dto.js';
+import { EnqueueBehaviorEventDto } from './dto/behavior-event.dto.js';
 
 @Injectable()
 export class RabbitmqProducer {
   constructor(
     @Inject('PROFILE_EMBEDDING_CLIENT')
     private readonly profile_embedding_client: ClientProxy,
+    @Inject('BEHAVIOR_EMBEDDING_CLIENT')
+    private readonly behavior_embedding_client: ClientProxy,
   ) {}
 
   // 필요한 DTO
@@ -20,5 +24,20 @@ export class RabbitmqProducer {
       'profile_embedding',
       new EnqueueProfileEmbeddingDto(userId),
     );
+  }
+
+  // 행동 이벤트 전송
+  enqueueBehaviorEvent(dto: EnqueueBehaviorEventDto) {
+    if (!isUUID(dto.userId)) {
+      throw new Error('Invalid user id');
+    }
+    if (dto.placeId && !isUUID(dto.placeId)) {
+      throw new Error('Invalid place id');
+    }
+
+    console.log(
+      `enqueueBehaviorEvent: ${dto.eventType} - user: ${dto.userId}, place: ${dto.placeId}`,
+    );
+    this.behavior_embedding_client.emit('behavior_event', dto);
   }
 }
