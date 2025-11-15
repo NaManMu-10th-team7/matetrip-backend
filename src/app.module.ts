@@ -19,6 +19,7 @@ import { AiModule } from './ai/ai.module';
 import { HttpModule } from '@nestjs/axios';
 import { PlaceModule } from './domain/place/place.module';
 import { RabbitmqModule } from './infra/rabbitmq/rabbitmq.module';
+import { ProxyModule } from './domain/proxy/proxy.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { RabbitmqModule } from './infra/rabbitmq/rabbitmq.module';
     AiModule,
     PlaceModule,
     RabbitmqModule,
+    ProxyModule,
   ],
   controllers: [AppController],
   providers: [AppService],
