@@ -15,6 +15,9 @@ import { ProfilePayloadDto } from './dto/profile.payload.dto'; // 변경된 DTO 
 import { plainToInstance } from 'class-transformer';
 import { BinaryContentService } from '../binary-content/binary-content.service';
 import { BinaryContent } from '../binary-content/entities/binary-content.entity';
+import { MatchingService } from './matching.service';
+//상세소개 , 여행 성향, 여행 스타일 얻는 dto 가 아래
+import { buildEmbeddingPayloadFromSource } from './utils/embedding-payload.util';
 
 /**
  * 클라이언트에 반환되는 프로필 정보 형태
@@ -46,6 +49,7 @@ export class ProfileService {
     private readonly binaryContentService: BinaryContentService,
     @InjectRepository(BinaryContent)
     private readonly binaryContentRepository: Repository<BinaryContent>,
+    private readonly matchingService: MatchingService,
   ) {}
 
   /**
@@ -187,6 +191,7 @@ export class ProfileService {
    *    (Object.assign을 통해 updateProfileDto에 들어있는 필드만 변경됩니다.)
    * 4. save() 메서드를 통해 변경된 엔티티를 DB에 저장하고, DTO 형태로 반환합니다.
    */
+
   async update(
     userId: string,
     updateProfileDto: UpdateProfileDto,
@@ -202,6 +207,10 @@ export class ProfileService {
     }
 
     const { profileImageId, ...textData } = updateProfileDto;
+
+    const prevTravelStyles = [...(profile.travelStyles ?? [])];
+    const prevTendencies = [...(profile.tendency ?? [])];
+    const prevDescription = profile.description ?? '';
 
     // 전달된 필드만 덮어쓰기 🌟(사진 파일 제외)
     Object.assign(profile, textData);
@@ -264,8 +273,24 @@ export class ProfileService {
         await this.binaryContentService.deleteFile(oldImageId);
       }
     }
+    //📌임베딩 진행
+    const shouldReembed = this.shouldRebuildEmbedding(
+      prevTravelStyles,
+      updatedProfile.travelStyles ?? [],
+      prevTendencies,
+      updatedProfile.tendency ?? [],
+      prevDescription,
+      updatedProfile.description ?? '',
+    );
+    //변경되었다면 임베딩 시작
+    if (shouldReembed) {
+      //임베딩 코드
+      await this.matchingService.embeddingMatchingProfile(
+        userId,
+        buildEmbeddingPayloadFromSource(updatedProfile),
+      );
+    }
 
-    //return this.toResponseDto(updatedProfile);
     // DTO로 변환하여 반환
     return this.toProfilePayloadDto(updatedProfile);
   }
@@ -378,5 +403,32 @@ export class ProfileService {
     payload.profileImageId = profile.profileImage?.id ?? null;
 
     return payload;
+  }
+
+  private shouldRebuildEmbedding(
+    prevStyles: TravelStyleType[],
+    nextStyles: TravelStyleType[],
+    prevTendencies: TendencyType[],
+    nextTendencies: TendencyType[],
+    prevDescription: string,
+    nextDescription: string,
+  ): boolean {
+    // 이전/현재 값을 비교해서 여행 스타일·성향·상세소개 중 하나라도 달라졌으면 true를 반환한다.
+    // (임베딩을 새로 만들 필요가 있는지 판별용)
+    return (
+      !this.areArraysEqual(prevStyles, nextStyles) ||
+      !this.areArraysEqual(prevTendencies, nextTendencies) ||
+      prevDescription.trim() !== nextDescription.trim()
+    );
+  }
+
+  private areArraysEqual<T>(a: T[], b: T[]): boolean {
+    // 정렬 후 요소를 하나씩 비교해 두 배열의 구성이 동일한지 판단한다.
+    if (a.length !== b.length) {
+      return false;
+    }
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((value, index) => value === sortedB[index]);
   }
 }

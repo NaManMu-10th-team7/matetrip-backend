@@ -5,13 +5,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
-import { MatchingService } from '../matching/matching.service';
+import { MatchingService } from '../profile/matching.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UserPayloadDto } from '../users/dto/user.payload.dto';
-import { EmbeddingMatchingProfileDto } from '../matching/dto/embedding-matching-profile.dto';
 import { CreateProfileDto } from '../profile/dto/create-profile.dto';
+import { EmbeddingMatchingProfileDto } from '../profile/dto/embedding-matching-profile.dto';
+import { buildEmbeddingPayloadFromSource } from '../profile/utils/embedding-payload.util';
 
 @Injectable()
 export class AuthService {
@@ -60,8 +61,8 @@ export class AuthService {
       // UserService의 create 메서드 호출. 안에서 트랜잭션, 해싱, 중복 검사 모두 일어남
       const newUser = await this.usersService.create(createUserDto);
 
-      //임베딩 처리
-      const embeddingPayload = this.buildEmbeddingPayload(
+      //임베딩 처리(임베딩 dto 대로 보냄)
+      const embeddingPayload = buildEmbeddingPayloadFromSource(
         createUserDto.profile,
       );
       await this.matchingService.embeddingMatchingProfile(
