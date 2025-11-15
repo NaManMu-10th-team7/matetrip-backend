@@ -8,33 +8,24 @@ import {
   HttpStatus,
   Req,
   UseGuards,
-  UnauthorizedException,
-  CanActivate,
-  ExecutionContext,
   ParseUUIDPipe,
   Logger,
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
+import { MatchingService } from './matching.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { MatchRequestDto } from './dto/match-request.dto';
 import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 
 type RequestWithUser = Request & { user: { id: string } };
 
-// 인증된 요청인지 확인하고 user id가 없으면 요청을 거절하는 가드
-class RequireUserGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest<RequestWithUser>();
-    if (!req.user?.id) {
-      throw new UnauthorizedException('Authentication required');
-    }
-    return true;
-  }
-}
-
 @Controller('profile')
 export class ProfileController {
-  constructor(private readonly profileService: ProfileService) {}
+  constructor(
+    private readonly profileService: ProfileService,
+    private readonly matchingService: MatchingService,
+  ) {}
 
   @Get('my')
   @HttpCode(HttpStatus.OK)
@@ -87,8 +78,21 @@ export class ProfileController {
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     Logger.log(updateProfileDto, 'ProfileController');
+    //변경사항 저장 + 임베딩까지 진행(상세소개, 여행성향 , 여행 스타일 변경되었을때만)
     return this.profileService.update(req.user.id, updateProfileDto);
   }
+
+  // 유사도 몇명 뽑아오는거
+  @Post('matching/search')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  searchMatches(
+    @Req() req: RequestWithUser,
+    @Body() matchRequestDto: MatchRequestDto,
+  ) {
+    return this.matchingService.findMatches(req.user.id, matchRequestDto);
+  }
+
   // // //JWT 일때로 가정
   // @Delete(':id')
   // @HttpCode(HttpStatus.OK)

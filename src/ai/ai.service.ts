@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
+import { AxiosError } from 'axios';
+import { AiAgentResponseDto } from './dto/ai-response.dto.js';
 
 @Injectable()
 export class AiService {
@@ -10,19 +12,32 @@ export class AiService {
     private readonly configService: ConfigService,
   ) {}
 
-  async getAgentResponse(query: string, sessionId: string) {
+  async getAgentResponse(
+    query: string,
+    sessionId: string,
+  ): Promise<AiAgentResponseDto> {
     const url = `${this.configService.get<string>('AI_API_SERVER_URL')}/chat`;
 
     try {
       const response = await firstValueFrom(
-        this.httpService.post(url, { query, session_id: sessionId }),
+        this.httpService.post<AiAgentResponseDto>(url, {
+          query,
+          session_id: sessionId,
+        }),
       );
 
-      console.log(response);
+      // console.log(response);
 
       return response.data;
     } catch (error) {
-      console.error('Error calling AI service (Agent):', error.response?.data);
+      if (error instanceof AxiosError) {
+        console.error(
+          'Error calling AI service (Agent):',
+          error.response?.data,
+        );
+      } else {
+        console.error('Error calling AI service (Agent):', error);
+      }
       throw new Error('AI service request failed');
     }
   }

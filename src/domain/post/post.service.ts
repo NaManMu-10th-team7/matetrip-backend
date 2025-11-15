@@ -451,9 +451,9 @@ export class PostService {
     );
   }
 
-  private attachProfileImageId(profile?: Profile | null): Profile {
+  private attachProfileImageId(profile?: Profile | null): Profile | null {
     if (!profile) {
-      throw new BadRequestException('Profile information is missing.');
+      return null;
     }
     return Object.assign(profile, {
       profileImageId: profile.profileImage?.id ?? null,

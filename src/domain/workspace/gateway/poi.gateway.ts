@@ -129,35 +129,33 @@ export class PoiGateway {
 
   @SubscribeMessage(PoiSocketEvent.MARK)
   async handlePoiMark(
+    // [수정] async/await 구조로 복귀
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: PoiCreateReqDto,
-  ): Promise<PoiResDto | { error: string }> {
+  ): Promise<void> {
+    // [수정] 명시적으로 void 반환 타입을 선언하여 ack가 발생하지 않도록 합니다.
     try {
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
 
       const cachedPoi = await this.workspaceService.cachePoi(data);
 
-      const markedPoi: PoiResDto = PoiResDto.of(cachedPoi);
+      // [수정] PoiResDto.of는 placeName이 필요하므로, cachedPoi에서 직접 payload 구성
+      const markedPoiPayload = {
+        ...cachedPoi,
+        tempId: data.tempId,
+      };
 
-      // 같은 워크스페이스의 모든 클라이언트에게 'marked' 이벤트를 전파합니다.
-      this.server.to(roomName).emit(PoiSocketEvent.MARKED, markedPoi);
+      this.server.to(roomName).emit(PoiSocketEvent.MARKED, markedPoiPayload);
 
       this.logger.debug(
         `Socket ${socket.id} marked POI ${cachedPoi.id} in workspace ${data.workspaceId}`,
       );
-
-      // 이벤트를 발생시킨 클라이언트에게 생성된 POI 정보를 응답(ack)으로 보냅니다.
-      return markedPoi;
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Socket ${socket.id} failed to mark POI in workspace ${data.workspaceId}: ${(error as Error).message}`,
+        `Socket ${socket.id} failed to mark POI in workspace ${data.workspaceId}: ${message}`,
       );
-
-      // 에러 발생 시, 이벤트를 발생시킨 클라이언트에게 에러 응답(ack)을 보냅니다.
-      return {
-        error: (error as Error).message || 'Failed to mark POI.',
-      };
     }
   }
 
@@ -182,7 +180,11 @@ export class PoiGateway {
         return;
       }
 
-      this.server.to(roomName).emit(PoiSocketEvent.UNMARKED, removedPoi);
+      // [수정] 일관된 데이터 구조를 위해 객체 형태로 전송합니다.
+      this.server
+        .to(roomName)
+        .emit(PoiSocketEvent.UNMARKED, { poiId: data.poiId });
+
       this.logger.debug(
         `Socket ${socket.id} unmarked POI ${data.poiId} in workspace ${data.workspaceId}`,
       );
@@ -494,6 +496,29 @@ export class PoiGateway {
         error,
       );
       throw error;
+    }
+  }
+
+  /**
+   * 특정 워크스페이스의 모든 클라이언트에게 현재 POI 목록 전체를 브로드캐스트합니다.
+   * @param workspaceId 동기화할 워크스페이스 ID
+   */
+  async broadcastSync(workspaceId: string) {
+    try {
+      const roomName = this.getPoiRoomName(workspaceId);
+      const pois: PoiResDto[] =
+        await this.poiService.getWorkspacePois(workspaceId);
+
+      this.server.to(roomName).emit(PoiSocketEvent.SYNC, { pois });
+
+      this.logger.log(
+        `[BROADCAST_SYNC] Synced ${pois.length} POIs to room: ${roomName}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to broadcast sync for workspace ${workspaceId}`,
+        error,
+      );
     }
   }
 

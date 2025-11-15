@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateWorkspaceReqDto } from '../dto/create-workspace-req.dto';
 import { PostService } from '../../post/post.service.js';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,16 +17,20 @@ import { PoiCreateReqDto } from '../dto/poi/poi-create-req.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
 import { CachedPoi, buildCachedPoiFromCreateDto } from '../types/cached-poi.js';
 import { PlanDayService } from './plan-day.service.js';
+import { PoiStatus } from '../entities/poi-status.enum.js';
 import { PoiService } from './poi.service.js';
 import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { lastValueFrom } from 'rxjs';
+import { v4 as uuidv4 } from 'uuid';
 import { AxiosError } from 'axios';
 import { KakaoResponse } from '../types/kakao-document.js';
+import { AiSearchPlaceDto } from '../../../ai/dto/ai-search-place.dto.js';
 
 @Injectable()
 export class WorkspaceService {
+  private readonly logger = new Logger(WorkspaceService.name);
   constructor(
     private readonly postService: PostService,
     @InjectRepository(Workspace)
@@ -94,6 +103,52 @@ export class WorkspaceService {
     const cachedPoi: CachedPoi = buildCachedPoiFromCreateDto(dto);
     await this.poiCacheService.upsertPoi(dto.workspaceId, cachedPoi);
     return cachedPoi;
+  }
+
+  /**
+   * AI가 검색한 장소 목록을 받아서 POI로 변환하고 캐시에 저장합니다.
+   * @param workspaceId 워크스페이스 ID
+   * @param places 카카오 지도 API에서 받은 장소 데이터 배열
+   * @returns 생성된 CachedPoi 배열
+   */
+  async markPoisFromSearch(
+    workspaceId: string,
+    places: AiSearchPlaceDto[],
+  ): Promise<CachedPoi[]> {
+    this.logger.log(
+      `Marking ${places.length} POIs from AI search in workspace ${workspaceId}`,
+    );
+    this.logger.debug(
+      `[DEBUG] markPoisFromSearch received places:`,
+      JSON.stringify(places, null, 2),
+    );
+    const newPois: CachedPoi[] = [];
+
+    for (const place of places) {
+      // PoiCreateReqDto를 생성하는 대신, 서버에서 직접 CachedPoi 객체를 생성합니다.
+      // 이 객체는 buildCachedPoiFromCreateDto의 결과물과 동일한 구조를 가집니다.
+      const newCachedPoi: CachedPoi = {
+        id: uuidv4(),
+        workspaceId,
+        createdBy: '00000000-0000-0000-0000-000000000000', // AI Agent User ID
+        placeName: place.name,
+        address: place.address,
+        longitude: place.longitude, // place.x -> place.longitude
+        latitude: place.latitude, // place.y -> place.latitude
+        status: PoiStatus.MARKED, // 'MARKED' 문자열 대신 enum 멤버 사용
+        sequence: 0, // 기본 순서
+        isPersisted: false,
+      };
+
+      this.logger.debug(
+        `[DEBUG] Creating newCachedPoi:`,
+        JSON.stringify(newCachedPoi, null, 2),
+      );
+      await this.poiCacheService.upsertPoi(workspaceId, newCachedPoi);
+      newPois.push(newCachedPoi);
+    }
+    this.logger.log(`Successfully marked ${newPois.length} new POIs.`);
+    return newPois;
   }
 
   async isExist(workspaceId: string): Promise<boolean> {
@@ -174,7 +229,8 @@ export class WorkspaceService {
   // }
 
   async searchPlaces(query: string) {
-    const kakaoKey = this.configService.get<string>('KAKAOMAP_REST_API_KEY');
+    this.logger.log(`Searching places with query: "${query}" by AI agent.`);
+    const kakaoKey = this.configService.get<string>('KAKAO_REST_API_KEY');
     const url = 'https://dapi.kakao.com/v2/local/search/keyword.json';
 
     try {
@@ -185,23 +241,34 @@ export class WorkspaceService {
         }),
       );
 
-      console.log('API 호출 성공 ^^!');
+      this.logger.log(
+        `Successfully fetched ${response.data.documents.length} places from Kakao API.`,
+      );
 
-      return response.data.documents.map((place) => ({
+      const mappedPlaces = response.data.documents.map((place) => ({
         name: place.place_name,
         address: place.address_name,
         road_address: place.road_address_name,
         phone: place.phone,
-        x: parseFloat(place.x),
-        y: parseFloat(place.y),
+        longitude: parseFloat(place.x),
+        latitude: parseFloat(place.y),
         url: place.place_url,
         category: place.category_name,
       }));
+
+      this.logger.debug(
+        `[DEBUG] Mapped places for AI:`,
+        JSON.stringify(mappedPlaces, null, 2),
+      );
+      return mappedPlaces;
     } catch (error: unknown) {
+      this.logger.error(`Failed to call Kakao API. Query: ${query}`, error);
       if (error instanceof AxiosError) {
-        console.error('Kakao API Error:', error.response?.data);
+        this.logger.error('Kakao API Error Details:', error.response?.data);
       }
-      throw new Error('Kakao API를 호출하는 중 오류가 발생했습니다.');
+      throw new InternalServerErrorException(
+        '카카오 지도 API 호출 중 오류가 발생했습니다.',
+      );
     }
   }
 }

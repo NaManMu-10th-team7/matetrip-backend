@@ -9,13 +9,13 @@ import { JwtStrategy } from './jwt.strategy';
 import { LocalStrategy } from './local.strategy';
 import { LocalAuthGuard } from './local_auth.guard';
 import { JwtAuthGuard } from './jwt_auth.guard';
-import { MatchingModule } from '../matching/matching.module';
+import { ProfileModule } from '../profile/profile.module';
 
 @Module({
   imports: [
     // 1. UsersModule 임포트 (AuthService에서 UsersService를 주입받아야 함)
     UsersModule,
-    MatchingModule,
+    ProfileModule,
 
     // 2. PassportModule 등록 (기본 전략을 'jwt'로 설정)
     PassportModule.register({ defaultStrategy: 'jwt' }),

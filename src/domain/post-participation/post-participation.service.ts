@@ -187,7 +187,6 @@ export class PostParticipationService {
       currentPostStatus: ${post.status},
       writerId: ${post.writer.id}`);
 
-
     if (post.writer.id !== authorId) {
       throw new ForbiddenException(
         '해당 게시물의 동행 신청을 관리할 권한이 없습니다.',
@@ -212,38 +211,53 @@ export class PostParticipationService {
       currentParticipationStatus: ${participation.status},
       requesterId: ${participation.requester.id}`);
 
-
     participation.status = updatePostParticipationDto.status;
     const updatedParticipation =
       await this.postParticipationRepository.save(participation);
 
-    console.log(`[updateParticipationStatus] Participation status updated to: ${updatedParticipation.status}`);
+    console.log(
+      `[updateParticipationStatus] Participation status updated to: ${updatedParticipation.status}`,
+    );
 
     // 동행 신청이 승인되었을 때, maxParticipants를 확인하여 게시글 상태를 업데이트
     if (updatedParticipation.status === PostParticipationStatus.APPROVED) {
-      const approvedParticipations = await this.postParticipationRepository.find({
-        where: {
-          post: { id: postId },
-          status: PostParticipationStatus.APPROVED,
-        },
-      });
+      const approvedParticipations =
+        await this.postParticipationRepository.find({
+          where: {
+            post: { id: postId },
+            status: PostParticipationStatus.APPROVED,
+          },
+        });
 
-      console.log(`[updateParticipationStatus] Number of APPROVED participations for post ${postId}: ${approvedParticipations.length}`);
+      console.log(
+        `[updateParticipationStatus] Number of APPROVED participations for post ${postId}: ${approvedParticipations.length}`,
+      );
 
       // 작성자 포함하여 현재 참여자 수 계산
       const currentParticipantsCount = approvedParticipations.length + 1;
-      console.log(`[updateParticipationStatus] currentParticipantsCount (including writer): ${currentParticipantsCount}`);
-      console.log(`[updateParticipationStatus] post.maxParticipants: ${post.maxParticipants}`);
-
+      console.log(
+        `[updateParticipationStatus] currentParticipantsCount (including writer): ${currentParticipantsCount}`,
+      );
+      console.log(
+        `[updateParticipationStatus] post.maxParticipants: ${post.maxParticipants}`,
+      );
 
       if (currentParticipantsCount >= post.maxParticipants) {
-        console.log(`[updateParticipationStatus] Condition met: currentParticipantsCount (${currentParticipantsCount}) >= post.maxParticipants (${post.maxParticipants})`);
-        console.log(`[updateParticipationStatus] Changing post status from ${post.status} to ${PostStatus.COMPLETED}`);
+        console.log(
+          `[updateParticipationStatus] Condition met: currentParticipantsCount (${currentParticipantsCount}) >= post.maxParticipants (${post.maxParticipants})`,
+        );
+        console.log(
+          `[updateParticipationStatus] Changing post status from ${post.status} to ${PostStatus.COMPLETED}`,
+        );
         post.status = PostStatus.COMPLETED;
         await this.postRepository.save(post);
-        console.log(`[updateParticipationStatus] Post status saved as ${post.status}`);
+        console.log(
+          `[updateParticipationStatus] Post status saved as ${post.status}`,
+        );
       } else {
-        console.log(`[updateParticipationStatus] Condition not met: currentParticipantsCount (${currentParticipantsCount}) < post.maxParticipants (${post.maxParticipants})`);
+        console.log(
+          `[updateParticipationStatus] Condition not met: currentParticipantsCount (${currentParticipantsCount}) < post.maxParticipants (${post.maxParticipants})`,
+        );
       }
     }
 

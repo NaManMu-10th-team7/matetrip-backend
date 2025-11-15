@@ -39,4 +39,8 @@ export class PoiCreateReqDto {
   @IsNotEmpty()
   @IsString()
   placeName: string;
+
+  @IsOptional()
+  @IsString()
+  tempId?: string;
 }
