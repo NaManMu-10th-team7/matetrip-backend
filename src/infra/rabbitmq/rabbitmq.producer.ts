@@ -1,10 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-
 import { isUUID } from 'class-validator';
 import { EnqueueProfileEmbeddingDto } from './dto/create-rabbitmq.dto.js';
-import { EnqueueBehaviorEventDto } from './dto/behavior-event.dto.js';
-
+import { EnqueueBehaviorEventDto } from './dto/enqueue-behavior-event.dto.js';
 @Injectable()
 export class RabbitmqProducer {
   constructor(
@@ -34,10 +32,8 @@ export class RabbitmqProducer {
     if (dto.placeId && !isUUID(dto.placeId)) {
       throw new Error('Invalid place id');
     }
-
-    console.log(
-      `enqueueBehaviorEvent: ${dto.eventType} - user: ${dto.userId}, place: ${dto.placeId}`,
-    );
+    console.log(`enqueueBehaviorEvent Full DTO:`, JSON.stringify(dto, null, 2));
+    // WARNING : NestJS는 메시지를 { pattern, data } 구조로 감싼다
     this.behavior_embedding_client.emit('behavior_event', dto);
   }
 }
