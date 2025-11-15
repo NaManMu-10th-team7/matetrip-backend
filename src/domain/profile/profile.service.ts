@@ -15,8 +15,11 @@ import { ProfilePayloadDto } from './dto/profile.payload.dto'; // 변경된 DTO 
 import { plainToInstance } from 'class-transformer';
 import { BinaryContentService } from '../binary-content/binary-content.service';
 import { BinaryContent } from '../binary-content/entities/binary-content.entity';
+<<<<<<< HEAD
 import { RabbitmqProducer } from '../../infra/rabbitmq/rabbitmq.producer.js';
 import { Transactional } from 'typeorm-transactional';
+=======
+>>>>>>> 4d3ebd168e93594f7d290872abecd34575f70a9f
 import { MatchingService } from './matching.service';
 //상세소개 , 여행 성향, 여행 스타일 얻는 dto 가 아래
 import { buildEmbeddingPayloadFromSource } from './utils/embedding-payload.util';
@@ -51,7 +54,10 @@ export class ProfileService {
     private readonly binaryContentService: BinaryContentService,
     @InjectRepository(BinaryContent)
     private readonly binaryContentRepository: Repository<BinaryContent>,
+<<<<<<< HEAD
     private readonly rabbitMQProducer: RabbitmqProducer,
+=======
+>>>>>>> 4d3ebd168e93594f7d290872abecd34575f70a9f
     private readonly matchingService: MatchingService,
   ) {}
 

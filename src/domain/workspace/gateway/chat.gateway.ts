@@ -16,9 +16,9 @@ import { ChatConnectionReqDto } from '../dto/chat/connect-chat-req.dto.js';
 import { AiService } from '../../../ai/ai.service.js';
 import { AiAgentResponseDto } from '../../../ai/dto/ai-response.dto.js';
 import { AiSearchPlaceDto } from '../../../ai/dto/ai-search-place.dto.js';
+import { ChatMessage } from '../entities/chat-message.entity.js';
 import { ChatMessageService } from '../service/chat-message.service.js';
 import { PoiGateway } from './poi.gateway.js';
-import { ChatMessage } from '../entities/chat-message.entity.js';
 
 const ChatEvent = {
   JOIN: 'join',
