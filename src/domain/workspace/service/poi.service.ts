@@ -37,8 +37,7 @@ export class PoiService {
   async getWorkspacePois(workspaceId: string): Promise<PoiResDto[]> {
     const cached = await this.poiCacheService.getWorkspacePois(workspaceId);
     if (cached.length > 0) {
-      // TODO: DTO로 변환
-      return cached;
+      return cached.map((poi) => PoiResDto.of(poi));
     }
 
     // DB에서 찾고 캐시에 저장
@@ -57,12 +56,13 @@ export class PoiService {
           id: In(planDayIds),
         },
       },
-      relations: ['createdBy', 'planDay'],
+      // TODO: 너무 무거운 JOIN인가 의심되니까 나중에 Refac생각해보기(일단 나중에) ex. userId만 필요한데 전체를 가져오니까
+      relations: ['createdBy', 'planDay', 'place'],
     });
 
     await this.poiCacheService.setWorkspacePois(workspaceId, pois);
 
-    return pois.map((poi) => PoiResDto.fromEntity(poi));
+    return pois.map((poi) => PoiResDto.fromEntity(poi, workspaceId));
   }
 
   async removeWorkspacePoi(
@@ -110,6 +110,7 @@ export class PoiService {
         longitude: poi.longitude,
         latitude: poi.latitude,
         address: poi.address,
+        placeId: poi.placeId ?? undefined,
         placeName: poi.placeName ?? '',
         status: poi.status,
         sequence: poi.sequence,

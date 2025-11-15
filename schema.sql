@@ -229,6 +229,7 @@ CREATE TABLE IF NOT EXISTS poi
     plan_day_id  UUID             NOT NULL,
     created_by   UUID             NOT NULL,
     created_at   TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+    place_id     UUID             NULL,
     place_name   TEXT             NOT NULL,
     longitude    DOUBLE PRECISION NOT NULL,
     latitude     DOUBLE PRECISION NOT NULL,
@@ -397,6 +398,10 @@ ALTER TABLE follow
         FOREIGN KEY (following_id) REFERENCES users (id) ON DELETE CASCADE,
     ADD CONSTRAINT chk_not_self CHECK ( follower_id <> following_id );
 
+ALTER TABLE poi
+    ADD CONSTRAINT fk_poi_place FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE SET NULL;
+    
+        
 
 CREATE UNIQUE INDEX idx_unique_schedule
     on poi (plan_day_id, sequence)
@@ -425,7 +430,6 @@ CREATE TABLE user_behavior_events (
     workspace_id UUID,
     place_id UUID REFERENCES places(id) ON DELETE SET NULL
     event_type TEXT NOT NULL,  -- POI_MARK, POI_SCHEDULE, POI_UNMARK, POI_UNSCHEDULE
-    event_data JSONB NOT NULL,        -- 행동별 상세 데이터 (placeId, workspaceId 등)
     weight NUMERIC(5, 2) NOT NULL,    -- 행동 가중치
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
 );

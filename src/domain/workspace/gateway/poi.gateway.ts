@@ -148,19 +148,17 @@ export class PoiGateway {
       const cachedPoi = await this.workspaceService.cachePoi(data);
 
       // [수정] PoiResDto.of는 placeName이 필요하므로, cachedPoi에서 직접 payload 구성
-      const markedPoiPayload = {
-        ...cachedPoi,
-        tempId: data.tempId,
-      };
+      // TODO: 이게 왜 필요한지 물어보기 (이미 cachedPoi에 placeName 있는 상태)
+      // const markedPoiPayload = {
+      //   ...cachedPoi,
+      //   tempId: data.tempId,
+      // };
+      // TODO: TO DTO
+      this.server.to(roomName).emit(PoiSocketEvent.MARKED, cachedPoi);
 
-      this.server.to(roomName).emit(PoiSocketEvent.MARKED, markedPoiPayload);
-
-      // MarkEvent 전달
-      this.sendBehaviorEvent(
-        cachedPoi,
-        BehaviorEventType.POI_MARK,
-        data.placeId,
-      );
+      if (cachedPoi && cachedPoi.placeId) {
+        this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_MARK);
+      }
 
       this.logger.debug(
         `Socket ${socket.id} marked POI in workspace ${data.workspaceId}`,
@@ -206,12 +204,8 @@ export class PoiGateway {
         .emit(PoiSocketEvent.UNMARKED, { poiId: data.poiId });
 
       // UnmarkEvent 전달
-      if (cachedPoi) {
-        this.sendBehaviorEvent(
-          cachedPoi,
-          BehaviorEventType.POI_UNMARK,
-          data.placeId,
-        );
+      if (cachedPoi && cachedPoi.placeId) {
+        this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_UNMARK);
       }
 
       this.logger.debug(
@@ -271,11 +265,7 @@ export class PoiGateway {
         data.poiId,
       );
       if (cachedPoi) {
-        this.sendBehaviorEvent(
-          cachedPoi,
-          BehaviorEventType.POI_SCHEDULE,
-          data.placeId,
-        );
+        this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_SCHEDULE);
       }
 
       this.logger.debug(
@@ -317,11 +307,7 @@ export class PoiGateway {
         data.poiId,
       );
       if (cachedPoi) {
-        this.sendBehaviorEvent(
-          cachedPoi,
-          BehaviorEventType.POI_UNSCHEDULE,
-          data.placeId,
-        );
+        this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_UNSCHEDULE);
       }
 
       this.logger.debug(
@@ -534,12 +520,13 @@ export class PoiGateway {
   private sendBehaviorEvent(
     cachedPoi: CachedPoi,
     eventType: BehaviorEventType,
-    placeId?: string,
   ): void {
-    if (!placeId) {
-      return; // placeId가 없으면 행동 이벤트를 전송하지 않음
+    // TODO: DB에 저장되어 있지 않은 정보는 현재 그냥 행동 추적 안하고 있는데 어떻게 할지 나중에 토의
+    if (!cachedPoi || !cachedPoi.placeId) {
+      return;
     }
 
+    const placeId = cachedPoi.placeId;
     try {
       const behaviorEvent = EnqueueBehaviorEventDto.fromCachedPoi(
         cachedPoi,
@@ -547,11 +534,9 @@ export class PoiGateway {
         placeId,
       );
       this.rabbitMQProducer.enqueueBehaviorEvent(behaviorEvent);
-      this.logger.debug(
-        `Behavior event sent: ${eventType} for place ${placeId}`,
-      );
+      this.logger.debug(`행동 Event 전송 : ${eventType} for place ${placeId}`);
     } catch (error) {
-      this.logger.error(`Failed to send behavior event: ${eventType}`, error);
+      this.logger.error(`행동 Event 전송 싑피 : ${eventType}`, error);
     }
   }
 }
