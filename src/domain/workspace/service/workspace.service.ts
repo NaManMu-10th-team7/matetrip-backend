@@ -297,6 +297,8 @@ export class WorkspaceService {
       category: p.category,
       title: p.title,
       summary: p.summary,
+      longitude: p.longitude,
+      latitude: p.latitude,
     }));
 
     // 여행 총 일수 계산 (종료일 - 시작일 + 1)
