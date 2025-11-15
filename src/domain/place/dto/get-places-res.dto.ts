@@ -1,6 +1,6 @@
 import { Place } from '../entities/place.entity.js';
 
-export class GetPlacesInboundsResDto {
+export class GetPlacesResDto {
   id: string;
   category: string;
   title: string;
@@ -31,7 +31,7 @@ export class GetPlacesInboundsResDto {
   }
 
   static from(place: Place) {
-    return new GetPlacesInboundsResDto(
+    return new GetPlacesResDto(
       place.id,
       place.category, // DB변경 전 임시
       place.title,

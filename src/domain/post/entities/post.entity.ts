@@ -1,9 +1,17 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+} from 'typeorm';
 import { Users } from '../../users/entities/users.entity';
 import { PostStatus } from './post-status.enum.js';
 import { BaseTimestampEntity } from '../../base.entity.js';
 import { KeywordType } from './keywords-type.enum.js';
 import { PostParticipation } from '../../post-participation/entities/post-participation.entity.js';
+import { BinaryContent } from '../../binary-content/entities/binary-content.entity';
 
 @Entity('post')
 export class Post extends BaseTimestampEntity {
@@ -53,4 +61,8 @@ export class Post extends BaseTimestampEntity {
     (postParticipation) => postParticipation.post,
   )
   participations: PostParticipation[];
+
+  @OneToOne(() => BinaryContent, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn([{ name: 'image_id', referencedColumnName: 'id' }])
+  image: BinaryContent | null;
 }

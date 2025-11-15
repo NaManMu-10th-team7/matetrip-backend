@@ -52,11 +52,11 @@ export class TitanEmbeddingService {
       this.configService.get<string>('TITAN_EMBEDDING_MODEL') ??
       'amazon.titan-embed-text-v2:0';
     this.dimensions =
-      Number(this.configService.get<string>('TITAN_EMBEDDING_DIM')) || 512;
+      Number(this.configService.get<string>('TITAN_EMBEDDING_DIM')) || 1024;
   }
 
   /**
-   * 주어진 텍스트를 Titan Embeddings v2 모델(512차원 기본)로 벡터화한다.
+   * 주어진 텍스트를 Titan Embeddings v2 모델(1024차원 기본)로 벡터화한다.
    * - 공백 문자열이면 null 반환
    * - 정상 호출 시 number[] 벡터를 돌려주고, 실패해도 예외 대신 null로 폴백
    */
