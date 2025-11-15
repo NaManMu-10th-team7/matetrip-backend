@@ -32,11 +32,9 @@ export class WorkspaceController {
 
   @Post('generate-ai-plan')
   async generatePlan(
-    @Req() req: Request & { user: { id: string } },
+    @Param('userId') userId: string,
     @Body() createPlanDto: PlanReqDto,
   ) {
-    const userId = req.user.id;
-
     return this.workspaceService.createAiPlan(userId, createPlanDto);
   }
 

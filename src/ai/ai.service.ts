@@ -26,8 +26,6 @@ export class AiService {
         }),
       );
 
-      // console.log(response);
-
       return response.data;
     } catch (error) {
       if (error instanceof AxiosError) {
@@ -42,13 +40,12 @@ export class AiService {
     }
   }
 
-  async generatePlan(places: any[], startDate: string, endDate: string) {
-    const fastApiUrl = this.configService.get<string>('FASTAPI_URL');
+  async generatePlan(places: any[], totalDays: number) {
+    const fastApiUrl = this.configService.get<string>('AI_API_SERVER_URL');
 
     const payload = {
       places: places,
-      start_date: startDate,
-      end_date: endDate,
+      total_date: totalDays,
     };
 
     try {
