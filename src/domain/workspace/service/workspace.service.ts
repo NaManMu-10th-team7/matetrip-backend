@@ -10,7 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Workspace } from '../entities/workspace.entity.js';
 import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
-import { WorkspaceResDto } from '../dto/workspace-res.dto.js';
+import { PlanReqDto, WorkspaceResDto } from '../dto/workspace-res.dto.js';
 import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from '../entities/plan-day.entity.js';
 import { PoiCreateReqDto } from '../dto/poi/poi-create-req.dto.js';
@@ -27,6 +27,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { AxiosError } from 'axios';
 import { KakaoResponse } from '../types/kakao-document.js';
 import { AiSearchPlaceDto } from '../../../ai/dto/ai-search-place.dto.js';
+import { PlaceService } from 'src/domain/place/place.service';
+import { AiService } from 'src/ai/ai.service';
+import { RegionGroup } from 'src/domain/place/entities/region_group.enum';
 
 @Injectable()
 export class WorkspaceService {
@@ -42,6 +45,8 @@ export class WorkspaceService {
     private readonly planDayService: PlanDayService,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly placesService: PlaceService,
+    private readonly aiService: AiService,
   ) {}
 
   @Transactional()
@@ -270,5 +275,31 @@ export class WorkspaceService {
         '카카오 지도 API 호출 중 오류가 발생했습니다.',
       );
     }
+  }
+
+  async createAiPlan(userId: string, planDto: PlanReqDto) {
+    // 1단계 : NestJS가 직접 DB에서 성향 기반 장소 DTO 리스트를 가져옴
+    const recommendedPlaces = await this.placesService.getPersonalizedPlaces({
+      userId,
+      region: planDto.region as RegionGroup,
+    });
+
+    if (!recommendedPlaces || recommendedPlaces.length === 0) {
+      throw new Error('추천 장소를 찾을 수 없습니다.');
+    }
+
+    // 2단계 : AI에게 장소 리스트와 날짜를 전달해 여행 계획 생성
+    const aiResult = await this.aiService.generatePlan(
+      recommendedPlaces,
+      planDto.startDate,
+      planDto.endDate,
+    );
+
+    if (aiResult.error) {
+      throw new Error(aiResult.error);
+    }
+
+    // 3단계 : AI가 생성한 텍스트와 원본 장소 데이터를 함께 반환
+    return aiResult;
   }
 }

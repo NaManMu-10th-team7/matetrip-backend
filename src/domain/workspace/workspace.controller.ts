@@ -15,6 +15,7 @@ import { CreateReviewDto } from '../review/dto/create-review.dto';
 import { ReviewService } from '../review/review.service';
 import { PoiGateway } from './gateway/poi.gateway.js';
 import { PoiOptimizeReqDto } from './dto/poi/poi-optimize-req.dto.js';
+import { PlanReqDto } from './dto/workspace-res.dto';
 
 @Controller('workspace')
 export class WorkspaceController {
@@ -27,6 +28,16 @@ export class WorkspaceController {
   @Post()
   create(@Body() createWorkspaceDto: CreateWorkspaceReqDto) {
     return this.workspaceService.create(createWorkspaceDto);
+  }
+
+  @Post('generate-ai-plan')
+  async generatePlan(
+    @Req() req: Request & { user: { id: string } },
+    @Body() createPlanDto: PlanReqDto,
+  ) {
+    const userId = req.user.id;
+
+    return this.workspaceService.createAiPlan(userId, createPlanDto);
   }
 
   @UseGuards(AuthGuard('jwt'))

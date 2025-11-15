@@ -20,6 +20,7 @@ import { ReviewModule } from '../review/review.module.js';
 import { AiModule } from '../../ai/ai.module.js';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
+import { PlaceModule } from '../place/place.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ConfigModule } from '@nestjs/config';
     AiModule,
     HttpModule,
     ConfigModule,
+    PlaceModule,
   ],
   controllers: [WorkspaceController],
   providers: [

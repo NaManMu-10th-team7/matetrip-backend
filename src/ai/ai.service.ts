@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, lastValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
 import { AxiosError } from 'axios';
 import { AiAgentResponseDto } from './dto/ai-response.dto.js';
@@ -39,6 +39,27 @@ export class AiService {
         console.error('Error calling AI service (Agent):', error);
       }
       throw new Error('AI service request failed');
+    }
+  }
+
+  async generatePlan(places: any[], startDate: string, endDate: string) {
+    const fastApiUrl = this.configService.get<string>('FASTAPI_URL');
+
+    const payload = {
+      places: places,
+      start_date: startDate,
+      end_date: endDate,
+    };
+
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post(`${fastApiUrl}/plan/generate`, payload),
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('FastAPI /plan/generate 호출 에러', error.message);
+      throw new Error('AI 계획 생성 실패');
     }
   }
 }

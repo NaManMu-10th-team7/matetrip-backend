@@ -9,5 +9,6 @@ import { ProfileModule } from '../profile/profile.module';
   imports: [TypeOrmModule.forFeature([Place]), ProfileModule],
   controllers: [PlaceController],
   providers: [PlaceService],
+  exports: [PlaceService],
 })
 export class PlaceModule {}
