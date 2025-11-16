@@ -3,6 +3,8 @@ import { PlaceService } from './place.service';
 import { GetPlacesReqDto } from './dto/get-places-req.dto.js';
 import { GetPlacesResDto } from './dto/get-places-res.dto.js';
 import { GetPersonalizedPlacesByRegionReqDto } from './dto/get-personalized-places-by-region-req-dto.js';
+import { GetPopularPlacesReqDto } from './dto/get-popular-places-req.dto.js';
+import { GetPopularPlacesResDto } from './dto/get-popular-places-res.dto.js';
 
 @Controller('places')
 export class PlaceController {
@@ -13,6 +15,18 @@ export class PlaceController {
   getPlacesInBounds(@Query() dto: GetPlacesReqDto): Promise<GetPlacesResDto[]> {
     console.log('dto', dto);
     return this.placeService.getPlacesInBounds(dto);
+  }
+
+  /**
+   * 목표 : 현재 places테이블의 데이터 중 addplace_id, title, address, image_url 반환하기
+   * 순서: user_behavior_events테이블에서 POI_SCHEDULE타입의 이벤트가 많은 순서대로 하기
+   * 목표 = 무한 스크롤 방식
+   */
+  @Get('popular')
+  getPopularPlaces(
+    @Query() dto: GetPopularPlacesReqDto,
+  ): Promise<GetPopularPlacesResDto[]> {
+    return this.placeService.getPopularPlaces(dto);
   }
 
   @Get('/recommendation')

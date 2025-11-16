@@ -7,6 +7,8 @@ import { GetPlacesResDto as GetPlacesResDto } from './dto/get-places-res.dto.js'
 import { GetPersonalizedPlacesByRegionReqDto } from './dto/get-personalized-places-by-region-req-dto.js';
 import { ProfileService } from '../profile/profile.service.js';
 import { RegionGroup } from './entities/region_group.enum.js';
+import { GetPopularPlacesReqDto } from './dto/get-popular-places-req.dto.js';
+import { GetPopularPlacesResDto } from './dto/get-popular-places-res.dto.js';
 
 @Injectable()
 export class PlaceService {
@@ -119,5 +121,46 @@ export class PlaceService {
    */
   getRegionGroups(): { key: string; value: string }[] {
     return Object.entries(RegionGroup).map(([key, value]) => ({ key, value }));
+  }
+
+  /**
+   * @description POI_SCHEDULE 이벤트가 많은 순서대로 장소를 조회합니다. (무한 스크롤)
+   * @param dto - 페이지네이션 파라미터 (page, limit)
+   * @returns GetPopularPlacesResDto[] - 인기 장소 목록
+   */
+  async getPopularPlaces(
+    dto: GetPopularPlacesReqDto,
+  ): Promise<GetPopularPlacesResDto[]> {
+    const { limit, offset } = dto;
+
+    const places = await this.placeRepo
+      .createQueryBuilder('place')
+      .leftJoin(
+        'user_behavior_events',
+        'event',
+        'event.place_id = place.id AND event.event_type = :eventType',
+        { eventType: 'POI_SCHEDULE' },
+      )
+      .select('place.id', 'id')
+      .addSelect('place.title', 'title')
+      .addSelect('place.address', 'address')
+      .addSelect('place.image_url', 'image_url')
+      .addSelect('COUNT(event.id)', 'event_count')
+      .groupBy('place.id')
+      .addGroupBy('place.title')
+      .addGroupBy('place.address')
+      .addGroupBy('place.image_url')
+      .orderBy('event_count', 'DESC')
+      .addOrderBy('place.created_at', 'DESC')
+      .offset(offset)
+      .limit(limit)
+      .getRawMany<{
+        id: string;
+        title: string;
+        address: string;
+        image_url?: string;
+      }>();
+
+    return places.map((place) => GetPopularPlacesResDto.from(place));
   }
 }
