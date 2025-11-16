@@ -104,4 +104,12 @@ export class WorkspaceController {
       region,
     );
   }
+
+  /**
+   * @description 워크스페이스에 연결된 게시글 정보를 조회합니다.
+   */
+  @Get(':workspaceId/post')
+  getPostByWorkspaceId(@Param('workspaceId') workspaceId: string) {
+    return this.workspaceService.getPostByWorkspaceId(workspaceId);
+  }
 }

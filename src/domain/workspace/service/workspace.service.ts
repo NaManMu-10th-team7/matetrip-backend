@@ -386,4 +386,27 @@ export class WorkspaceService {
       region,
     );
   }
+
+  /**
+   * @description 워크스페이스에 연결된 게시글 정보를 조회합니다.
+   * @param workspaceId - 워크스페이스의 ID
+   * @returns 게시글 정보 DTO
+   */
+  async getPostByWorkspaceId(workspaceId: string) {
+    this.logger.log(`Fetching post info for workspace: ${workspaceId}`);
+
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspaceId },
+      relations: ['post'], // 'post' 관계를 함께 로드합니다.
+    });
+
+    if (!workspace || !workspace.post) {
+      throw new NotFoundException(
+        `Workspace with ID ${workspaceId} or its associated post not found.`,
+      );
+    }
+
+    // PostService의 findOne을 사용하여 PostResDto로 변환하여 반환합니다.
+    return this.postService.findOne(workspace.post.id);
+  }
 }
