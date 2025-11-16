@@ -39,7 +39,7 @@ interface MatchCandidatesResult {
   query: MatchRequestDto;
 }
 
-const DEFAULT_LIMIT = 5;
+const DEFAULT_LIMIT = 15;
 const VECTOR_WEIGHT = 0.3;
 const STYLE_WEIGHT = 0.25;
 const MBTI_WEIGHT = 0.25;
@@ -288,6 +288,7 @@ export class MatchingService {
   }
 
   async findMatchesWithRecruitingPosts(
+    //이제 각 매칭 후보에 대해 recruitingPosts 배열을 채운 뒤 recruitingPost를 배열의 첫 요소(없으면 null)로 설정
     userId: string,
     matchRequestDto: MatchRequestDto,
   ): Promise<MatchResponseDto> {
@@ -297,14 +298,19 @@ export class MatchingService {
       matchRequestDto,
     );
 
-    const recruitingPostMap = await this.loadRecruitingPostMap(
-      matches.map((candidate) => candidate.userId),
-    );
+    const userIds = matches.map((candidate) => candidate.userId);
+    const recruitingPostMap = this.hasPostFilters(matchRequestDto)
+      ? await this.loadFilteredRecruitingPostMap(userIds, matchRequestDto)
+      : await this.loadRecruitingPostMap(userIds);
 
-    const matchesWithPosts = matches.map((candidate) => ({
-      ...candidate,
-      recruitingPost: recruitingPostMap.get(candidate.userId) ?? null,
-    }));
+    const matchesWithPosts = matches.map((candidate) => {
+      const recruitingPosts = recruitingPostMap.get(candidate.userId) ?? [];
+      return {
+        ...candidate,
+        recruitingPost: recruitingPosts[0] ?? null,
+        recruitingPosts,
+      };
+    });
 
     return {
       query,
@@ -375,12 +381,45 @@ export class MatchingService {
         .subQuery()
         .select('1')
         .from(Post, 'post')
-        .where('post.writer_id = profile.user_id') //매칭 후보가 모집 중 글을 올렸는지를 가리는 필터
-        .andWhere('post.status = :recruitingStatus') //게시글이 모집중인지 구별하는 필터
+        .where('post.writer_id = profile.user_id')
+        .andWhere('post.status = :recruitingStatus')
+        //🔍 검색 조건에 추가
+        // 아래 조건들은 검색 필터가 넘어왔을 때만 적용한다.
+        // 검색 파라미터가 없으면 1=1(항상 참인 조건)을 넣어 SQL 체인을 유지한다.
+        // 1=1은 “1은 1과 같다”처럼 무조건 참인 표현이라 필터를 건너뛰는 역할을 한다.
+        .andWhere(
+          matchRequestDto.startDate ? 'post.start_date >= :startDate' : '1=1',
+        )
+        .andWhere(matchRequestDto.endDate ? 'post.end_date <= :endDate' : '1=1')
+        .andWhere(
+          matchRequestDto.locationQuery
+            ? '(post.location ILIKE :location OR post.title ILIKE :location)' //제목이나 지역에 있으면
+            : '1=1',
+        )
+        .andWhere(
+          matchRequestDto.keywords?.length
+            ? 'post.keywords && :keywords'
+            : '1=1',
+        )
         .getQuery();
       return `EXISTS ${subQuery}`;
     });
     qb.setParameter('recruitingStatus', PostStatus.RECRUITING);
+    // 조건을 문자열로만 넣고 값을 바인딩하지 않으면 Postgres가
+    // `:location` 처럼 생긴 토큰을 그대로 받아 syntax error를 낸다.
+    // 필터가 실제로 넘어온 경우에만 setParameter로 값까지 채워준다.
+    if (matchRequestDto.startDate) {
+      qb.setParameter('startDate', matchRequestDto.startDate);
+    }
+    if (matchRequestDto.endDate) {
+      qb.setParameter('endDate', matchRequestDto.endDate);
+    }
+    if (matchRequestDto.locationQuery) {
+      qb.setParameter('location', `%${matchRequestDto.locationQuery.trim()}%`);
+    }
+    if (matchRequestDto.keywords?.length) {
+      qb.setParameter('keywords', matchRequestDto.keywords);
+    }
 
     //겹치는 항목이 하나라도 있어야 해당
     // if (filterTravelStyles.length > 0) {
@@ -564,13 +603,13 @@ export class MatchingService {
    */
   private async loadRecruitingPostMap(
     userIds: string[],
-  ): Promise<Map<string, MatchRecruitingPostDto>> {
-    const map = new Map<string, MatchRecruitingPostDto>();
+  ): Promise<Map<string, MatchRecruitingPostDto[]>> {
+    const map = new Map<string, MatchRecruitingPostDto[]>();
     if (!userIds.length) {
       return map;
     }
 
-    // 추천된 사용자 집합 안에서 "모집 중" 상태인 게시글만 싹 모아서 사용자별로 한 건씩 매칭한다.
+    // 추천된 사용자 집합 안에서 "모집 중" 상태인 게시글을 모두 사용자별로 모은다.
     const posts = await this.postRepository.find({
       where: {
         writer: { id: In(userIds) },
@@ -583,15 +622,84 @@ export class MatchingService {
 
     for (const post of posts) {
       const writerId = post.writer?.id;
-      //Map 자료구조는 map.has(key)로 해당 키가 등록돼 있는지 O(1)로 검사
-      if (!writerId || map.has(writerId)) {
-        // 사용자마다 최신 글 한 건만 노출하고 싶으므로 이미 맵에 있다면 스킵
+      if (!writerId) {
         continue;
       }
-      // 아직 등록되지 않은 사용자라면 최신 글을 DTO로 변환해 등록
-      map.set(writerId, this.toRecruitingPostDto(post));
+      const dto = this.toRecruitingPostDto(post);
+      const existing = map.get(writerId);
+      if (existing) {
+        existing.push(dto);
+      } else {
+        map.set(writerId, [dto]);
+      }
     }
-    //키는 userId, 값은 해당 사용자의 최신 모집 중 게시글 DTO
+    //키는 userId, 값은 해당 사용자의 모집 중 게시글 DTO 리스트
+    return map;
+  }
+
+  private hasPostFilters(matchRequestDto: MatchRequestDto): boolean {
+    return Boolean(
+      matchRequestDto.startDate ||
+        matchRequestDto.endDate ||
+        matchRequestDto.locationQuery ||
+        (matchRequestDto.keywords?.length ?? 0) > 0,
+    );
+  }
+
+  private async loadFilteredRecruitingPostMap(
+    userIds: string[],
+    matchRequestDto: MatchRequestDto,
+  ): Promise<Map<string, MatchRecruitingPostDto[]>> {
+    const map = new Map<string, MatchRecruitingPostDto[]>();
+    if (!userIds.length) {
+      return map;
+    }
+
+    const qb = this.postRepository
+      .createQueryBuilder('post')
+      .innerJoinAndSelect('post.writer', 'writer')
+      .where('post.status = :status', { status: PostStatus.RECRUITING })
+      .andWhere('post.writer_id IN (:...userIds)', { userIds })
+      .orderBy('post.created_at', 'DESC');
+
+    if (matchRequestDto.startDate) {
+      qb.andWhere('post.start_date >= :startDate', {
+        startDate: matchRequestDto.startDate,
+      });
+    }
+    if (matchRequestDto.endDate) {
+      qb.andWhere('post.end_date <= :endDate', {
+        endDate: matchRequestDto.endDate,
+      });
+    }
+    if (matchRequestDto.locationQuery) {
+      qb.andWhere(
+        '(post.location ILIKE :location OR post.title ILIKE :location)',
+        {
+          location: `%${matchRequestDto.locationQuery.trim()}%`,
+        },
+      );
+    }
+    if (matchRequestDto.keywords?.length) {
+      qb.andWhere('post.keywords && :keywords', {
+        keywords: matchRequestDto.keywords,
+      });
+    }
+
+    const posts = await qb.getMany();
+    for (const post of posts) {
+      const writerId = post.writer?.id;
+      if (!writerId) {
+        continue;
+      }
+      const dto = this.toRecruitingPostDto(post);
+      const existing = map.get(writerId);
+      if (existing) {
+        existing.push(dto);
+      } else {
+        map.set(writerId, [dto]);
+      }
+    }
     return map;
   }
 

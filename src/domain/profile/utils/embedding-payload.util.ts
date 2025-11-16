@@ -22,7 +22,7 @@ export function buildEmbeddingPayloadFromSource(
   }
 
   if (source.travelStyles?.length) {
-    payload.travelTendencyTypes = source.travelStyles;
+    payload.travelStyleTypes = source.travelStyles;
   }
 
   if (source.tendency?.length) {

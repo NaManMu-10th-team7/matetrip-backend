@@ -22,7 +22,7 @@ export class MatchCandidateDto {
   overlappingTravelStyles: TravelStyleType[];
   overlappingTendencies: TendencyType[];
   mbtiMatchScore: number;
-  recruitingPost?: MatchRecruitingPostDto | null;
+  recruitingPosts?: MatchRecruitingPostDto[];
 }
 
 export class MatchResponseDto {
