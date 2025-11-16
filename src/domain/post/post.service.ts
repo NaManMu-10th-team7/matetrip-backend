@@ -453,6 +453,40 @@ export class PostService {
     );
   }
 
+  /**
+   * 게시글 ID를 기반으로 작성자와 승인된 모든 참여자의 사용자 ID 목록을 반환합니다.
+   * @param postId - 게시글의 ID
+   * @returns 사용자 ID의 배열 (중복 제거됨)
+   */
+  async getParticipantIds(postId: string): Promise<string[]> {
+    const post = await this.postRepository.findOne({
+      where: { id: postId },
+      relations: ['writer'], // 작성자 정보 로드
+    });
+
+    if (!post || !post.writer) {
+      throw new NotFoundException(
+        `Post with ID "${postId}" not found or has no writer.`,
+      );
+    }
+
+    const approvedParticipations = await this.postParticipationRepository.find({
+      where: {
+        post: { id: postId },
+        status: PostParticipationStatus.APPROVED,
+      },
+      relations: ['requester'], // 신청자 정보 로드
+    });
+
+    const writerId = post.writer.id;
+    const participantIds = approvedParticipations.map((p) => p.requester.id);
+
+    // 작성자와 참여자 ID를 합치고 Set을 이용해 중복을 제거
+    const allMemberIds = new Set([writerId, ...participantIds]);
+
+    return Array.from(allMemberIds);
+  }
+
   private attachProfileImageId(profile?: Profile | null): Profile | null {
     if (!profile) {
       return null;

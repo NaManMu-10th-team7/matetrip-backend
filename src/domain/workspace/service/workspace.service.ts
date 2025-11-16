@@ -10,7 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Workspace } from '../entities/workspace.entity.js';
 import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
-import { WorkspaceResDto } from '../dto/workspace-res.dto.js';
+import { PlanReqDto, WorkspaceResDto } from '../dto/workspace-res.dto.js';
 import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from '../entities/plan-day.entity.js';
 import { PoiCreateReqDto } from '../dto/poi/poi-create-req.dto.js';
@@ -27,6 +27,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { AxiosError } from 'axios';
 import { KakaoResponse } from '../types/kakao-document.js';
 import { AiSearchPlaceDto } from '../../../ai/dto/ai-search-place.dto.js';
+import { PlaceService } from 'src/domain/place/place.service';
+import { AiService } from 'src/ai/ai.service';
+import { RegionGroup } from 'src/domain/place/entities/region_group.enum';
+import { differenceInCalendarDays } from 'date-fns';
 
 @Injectable()
 export class WorkspaceService {
@@ -42,6 +46,8 @@ export class WorkspaceService {
     private readonly planDayService: PlanDayService,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly placesService: PlaceService,
+    private readonly aiService: AiService,
   ) {}
 
   @Transactional()
@@ -270,5 +276,137 @@ export class WorkspaceService {
         '카카오 지도 API 호출 중 오류가 발생했습니다.',
       );
     }
+  }
+
+  async createAiPlan(userId: string, planDto: PlanReqDto) {
+    console.log(new Date(Date.now()));
+
+    // 1단계 : NestJS가 직접 DB에서 성향 기반 장소 DTO 리스트를 가져옴
+    const recommendedPlaces = await this.placesService.getPersonalizedPlaces({
+      userId,
+      region: planDto.region as RegionGroup,
+    });
+    console.log(new Date(Date.now()));
+
+    if (!recommendedPlaces || recommendedPlaces.length === 0) {
+      throw new Error('추천 장소를 찾을 수 없습니다.');
+    }
+
+    const sendPlaces = recommendedPlaces.map((p) => ({
+      id: p.id,
+      category: p.category,
+      title: p.title,
+      summary: p.summary,
+      longitude: p.longitude,
+      latitude: p.latitude,
+    }));
+
+    // 여행 총 일수 계산 (종료일 - 시작일 + 1)
+    const startDate = new Date(planDto.startDate);
+    const endDate = new Date(planDto.endDate);
+
+    const daysDiff = differenceInCalendarDays(endDate, startDate);
+    const totalDays = daysDiff + 1;
+
+    // 2단계 : AI에게 장소 리스트와 날짜를 전달해 여행 계획 생성
+    const aiResult = await this.aiService.generatePlan(sendPlaces, totalDays);
+
+    console.log(new Date(Date.now()));
+
+    if (aiResult.error) {
+      throw new Error(aiResult.error);
+    }
+
+    // 3단계 : NestJS가 데이터 조립
+    const finalResponse = {
+      recommendations: aiResult.daily_plans.map((day) => {
+        // AI가 준 ID 목록
+        const pois = day.placeIDs.map((id) => {
+          // 원본 DTO 리스트에서 ID로 해당 장소의 전체 정보를 찾음
+          return recommendedPlaces.find((p) => p.id === id);
+        });
+
+        return { pois: pois };
+      }),
+    };
+
+    console.log(new Date(Date.now()));
+
+    // 4단계 : AI가 생성한 텍스트와 원본 장소 데이터를 함께 반환
+    return finalResponse;
+  }
+
+  /**
+   * 워크스페이스 ID를 기반으로 해당 게시글에 참여중인 모든 사용자의 ID 목록을 반환합니다.
+   * @param workspaceId - 워크스페이스의 ID
+   * @returns 사용자 ID의 배열
+   */
+  async getParticipantUserIds(workspaceId: string): Promise<string[]> {
+    this.logger.log(
+      `Fetching participant user IDs for workspace: ${workspaceId}`,
+    );
+
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspaceId },
+      relations: ['post'], // 'post' 관계를 함께 로드합니다.
+    });
+
+    if (!workspace || !workspace.post) {
+      throw new NotFoundException(
+        `Workspace with ID ${workspaceId} or its associated post not found.`,
+      );
+    }
+
+    // PostService를 통해 해당 게시글의 참여자 ID 목록을 가져옵니다.
+    // PostService에 getParticipantIds와 같은 메서드가 구현되어 있어야 합니다.
+    return this.postService.getParticipantIds(workspace.post.id);
+  }
+
+  /**
+   * 워크스페이스의 모든 참여자 성향을 종합하여 장소를 추천합니다.
+   * @param workspaceId - 워크스페이스의 ID
+   * @returns 추천 장소 DTO의 배열
+   */
+  async getConsensusRecommendations(workspaceId: string, region: RegionGroup) {
+    this.logger.log(
+      `Fetching consensus recommendations for workspace: ${workspaceId}`,
+    );
+
+    // 1. 워크스페이스의 모든 참여자 ID를 가져옵니다.
+    const participantUserIds = await this.getParticipantUserIds(workspaceId);
+
+    if (participantUserIds.length === 0) {
+      this.logger.warn(`No participants found for workspace: ${workspaceId}`);
+      return [];
+    }
+
+    // 2. PlaceService에 사용자 ID 목록을 전달하여 종합 추천 장소를 요청합니다.
+    return this.placesService.getConsensusRecommendedPlaces(
+      participantUserIds,
+      region,
+    );
+  }
+
+  /**
+   * @description 워크스페이스에 연결된 게시글 정보를 조회합니다.
+   * @param workspaceId - 워크스페이스의 ID
+   * @returns 게시글 정보 DTO
+   */
+  async getPostByWorkspaceId(workspaceId: string) {
+    this.logger.log(`Fetching post info for workspace: ${workspaceId}`);
+
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspaceId },
+      relations: ['post'], // 'post' 관계를 함께 로드합니다.
+    });
+
+    if (!workspace || !workspace.post) {
+      throw new NotFoundException(
+        `Workspace with ID ${workspaceId} or its associated post not found.`,
+      );
+    }
+
+    // PostService의 findOne을 사용하여 PostResDto로 변환하여 반환합니다.
+    return this.postService.findOne(workspace.post.id);
   }
 }
