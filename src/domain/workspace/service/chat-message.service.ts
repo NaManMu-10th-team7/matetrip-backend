@@ -35,9 +35,9 @@ export class ChatMessageService {
       const savedMessage = await this.chatMessageRepository.save(message);
       this.logger.log(`Message saved successfully with id: ${savedMessage.id}`);
       return savedMessage;
-    } catch {
+    } catch (error) {
       this.logger.error(`Failed to save message for user ${dto.userId}.`);
-      throw new Error('Failed to save message');
+      throw error;
     }
   }
 
@@ -55,7 +55,7 @@ export class ChatMessageService {
     // DB 엔티티를 프론트엔드가 사용하는 페이로드 형식으로 변환
     return messages.map((msg) => {
       const username = msg.user
-        ? msg.user.profile.nickname
+        ? msg.user.profile?.nickname || '알 수 없는 사용자'
         : '알 수 없는 사용자';
       const userId = msg.user ? msg.user.id : undefined;
 

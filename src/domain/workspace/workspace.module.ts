@@ -20,7 +20,7 @@ import { ReviewModule } from '../review/review.module.js';
 import { AiModule } from '../../ai/ai.module.js';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
-import { PlaceModule } from '../place/place.module';
+import { RabbitmqModule } from '../../infra/rabbitmq/rabbitmq.module.js';
 
 @Module({
   imports: [
@@ -38,7 +38,7 @@ import { PlaceModule } from '../place/place.module';
     AiModule,
     HttpModule,
     ConfigModule,
-    PlaceModule,
+    RabbitmqModule,
   ],
   controllers: [WorkspaceController],
   providers: [

@@ -229,6 +229,7 @@ CREATE TABLE IF NOT EXISTS poi
     plan_day_id  UUID             NOT NULL,
     created_by   UUID             NOT NULL,
     created_at   TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+    place_id     UUID             NULL,
     place_name   TEXT             NOT NULL,
     longitude    DOUBLE PRECISION NOT NULL,
     latitude     DOUBLE PRECISION NOT NULL,
@@ -303,9 +304,9 @@ CREATE TABLE places
     image_url text NULL, -- 장소 대표 이미지 URL
     longitude double precision NOT NULL,
     latitude double precision NOT NULL,
-    embedding vector (1024) NULL, -- 장소 대표 임베딩 (리뷰 기반),
-    created_at TIMESTAMP DEFAULT now () NOT NULL,
-    updated_at TIMESTAMP DEFAULT now () NOT NULL
+    embedding VECTOR(1024) NULL, -- 장소 대표 임베딩 (리뷰 기반),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now () ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now ()
 );
 
 -- 리뷰 테이블
@@ -397,6 +398,10 @@ ALTER TABLE follow
         FOREIGN KEY (following_id) REFERENCES users (id) ON DELETE CASCADE,
     ADD CONSTRAINT chk_not_self CHECK ( follower_id <> following_id );
 
+ALTER TABLE poi
+    ADD CONSTRAINT fk_poi_place FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE SET NULL;
+    
+        
 
 CREATE UNIQUE INDEX idx_unique_schedule
     on poi (plan_day_id, sequence)
@@ -415,3 +420,47 @@ CREATE UNIQUE INDEX idx_unique_schedule
 -- CREATE INDEX idx_conn_next                 ON poi_connection(next_poi_id);
 -- CREATE INDEX idx_pp_post                   ON post_participation(post_id);
 -- CREATE INDEX idx_pp_user                   ON post_participation(requester_id);
+
+
+-- ========= 행동 기반 임베딩 테이블 =========
+-- TODO: 나중에 스크립트 순서 조정 
+DROP TABLE IF EXISTS user_behavior_events;
+DROP TABLE IF EXISTS user_behavior_embeddings;
+
+-- 사용자 행동 이벤트 원본 데이터
+CREATE TABLE user_behavior_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    workspace_id UUID,
+    place_id UUID,
+    plan_day_id UUID,
+    event_type TEXT NOT NULL,  -- POI_MARK, POI_SCHEDULE, POI_UNMARK, POI_UNSCHEDULE
+    weight NUMERIC(5, 2) NOT NULL,    -- 행동 가중치
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- 사용자별 집계된 행동 임베딩
+CREATE TABLE user_behavior_embeddings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    behavior_embedding vector(1024),  -- 행동 기반 임베딩 벡터 (장소 임베딩 가중평균)
+    aggregated_data JSONB,            -- 집계된 통계 데이터 (카테고리별 점수 등)
+    last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    total_events_count INTEGER DEFAULT 0 NOT NULL
+);
+
+ALTER TABLE user_behavior_events
+    ADD CONSTRAINT fk_user_behavior_events_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    ADD CONSTRAINT fk_user_behavior_events_place FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE SET NULL,
+    ADD CONSTRAINT fk_user_behavior_events_plan_day FOREIGN KEY (plan_day_id) REFERENCES plan_day (id) ON DELETE SET NULL,
+    ADD CONSTRAINT fk_user_behavior_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspace (id) ON DELETE SET NULL;
+
+
+-- user_behavior_events 인덱스
+CREATE INDEX idx_user_behavior_events_user_created ON user_behavior_events(user_id, created_at DESC);
+CREATE INDEX idx_user_behavior_events_type ON user_behavior_events(event_type);
+CREATE INDEX idx_user_behavior_events_place ON user_behavior_events(place_id);
+
+-- user_behavior_embeddings 인덱스
+-- ivfflat 인덱스는 데이터가 충분히 쌓인 후 생성 (최소 1000개 벡터 권장)
+-- CREATE INDEX idx_behavior_embedding ON user_behavior_embeddings USING ivfflat (behavior_embedding vector_cosine_ops) WITH (lists = 100);

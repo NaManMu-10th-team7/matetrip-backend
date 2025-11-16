@@ -22,6 +22,7 @@ import { BinaryContent } from '../binary-content/entities/binary-content.entity'
 import { BinaryContentService } from '../binary-content/binary-content.service';
 import { Profile } from '../profile/entities/profile.entity';
 import { Users } from '../users/entities/users.entity';
+import { Transactional } from 'typeorm-transactional';
 
 @Injectable()
 export class PostService {
@@ -163,6 +164,7 @@ export class PostService {
     return uniquePosts.map((post) => this.toPostResponseDto(post));
   }
 
+  @Transactional()
   async update(id: string, userId: string, dto: UpdatePostDto) {
     const post = await this.postRepository.findOne({
       where: { id: id, writer: { id: userId } },

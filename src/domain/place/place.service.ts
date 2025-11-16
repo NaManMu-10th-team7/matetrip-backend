@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { GetPlacesReqDto } from './dto/get-places-req.dto.js';
 import { Place } from './entities/place.entity.js';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -44,7 +44,10 @@ export class PlaceService {
     const { userId, region } = dto;
     const embeddingValue: number[] =
       await this.profileService.getUserEmbeddingValueByUserId(userId);
-    // const embeddingString = `[${mbeddingValue.join(', ')}]`;
+
+    if (!embeddingValue) {
+      throw new NotFoundException(`유저 embeddingValue not found ${userId}`);
+    }
     const embeddingString = `[${embeddingValue.join(', ')}]`;
     const places: Place[] = await this.placeRepo
       .createQueryBuilder('p')

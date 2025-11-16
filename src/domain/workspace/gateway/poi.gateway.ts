@@ -24,6 +24,12 @@ import { PoiReorderReqDto } from '../dto/poi/poi-reorder-req.dto.js';
 import { CursorMoveDto } from '../dto/poi/cursor-move.dto.js';
 import { PoiHoverReqDto } from '../dto/poi/poi-hover-req.dto.js';
 import { MapClickReqDto } from '../dto/poi/map-click-req.dto.js';
+import { RabbitmqProducer } from '../../../infra/rabbitmq/rabbitmq.producer.js';
+import {
+  BehaviorEventType,
+  EnqueueBehaviorEventDto,
+} from '../../../infra/rabbitmq/dto/enqueue-behavior-event.dto.js';
+import { CachedPoi } from '../types/cached-poi.js';
 
 const PoiSocketEvent = {
   JOIN: 'join',
@@ -78,6 +84,7 @@ export class PoiGateway {
     private readonly workspaceService: WorkspaceService,
     private readonly poiService: PoiService,
     private readonly poiCacheService: PoiCacheService,
+    private readonly rabbitMQProducer: RabbitmqProducer,
   ) {}
 
   @SubscribeMessage(PoiSocketEvent.JOIN)
@@ -141,15 +148,20 @@ export class PoiGateway {
       const cachedPoi = await this.workspaceService.cachePoi(data);
 
       // [수정] PoiResDto.of는 placeName이 필요하므로, cachedPoi에서 직접 payload 구성
-      const markedPoiPayload = {
-        ...cachedPoi,
-        tempId: data.tempId,
-      };
+      // TODO: 이게 왜 필요한지 물어보기 (이미 cachedPoi에 placeName 있는 상태)
+      // const markedPoiPayload = {
+      //   ...cachedPoi,
+      //   tempId: data.tempId,
+      // };
+      // TODO: TO DTO
+      this.server.to(roomName).emit(PoiSocketEvent.MARKED, cachedPoi);
 
-      this.server.to(roomName).emit(PoiSocketEvent.MARKED, markedPoiPayload);
+      if (cachedPoi && cachedPoi.placeId) {
+        this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_MARK);
+      }
 
       this.logger.debug(
-        `Socket ${socket.id} marked POI ${cachedPoi.id} in workspace ${data.workspaceId}`,
+        `Socket ${socket.id} marked POI in workspace ${data.workspaceId}`,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -168,6 +180,12 @@ export class PoiGateway {
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
 
+      // 삭제 전에 캐시에서 POI 정보 가져오기 (행동 이벤트용)
+      const cachedPoi = await this.poiCacheService.getPoi(
+        data.workspaceId,
+        data.poiId,
+      );
+
       const removedPoi = await this.poiService.removeWorkspacePoi(
         data.workspaceId,
         data.poiId,
@@ -184,6 +202,11 @@ export class PoiGateway {
       this.server
         .to(roomName)
         .emit(PoiSocketEvent.UNMARKED, { poiId: data.poiId });
+
+      // UnmarkEvent 전달
+      if (cachedPoi && cachedPoi.placeId) {
+        this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_UNMARK);
+      }
 
       this.logger.debug(
         `Socket ${socket.id} unmarked POI ${data.poiId} in workspace ${data.workspaceId}`,
@@ -236,6 +259,15 @@ export class PoiGateway {
         planDayId: data.planDayId,
       });
 
+      // ScheduleEvent 전달
+      const cachedPoi = await this.poiCacheService.getPoi(
+        data.workspaceId,
+        data.poiId,
+      );
+      if (cachedPoi) {
+        this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_SCHEDULE);
+      }
+
       this.logger.debug(
         `Socket ${socket.id} added POI ${data.poiId} to schedule in planDay ${data.planDayId}`,
       );
@@ -268,6 +300,15 @@ export class PoiGateway {
         poiId: data.poiId,
         planDayId: data.planDayId,
       });
+
+      // UnscheduleEvent 전달
+      const cachedPoi = await this.poiCacheService.getPoi(
+        data.workspaceId,
+        data.poiId,
+      );
+      if (cachedPoi) {
+        this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_UNSCHEDULE);
+      }
 
       this.logger.debug(
         `Socket ${socket.id} removed POI ${data.poiId} from schedule in planDay ${data.planDayId}`,
@@ -467,6 +508,35 @@ export class PoiGateway {
     if (!socket.rooms.has(roomName)) {
       this.logger.warn(`Socket ${socket.id} tried to unmark`);
       throw new UnauthorizedException();
+    }
+  }
+
+  /**
+   * 행동 이벤트를 RabbitMQ에 전송하는 공통 메서드
+   * @param cachedPoi - 캐시된 POI 정보
+   * @param eventType - 행동 이벤트 타입
+   * @param placeId - focus에서 추천받은 place의 ID (옵셔널)
+   */
+  private sendBehaviorEvent(
+    cachedPoi: CachedPoi,
+    eventType: BehaviorEventType,
+  ): void {
+    // TODO: DB에 저장되어 있지 않은 정보는 현재 그냥 행동 추적 안하고 있는데 어떻게 할지 나중에 토의
+    if (!cachedPoi || !cachedPoi.placeId) {
+      return;
+    }
+
+    const placeId = cachedPoi.placeId;
+    try {
+      const behaviorEvent = EnqueueBehaviorEventDto.fromCachedPoi(
+        cachedPoi,
+        eventType,
+        placeId,
+      );
+      this.rabbitMQProducer.enqueueBehaviorEvent(behaviorEvent);
+      this.logger.debug(`행동 Event 전송 : ${eventType} for place ${placeId}`);
+    } catch (error) {
+      this.logger.error(`행동 Event 전송 싑피 : ${eventType}`, error);
     }
   }
 }
