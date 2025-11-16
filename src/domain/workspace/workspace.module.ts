@@ -21,6 +21,7 @@ import { AiModule } from '../../ai/ai.module.js';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import { RabbitmqModule } from '../../infra/rabbitmq/rabbitmq.module.js';
+import { PlaceModule } from '../place/place.module.js';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { RabbitmqModule } from '../../infra/rabbitmq/rabbitmq.module.js';
     HttpModule,
     ConfigModule,
     RabbitmqModule,
+    PlaceModule,
   ],
   controllers: [WorkspaceController],
   providers: [
