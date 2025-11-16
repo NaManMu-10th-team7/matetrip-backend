@@ -15,12 +15,9 @@ export class Poi extends BaseTimestampEntity {
   @JoinColumn([{ name: 'plan_day_id', referencedColumnName: 'id' }])
   planDay: PlanDay;
 
-  @ManyToOne(() => Place, { nullable: true, onDelete: 'SET NULL' })
+  @ManyToOne(() => Place, { nullable: false, onDelete: 'RESTRICT' })
   @JoinColumn([{ name: 'place_id', referencedColumnName: 'id' }])
-  place?: Place;
-
-  @Column({ type: 'uuid', name: 'place_id', nullable: true })
-  placeId?: string; // todo: 중복 없애기 (임시로 해논거)
+  place: Place;
 
   @Column({ type: 'text', name: 'place_name', nullable: false })
   placeName: string;

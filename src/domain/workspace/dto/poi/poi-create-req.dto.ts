@@ -24,9 +24,9 @@ export class PoiCreateReqDto {
   @IsUUID()
   planDayId?: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsUUID()
-  placeId?: string; // focus에서 추천받은 place의 ID (행동 이벤트용)
+  placeId: string;
 
   @Type(() => Number)
   @IsNumber()

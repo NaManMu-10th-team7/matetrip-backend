@@ -6,6 +6,7 @@ import { PoiCacheService } from './poi-cache.service.js';
 import { CachedPoi } from '../types/cached-poi.js';
 import { Users } from '../../users/entities/users.entity.js';
 import { PlanDay } from '../entities/plan-day.entity.js';
+import { Place } from '../../place/entities/place.entity.js';
 import { PlanDayService } from './plan-day.service.js';
 import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 import { PoiResDto } from '../dto/poi/poi-res.dto.js';
@@ -110,7 +111,7 @@ export class PoiService {
         longitude: poi.longitude,
         latitude: poi.latitude,
         address: poi.address,
-        placeId: poi.placeId ?? undefined,
+        place: poi.placeId ? ({ id: poi.placeId } as Place) : undefined,
         placeName: poi.placeName ?? '',
         status: poi.status,
         sequence: poi.sequence,
