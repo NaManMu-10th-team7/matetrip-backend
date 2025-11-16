@@ -38,6 +38,15 @@ export class PlaceController {
     console.log('테스트');
     return this.placeService.getPersonalizedPlaces(dto);
   }
+  /**
+   * @description 지역 그룹 목록을 조회합니다.
+   * @author Hugo
+   * @returns { { key: string; value: string }[] } 지역 그룹 목록
+   */
+  @Get('regions')
+  getRegionGroups(): { key: string; value: string }[] {
+    return this.placeService.getRegionGroups();
+  }
 
   /**
    * @description 사용자의 행동 데이터(mark, schedule)를 기반으로 유사한 장소를 추천합니다.
@@ -54,15 +63,5 @@ export class PlaceController {
   @Get(':id')
   getPlaceById(@Param('id') id: string): Promise<GetPlacesResDto> {
     return this.placeService.getPlaceById(id);
-  }
-
-  /**
-   * @description 지역 그룹 목록을 조회합니다.
-   * @author Hugo
-   * @returns { { key: string; value: string }[] } 지역 그룹 목록
-   */
-  @Get('regions')
-  getRegionGroups(): { key: string; value: string }[] {
-    return this.placeService.getRegionGroups();
   }
 }
