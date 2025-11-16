@@ -6,6 +6,7 @@ import { PoiCacheService } from './poi-cache.service.js';
 import { CachedPoi } from '../types/cached-poi.js';
 import { Users } from '../../users/entities/users.entity.js';
 import { PlanDay } from '../entities/plan-day.entity.js';
+import { Place } from '../../place/entities/place.entity.js';
 import { PlanDayService } from './plan-day.service.js';
 import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 import { PoiResDto } from '../dto/poi/poi-res.dto.js';
@@ -37,7 +38,7 @@ export class PoiService {
   async getWorkspacePois(workspaceId: string): Promise<PoiResDto[]> {
     const cached = await this.poiCacheService.getWorkspacePois(workspaceId);
     if (cached.length > 0) {
-      return cached.map((poi) => PoiResDto.of(poi));
+      return cached.map((poi) => PoiResDto.fromCachedPoi(poi));
     }
 
     // DB에서 찾고 캐시에 저장
@@ -110,7 +111,7 @@ export class PoiService {
         longitude: poi.longitude,
         latitude: poi.latitude,
         address: poi.address,
-        placeId: poi.placeId ?? undefined,
+        place: poi.placeId ? ({ id: poi.placeId } as Place) : undefined,
         placeName: poi.placeName ?? '',
         status: poi.status,
         sequence: poi.sequence,

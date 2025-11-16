@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { PlaceService } from './place.service';
 import { GetPlacesReqDto } from './dto/get-places-req.dto.js';
 import { GetPlacesResDto } from './dto/get-places-res.dto.js';
@@ -38,7 +38,7 @@ export class PlaceController {
   }
 
   @Get(':id')
-  getPlaceById(@Query('id') id: string): Promise<GetPlacesResDto> {
+  getPlaceById(@Param('id') id: string): Promise<GetPlacesResDto> {
     return this.placeService.getPlaceById(id);
   }
 

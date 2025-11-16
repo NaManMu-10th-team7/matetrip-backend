@@ -14,7 +14,7 @@ type PoiResDtoProps = {
   status: PoiStatus;
   sequence: number;
   planDayId?: string;
-  placeId?: string;
+  placeId: string;
 };
 
 export class PoiResDto {
@@ -35,7 +35,7 @@ export class PoiResDto {
   @Expose()
   readonly planDayId?: string;
   @Expose()
-  readonly placeId?: string; // places 테이블의 ID
+  readonly placeId: string; // places 테이블의 ID (필수)
   @Expose()
   readonly status: PoiStatus;
   @Expose()
@@ -55,7 +55,7 @@ export class PoiResDto {
     this.placeId = props.placeId;
   }
 
-  static of(poi: CachedPoi): PoiResDto {
+  static fromCachedPoi(poi: CachedPoi): PoiResDto {
     return new PoiResDto({
       id: poi.id,
       workspaceId: poi.workspaceId,
@@ -83,7 +83,7 @@ export class PoiResDto {
       status: poi.status,
       sequence: poi.sequence,
       planDayId: poi.planDay?.id,
-      placeId: poi.placeId,
+      placeId: poi.place?.id,
     });
   }
 }

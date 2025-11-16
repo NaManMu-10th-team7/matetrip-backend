@@ -15,7 +15,10 @@ import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from '../entities/plan-day.entity.js';
 import { PoiCreateReqDto } from '../dto/poi/poi-create-req.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
-import { CachedPoi, buildToCachPoiFromCreateDto } from '../types/cached-poi.js';
+import {
+  buildToCachedPoiFromCreateDto,
+  CachedPoi,
+} from '../types/cached-poi.js';
 import { PlanDayService } from './plan-day.service.js';
 import { PoiStatus } from '../entities/poi-status.enum.js';
 import { PoiService } from './poi.service.js';
@@ -106,7 +109,7 @@ export class WorkspaceService {
   }
 
   async cachePoi(dto: PoiCreateReqDto): Promise<CachedPoi> {
-    const cachedPoi: CachedPoi = buildToCachPoiFromCreateDto(dto);
+    const cachedPoi: CachedPoi = buildToCachedPoiFromCreateDto(dto);
     await this.poiCacheService.upsertPoi(dto.workspaceId, cachedPoi);
     return cachedPoi;
   }
@@ -137,12 +140,13 @@ export class WorkspaceService {
         id: uuidv4(),
         workspaceId,
         createdBy: '00000000-0000-0000-0000-000000000000', // AI Agent User ID
+        placeId: place.id, // AI가 검색한 장소의 ID
         placeName: place.name,
         address: place.address,
-        longitude: place.longitude, // place.x -> place.longitude
-        latitude: place.latitude, // place.y -> place.latitude
-        status: PoiStatus.MARKED, // 'MARKED' 문자열 대신 enum 멤버 사용
-        sequence: 0, // 기본 순서
+        longitude: place.longitude,
+        latitude: place.latitude,
+        status: PoiStatus.MARKED,
+        sequence: 0,
         isPersisted: false,
       };
 

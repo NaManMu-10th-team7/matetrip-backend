@@ -8,7 +8,7 @@ export interface CachedPoi {
   workspaceId: string;
   planDayId?: string;
   createdBy: string;
-  placeId?: string; // places 테이블의 ID (null이면 사용자가 직접 찍은 장소)
+  placeId: string;
   placeName: string;
   longitude: number;
   latitude: number;
@@ -18,7 +18,7 @@ export interface CachedPoi {
   isPersisted: boolean;
 }
 
-export const buildToCachPoiFromCreateDto = (
+export const buildToCachedPoiFromCreateDto = (
   dto: PoiCreateReqDto,
 ): CachedPoi => ({
   id: dto.poiId ?? randomUUID(),
@@ -43,7 +43,7 @@ export const buildCachedPoiFromEntity = (
   workspaceId,
   planDayId: poi.planDay?.id,
   createdBy: poi.createdBy.id,
-  placeId: poi.placeId,
+  placeId: poi.place.id,
   longitude: poi.longitude,
   latitude: poi.latitude,
   address: poi.address,

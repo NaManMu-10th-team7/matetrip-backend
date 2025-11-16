@@ -318,7 +318,7 @@ CREATE TABLE place_review
     source_url text NOT NULL,
     embedding vector (1024) NULL, -- 리뷰 임베딩 (검색 정확도 향상용)
     is_deleted boolean DEFAULT false NOT NULL,
-    created_at TIMESTAMP DEFAULT now () NOT NULL
+    created_at TIMESTAMPTZ DEFAULT now () NOT NULL
 );
 
 -- ========= 2) ALTER TABLE: UNIQUE  =========
