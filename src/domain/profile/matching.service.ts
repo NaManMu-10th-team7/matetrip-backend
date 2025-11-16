@@ -288,11 +288,10 @@ export class MatchingService {
   }
 
   async findMatchesWithRecruitingPosts(
-    //이제 각 매칭 후보에 대해 recruitingPosts 배열을 채운 뒤 recruitingPost를 배열의 첫 요소(없으면 null)로 설정
     userId: string,
     matchRequestDto: MatchRequestDto,
   ): Promise<MatchResponseDto> {
-    // 추천 사용자 계산 + 각 사용자별 최신 모집글을 붙여서 돌려준다.
+    // 추천 사용자 계산 + 각 사용자별 모집글 목록을 붙여서 돌려준다.
     const { matches, query } = await this.buildMatchCandidatesResult(
       userId,
       matchRequestDto,
@@ -303,14 +302,10 @@ export class MatchingService {
       ? await this.loadFilteredRecruitingPostMap(userIds, matchRequestDto)
       : await this.loadRecruitingPostMap(userIds);
 
-    const matchesWithPosts = matches.map((candidate) => {
-      const recruitingPosts = recruitingPostMap.get(candidate.userId) ?? [];
-      return {
-        ...candidate,
-        recruitingPost: recruitingPosts[0] ?? null,
-        recruitingPosts,
-      };
-    });
+    const matchesWithPosts = matches.map((candidate) => ({
+      ...candidate,
+      recruitingPosts: recruitingPostMap.get(candidate.userId) ?? [],
+    }));
 
     return {
       query,

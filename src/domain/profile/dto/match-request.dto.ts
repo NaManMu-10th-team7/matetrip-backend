@@ -35,7 +35,6 @@ export class MatchRequestDto {
   locationQuery?: string;
 
   @IsOptional()
-  @IsOptional()
   @IsArray()
   @ArrayUnique()
   @ArrayNotEmpty()
