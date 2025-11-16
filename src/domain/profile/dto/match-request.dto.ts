@@ -72,6 +72,6 @@ export class MatchRequestDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
-  @Max(50)
+  @Max(300)
   limit?: number;
 }
