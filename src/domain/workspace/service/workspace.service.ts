@@ -15,7 +15,10 @@ import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from '../entities/plan-day.entity.js';
 import { PoiCreateReqDto } from '../dto/poi/poi-create-req.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
-import { CachedPoi, buildToCachPoiFromCreateDto } from '../types/cached-poi.js';
+import {
+  buildToCachedPoiFromCreateDto,
+  CachedPoi,
+} from '../types/cached-poi.js';
 import { PlanDayService } from './plan-day.service.js';
 import { PoiStatus } from '../entities/poi-status.enum.js';
 import { PoiService } from './poi.service.js';
@@ -106,7 +109,7 @@ export class WorkspaceService {
   }
 
   async cachePoi(dto: PoiCreateReqDto): Promise<CachedPoi> {
-    const cachedPoi: CachedPoi = buildToCachPoiFromCreateDto(dto);
+    const cachedPoi: CachedPoi = buildToCachedPoiFromCreateDto(dto);
     await this.poiCacheService.upsertPoi(dto.workspaceId, cachedPoi);
     return cachedPoi;
   }

@@ -18,7 +18,7 @@ export interface CachedPoi {
   isPersisted: boolean;
 }
 
-export const buildToCachPoiFromCreateDto = (
+export const buildToCachedPoiFromCreateDto = (
   dto: PoiCreateReqDto,
 ): CachedPoi => ({
   id: dto.poiId ?? randomUUID(),

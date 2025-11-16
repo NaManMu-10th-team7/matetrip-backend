@@ -38,7 +38,7 @@ export class PoiService {
   async getWorkspacePois(workspaceId: string): Promise<PoiResDto[]> {
     const cached = await this.poiCacheService.getWorkspacePois(workspaceId);
     if (cached.length > 0) {
-      return cached.map((poi) => PoiResDto.of(poi));
+      return cached.map((poi) => PoiResDto.fromCachedPoi(poi));
     }
 
     // DB에서 찾고 캐시에 저장

@@ -55,7 +55,7 @@ export class PoiResDto {
     this.placeId = props.placeId;
   }
 
-  static of(poi: CachedPoi): PoiResDto {
+  static fromCachedPoi(poi: CachedPoi): PoiResDto {
     return new PoiResDto({
       id: poi.id,
       workspaceId: poi.workspaceId,

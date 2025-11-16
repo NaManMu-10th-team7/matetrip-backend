@@ -172,15 +172,23 @@ export class PoiGateway {
     @MessageBody() data: PoiRemoveReqDto,
   ) {
     try {
-      console.log(``);
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
 
       // 삭제 전에 캐시에서 POI 정보 가져오기 (행동 이벤트용)
-      const cachedPoi = await this.poiCacheService.getPoi(
-        data.workspaceId,
-        data.poiId,
-      );
+      const cachedPoi: CachedPoi | undefined =
+        await this.poiCacheService.getPoi(data.workspaceId, data.poiId);
+
+      if (!cachedPoi) {
+        this.logger.warn(
+          `Failed to unmark POI ${data.poiId} POI not found in cache`,
+        );
+        return;
+      }
+
+      // UnmarkEvent 전달
+      console.log(`UNMARK Event : ${data.poiId}`);
+      this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_UNMARK);
 
       const removedPoi = await this.poiService.removeWorkspacePoi(
         data.workspaceId,
@@ -194,15 +202,9 @@ export class PoiGateway {
         return;
       }
 
-      // [수정] 일관된 데이터 구조를 위해 객체 형태로 전송합니다.
       this.server
         .to(roomName)
         .emit(PoiSocketEvent.UNMARKED, { poiId: data.poiId });
-
-      // UnmarkEvent 전달
-      if (cachedPoi) {
-        this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_UNMARK);
-      }
 
       this.logger.debug(
         `Socket ${socket.id} unmarked POI ${data.poiId} in workspace ${data.workspaceId}`,
@@ -249,24 +251,26 @@ export class PoiGateway {
         data.poiId,
       );
 
+      const poi: CachedPoi | undefined = await this.poiCacheService.getPoi(
+        data.workspaceId,
+        data.poiId,
+      );
+
+      if (!poi) {
+        this.logger.warn(`Failed to add POI to schedule`);
+        return;
+      }
+
+      // ScheduleEvent 전달
+      this.sendBehaviorEvent(poi, BehaviorEventType.POI_SCHEDULE);
+
       // 모든 클라이언트에 알림
       this.server.to(roomName).emit(PoiSocketEvent.ADD_SCHEDULE, {
         poiId: data.poiId,
         planDayId: data.planDayId,
       });
 
-      // ScheduleEvent 전달
-      const cachedPoi = await this.poiCacheService.getPoi(
-        data.workspaceId,
-        data.poiId,
-      );
-      if (cachedPoi) {
-        this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_SCHEDULE);
-      }
-
-      this.logger.debug(
-        `Socket ${socket.id} added POI ${data.poiId} to schedule in planDay ${data.planDayId}`,
-      );
+      this.logger.debug(`Added POI to schedule in planDay ${data.planDayId}`);
     } catch (error) {
       this.logger.error(
         `Socket ${socket.id} failed to add POI to schedule`,
@@ -285,6 +289,18 @@ export class PoiGateway {
       this.validateRoomAuth(roomName, socket);
 
       // POI를 MARKED로 전환하고 List에서 제거
+      const poi: CachedPoi | undefined = await this.poiCacheService.getPoi(
+        data.workspaceId,
+        data.poiId,
+      );
+
+      if (!poi) {
+        this.logger.warn(`Failed to remove POI from schedule`);
+        return;
+      }
+
+      // RemoveScheduleEvent 전달
+      this.sendBehaviorEvent(poi, BehaviorEventType.POI_UNSCHEDULE);
       await this.poiCacheService.removeFromSchedule(
         data.workspaceId,
         data.planDayId,
@@ -296,15 +312,6 @@ export class PoiGateway {
         poiId: data.poiId,
         planDayId: data.planDayId,
       });
-
-      // UnscheduleEvent 전달
-      const cachedPoi = await this.poiCacheService.getPoi(
-        data.workspaceId,
-        data.poiId,
-      );
-      if (cachedPoi) {
-        this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_UNSCHEDULE);
-      }
 
       this.logger.debug(
         `Socket ${socket.id} removed POI ${data.poiId} from schedule in planDay ${data.planDayId}`,
@@ -446,13 +453,7 @@ export class PoiGateway {
         userName: data.userName,
         places,
       });
-
-      // 다른 클라이언트에게도 알림 (장소 목록은 제외)
-      socket.to(roomName).emit(PoiSocketEvent.PLACE_FOCUSED, {
-        userId: data.userId,
-        userName: data.userName,
-      });
-
+      // TODO : Focus는 특정 클라이언트에만 보내주고 프론트에서 버튼이나 뭐 누르면 그 사용자의 Focus로 가는거
       this.logger.debug(
         `[PLACE_FOCUS] User ${data.userName} focused, returned ${places.length} places in bounds`,
       );

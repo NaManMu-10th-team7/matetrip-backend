@@ -15,7 +15,7 @@ export class Poi extends BaseTimestampEntity {
   @JoinColumn([{ name: 'plan_day_id', referencedColumnName: 'id' }])
   planDay: PlanDay;
 
-  @ManyToOne(() => Place, { nullable: false, onDelete: 'RESTRICT' })
+  @ManyToOne(() => Place, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn([{ name: 'place_id', referencedColumnName: 'id' }])
   place: Place;
 

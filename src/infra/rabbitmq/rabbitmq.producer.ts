@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { isUUID } from 'class-validator';
 import { EnqueueProfileEmbeddingDto } from './dto/create-rabbitmq.dto.js';
@@ -14,8 +14,8 @@ export class RabbitmqProducer {
 
   // 필요한 DTO
   enqueueProfileEmbedding(userId: string) {
-    if (isUUID(userId) == false) {
-      throw new Error('Invalid user id');
+    if (!isUUID(userId)) {
+      throw new BadRequestException('Invalid user id');
     }
     console.log(`sendProfileEmbedding: ${userId}`);
     this.profile_embedding_client.emit(
