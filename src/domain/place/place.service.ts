@@ -9,6 +9,9 @@ import { ProfileService } from '../profile/profile.service.js';
 import { RegionGroup } from './entities/region_group.enum.js';
 import { GetPopularPlacesReqDto } from './dto/get-popular-places-req.dto.js';
 import { GetPopularPlacesResDto } from './dto/get-popular-places-res.dto.js';
+import { GetBehaviorBasedRecommendationReqDto } from './dto/get-behavior-based-recommendation-req.dto.js';
+import { GetBehaviorBasedRecommendationResDto } from './dto/get-behavior-based-recommendation-res.dto.js';
+import { RecommendationReasonDto } from './dto/recommendation-reason.dto.js';
 
 @Injectable()
 export class PlaceService {
@@ -171,5 +174,177 @@ export class PlaceService {
       }>();
 
     return places.map((place) => GetPopularPlacesResDto.from(place));
+  }
+
+  /**
+   * @description 사용자의 최근 행동 데이터를 기반으로 유사한 장소를 추천합니다.
+   * @param dto - userId, page, limit
+   * @returns GetBehaviorBasedRecommendationResDto[] - 추천 장소 목록 (추천 이유 포함)
+   */
+  async getBehaviorBasedRecommendation(
+    dto: GetBehaviorBasedRecommendationReqDto,
+  ): Promise<GetBehaviorBasedRecommendationResDto[]> {
+    const { userId, limit = 10 } = dto;
+
+    // 1. 최근 10일간 사용자가 관심 보인 장소들을 조회
+    const interestedPlaces = await this.getRecentInterestedPlaces(userId, 10);
+
+    if (interestedPlaces.length === 0) {
+      return [];
+    }
+
+    // 2. 관심 보인 장소들과 유사한 장소 추천 (카테고리 다양성 고려)
+    const recommendations = await this.findSimilarPlacesWithDiversity(
+      interestedPlaces,
+      limit,
+    );
+
+    return recommendations;
+  }
+
+  /**
+   * 최근 N일간 사용자가 관심 보인 장소들을 조회합니다.
+   * - POI_SCHEDULE (일정에 추가)
+   * - POI_MARK (마크)
+   * 이벤트를 기준으로 조회합니다.
+   */
+  private async getRecentInterestedPlaces(
+    userId: string,
+    recentDays: number,
+  ): Promise<Place[]> {
+    const sinceDate = new Date();
+    sinceDate.setDate(sinceDate.getDate() - recentDays);
+
+    const places = await this.placeRepo
+      .createQueryBuilder('place')
+      .innerJoin(
+        'user_behavior_events',
+        'event',
+        'event.place_id = place.id AND event.user_id = :userId AND event.event_type IN (:...eventTypes) AND event.created_at >= :sinceDate',
+        {
+          userId,
+          eventTypes: ['POI_SCHEDULE', 'POI_MARK'],
+          sinceDate,
+        },
+      )
+      .select('place.*')
+      .addSelect('event.created_at', 'event_created_at')
+      .orderBy('event.created_at', 'DESC')
+      .getRawMany<{
+        place_id: string;
+        place_category: string;
+        place_title: string;
+        place_address: string;
+        place_summary?: string;
+        place_image_url?: string;
+        place_longitude: number;
+        place_latitude: number;
+        place_embedding: number[] | null;
+      }>();
+
+    // Place 엔티티로 변환 (embedding이 있는 것만 반환)
+    return places
+      .filter((raw) => raw.place_embedding !== null)
+      .map((raw) => {
+        const place = new Place();
+        place.id = raw.place_id;
+        place.category = raw.place_category;
+        place.title = raw.place_title;
+        place.address = raw.place_address;
+        place.summary = raw.place_summary ?? '';
+        place.image_url = raw.place_image_url;
+        place.longitude = raw.place_longitude;
+        place.latitude = raw.place_latitude;
+        place.embedding = raw.place_embedding;
+        return place;
+      });
+  }
+
+  /**
+   * 관심 보인 장소들과 유사한 장소를 찾기
+   * 카테고리 다양성을 고려하여 추천
+   */
+  private async findSimilarPlacesWithDiversity(
+    interestedPlaces: Place[],
+    limit: number,
+  ): Promise<GetBehaviorBasedRecommendationResDto[]> {
+    const recommendations: GetBehaviorBasedRecommendationResDto[] = [];
+    const recommendedPlaceIds = new Set<string>();
+    const categoryCount = new Map<string, number>();
+
+    // 각 관심 장소에 대해 유사한 장소 찾기
+    for (const interestedPlace of interestedPlaces) {
+      if (recommendations.length >= limit) {
+        break;
+      }
+
+      const similarPlaces = await this.findSimilarPlaces(
+        interestedPlace,
+        limit,
+      );
+
+      // 카테고리 다양성을 고려하여 추천 목록에 추가
+      for (const similarPlace of similarPlaces) {
+        if (recommendations.length >= limit) {
+          break;
+        }
+
+        // 이미 추천한 장소는 제외
+        if (recommendedPlaceIds.has(similarPlace.id)) {
+          continue;
+        }
+
+        // 관심 보인 장소 자체는 제외
+        const isInterestedPlace = interestedPlaces.some(
+          (p) => p.id === similarPlace.id,
+        );
+        if (isInterestedPlace) {
+          continue;
+        }
+
+        // 같은 카테고리가 너무 많으면 건너뛰기 (다양성 확보)
+        const currentCategoryCount =
+          categoryCount.get(similarPlace.category) || 0;
+        if (currentCategoryCount >= Math.ceil(limit / 3)) {
+          continue;
+        }
+
+        // 추천 목록에 추가
+        const reason = new RecommendationReasonDto({
+          id: interestedPlace.id,
+          title: interestedPlace.title,
+        });
+
+        recommendations.push(
+          GetBehaviorBasedRecommendationResDto.from(similarPlace, reason),
+        );
+
+        recommendedPlaceIds.add(similarPlace.id);
+        categoryCount.set(similarPlace.category, currentCategoryCount + 1);
+      }
+    }
+
+    return recommendations;
+  }
+
+  /**
+   * 특정 장소와 임베딩 유사도가 높은 장소들을 조회합니다.
+   */
+  private async findSimilarPlaces(
+    referencePlace: Place,
+    limit: number,
+  ): Promise<Place[]> {
+    if (!referencePlace.embedding) {
+      return [];
+    }
+
+    const embeddingString = `[${referencePlace.embedding.join(', ')}]`;
+
+    return await this.placeRepo
+      .createQueryBuilder('p')
+      .orderBy('p.embedding <=> :embedding', 'ASC')
+      .setParameters({ embedding: embeddingString })
+      .limit(limit * 3) // 여유있게 조회 (필터링 고려)
+      .getMany();
   }
 }

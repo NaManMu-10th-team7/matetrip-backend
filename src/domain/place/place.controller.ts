@@ -39,6 +39,18 @@ export class PlaceController {
     return this.placeService.getPersonalizedPlaces(dto);
   }
 
+  /**
+   * @description 사용자의 행동 데이터(mark, schedule)를 기반으로 유사한 장소를 추천합니다.
+   * @param dto - userId, page, limit
+   * @returns GetBehaviorBasedRecommendationResDto[] - 추천 장소 목록 (추천 이유 포함)
+   */
+  @Get('/recommendation/behavior')
+  async getBehaviorBasedRecommendation(
+    @Query() dto: GetBehaviorBasedRecommendationReqDto,
+  ): Promise<GetBehaviorBasedRecommendationResDto[]> {
+    return this.placeService.getBehaviorBasedRecommendation(dto);
+  }
+
   @Get(':id')
   getPlaceById(@Param('id') id: string): Promise<GetPlacesResDto> {
     return this.placeService.getPlaceById(id);

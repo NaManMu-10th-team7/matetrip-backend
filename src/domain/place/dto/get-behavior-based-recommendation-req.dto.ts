@@ -15,9 +15,9 @@ export class GetBehaviorBasedRecommendationReqDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  limit?: number = 20;
+  limit?: number = 10;
 
   get offset(): number {
-    return ((this.page || 1) - 1) * (this.limit || 20);
+    return ((this.page || 1) - 1) * (this.limit || 10);
   }
 }
