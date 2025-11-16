@@ -109,4 +109,12 @@ export class PlaceService {
 
     return places.map((place) => GetPlacesResDto.from(place));
   }
+
+  /**
+   * @description 지역 그룹 목록을 조회합니다.
+   * @returns { { key: string; value: string }[] } 지역 그룹 목록
+   */
+  getRegionGroups(): { key: string; value: string }[] {
+    return Object.entries(RegionGroup).map(([key, value]) => ({ key, value }));
+  }
 }
