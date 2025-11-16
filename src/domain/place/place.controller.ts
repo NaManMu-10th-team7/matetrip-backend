@@ -37,6 +37,11 @@ export class PlaceController {
     return this.placeService.getPersonalizedPlaces(dto);
   }
 
+  @Get(':id')
+  getPlaceById(@Query('id') id: string): Promise<GetPlacesResDto> {
+    return this.placeService.getPlaceById(id);
+  }
+
   /**
    * @description 지역 그룹 목록을 조회합니다.
    * @author Hugo
