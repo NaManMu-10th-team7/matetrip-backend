@@ -27,10 +27,10 @@ export class RabbitmqProducer {
   // 행동 이벤트 전송
   enqueueBehaviorEvent(dto: EnqueueBehaviorEventDto) {
     if (!isUUID(dto.userId)) {
-      throw new Error('Invalid user id');
+      throw new BadRequestException('Invalid user id');
     }
     if (dto.placeId && !isUUID(dto.placeId)) {
-      throw new Error('Invalid place id');
+      throw new BadRequestException('Invalid place id');
     }
     console.log(`enqueueBehaviorEvent Full DTO:`, JSON.stringify(dto, null, 2));
     // WARNING : NestJS는 메시지를 { pattern, data } 구조로 감싼다

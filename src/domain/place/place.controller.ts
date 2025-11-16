@@ -5,6 +5,8 @@ import { GetPlacesResDto } from './dto/get-places-res.dto.js';
 import { GetPersonalizedPlacesByRegionReqDto } from './dto/get-personalized-places-by-region-req-dto.js';
 import { GetPopularPlacesReqDto } from './dto/get-popular-places-req.dto.js';
 import { GetPopularPlacesResDto } from './dto/get-popular-places-res.dto.js';
+import { GetBehaviorBasedRecommendationReqDto } from './dto/get-behavior-based-recommendation-req.dto.js';
+import { GetBehaviorBasedRecommendationResDto } from './dto/get-behavior-based-recommendation-res.dto.js';
 
 @Controller('places')
 export class PlaceController {
@@ -36,12 +38,6 @@ export class PlaceController {
     console.log('테스트');
     return this.placeService.getPersonalizedPlaces(dto);
   }
-
-  @Get(':id')
-  getPlaceById(@Param('id') id: string): Promise<GetPlacesResDto> {
-    return this.placeService.getPlaceById(id);
-  }
-
   /**
    * @description 지역 그룹 목록을 조회합니다.
    * @author Hugo
@@ -50,5 +46,22 @@ export class PlaceController {
   @Get('regions')
   getRegionGroups(): { key: string; value: string }[] {
     return this.placeService.getRegionGroups();
+  }
+
+  /**
+   * @description 사용자의 행동 데이터(mark, schedule)를 기반으로 유사한 장소를 추천합니다.
+   * @param dto - userId, page, limit
+   * @returns GetBehaviorBasedRecommendationResDto[] - 추천 장소 목록 (추천 이유 포함)
+   */
+  @Get('/recommendation/behavior')
+  async getBehaviorBasedRecommendation(
+    @Query() dto: GetBehaviorBasedRecommendationReqDto,
+  ): Promise<GetBehaviorBasedRecommendationResDto[]> {
+    return this.placeService.getBehaviorBasedRecommendation(dto);
+  }
+
+  @Get(':id')
+  getPlaceById(@Param('id') id: string): Promise<GetPlacesResDto> {
+    return this.placeService.getPlaceById(id);
   }
 }

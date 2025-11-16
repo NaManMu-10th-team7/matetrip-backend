@@ -35,7 +35,7 @@ export class PoiResDto {
   @Expose()
   readonly planDayId?: string;
   @Expose()
-  readonly placeId: string; // places 테이블의 ID (필수)
+  readonly placeId: string;
   @Expose()
   readonly status: PoiStatus;
   @Expose()
