@@ -10,7 +10,7 @@ export const RabbitMQConfig = ClientsModule.registerAsync([
       options: {
         urls: [
           configService.getOrThrow<string>(
-            'RABBITMQ_URL',
+            'AWS_RABBITMQ_URL',
             'amqp://guest:guest@localhost:5672',
           ),
         ],
@@ -31,7 +31,7 @@ export const RabbitMQConfig = ClientsModule.registerAsync([
       options: {
         urls: [
           configService.get<string>(
-            'RABBITMQ_URL',
+            'AWS_RABBITMQ_URL',
             'amqp://guest:guest@localhost:5672',
           ),
         ],

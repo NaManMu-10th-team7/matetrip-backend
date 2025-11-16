@@ -6,10 +6,16 @@ import { Post } from './entities/post.entity';
 import { PostParticipation } from '../post-participation/entities/post-participation.entity';
 import { Workspace } from '../workspace/entities/workspace.entity';
 import { BinaryContentModule } from '../binary-content/binary-content.module';
+import { BinaryContent } from '../binary-content/entities/binary-content.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Post, PostParticipation, Workspace]),
+    TypeOrmModule.forFeature([
+      Post,
+      PostParticipation,
+      Workspace,
+      BinaryContent,
+    ]),
     BinaryContentModule,
   ],
   controllers: [PostController],

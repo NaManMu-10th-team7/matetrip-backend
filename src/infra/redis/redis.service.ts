@@ -40,7 +40,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       // 연결된 클라이언트 정리
       await Promise.all(
         [this.client, this.pubClient, this.subClient].map((instance) =>
-          instance.isOpen ? instance.disconnect() : Promise.resolve(),
+          instance.isOpen ? instance.quit() : Promise.resolve(),
         ),
       );
 
