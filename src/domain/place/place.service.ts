@@ -12,6 +12,8 @@ import { GetPopularPlacesResDto } from './dto/get-popular-places-res.dto.js';
 import { GetBehaviorBasedRecommendationReqDto } from './dto/get-behavior-based-recommendation-req.dto.js';
 import { GetBehaviorBasedRecommendationResDto } from './dto/get-behavior-based-recommendation-res.dto.js';
 import { RecommendationReasonDto } from './dto/recommendation-reason.dto.js';
+import { UserBehaviorEventRepository } from '../user_behavior/user_behavior_event.repository.js';
+import { GetPlaceIdWithTimeDto } from './dto/get-placeId-with-time.dto.js';
 
 @Injectable()
 export class PlaceService {
@@ -19,6 +21,7 @@ export class PlaceService {
     @InjectRepository(Place)
     private readonly placeRepo: Repository<Place>,
     private readonly profileService: ProfileService,
+    private readonly userBehaviorEventRepo: UserBehaviorEventRepository,
   ) {}
 
   async getPlaceById(id: string): Promise<GetPlacesResDto> {
@@ -36,10 +39,6 @@ export class PlaceService {
       northEastLatitude,
       northEastLongitude,
     } = dto;
-    console.log('southWestLatitude', southWestLatitude);
-    console.log('southWestLongitude', southWestLongitude);
-    console.log('northEastLatitude', northEastLatitude);
-    console.log('northEastLongitude', northEastLongitude);
 
     const places: Place[] = await this.placeRepo.find({
       where: {
@@ -178,8 +177,7 @@ export class PlaceService {
 
   /**
    * @description 사용자의 최근 행동 데이터를 기반으로 유사한 장소를 추천합니다.
-   * @param dto - userId, page, limit
-   * @returns GetBehaviorBasedRecommendationResDto[] - 추천 장소 목록 (추천 이유 포함)
+   * @returns 추천 장소 목록 (추천 이유 포함)
    */
   async getBehaviorBasedRecommendation(
     dto: GetBehaviorBasedRecommendationReqDto,
@@ -194,70 +192,58 @@ export class PlaceService {
     }
 
     // 2. 관심 보인 장소들과 유사한 장소 추천 (카테고리 다양성 고려)
-    const recommendations = await this.findSimilarPlacesWithDiversity(
-      interestedPlaces,
-      limit,
-    );
-
-    return recommendations;
+    return await this.findSimilarPlacesWithDiversity(interestedPlaces, limit);
   }
 
   /**
    * 최근 N일간 사용자가 관심 보인 장소들을 조회합니다.
+   * 이벤트를 기준으로 조회합니다.
    * - POI_SCHEDULE (일정에 추가)
    * - POI_MARK (마크)
-   * 이벤트를 기준으로 조회합니다.
    */
   private async getRecentInterestedPlaces(
     userId: string,
     recentDays: number,
   ): Promise<Place[]> {
-    const sinceDate = new Date();
-    sinceDate.setDate(sinceDate.getDate() - recentDays);
+    // 1. 최근 관심 장소의 placeId 목록 + 최신 이벤트 시간만 조회
+    const placeIdsWithTime: GetPlaceIdWithTimeDto[] =
+      await this.userBehaviorEventRepo.getRecentInterestedPlaceIds(
+        userId,
+        recentDays,
+        100,
+      );
 
+    // 2. 해당 placeId들에 대한 Place 엔티티 조회 (embedding 있는 것만, 원래 순서 유지)
+    return this.getPlacesByIdsInOrder(placeIdsWithTime);
+  }
+
+  /**
+   * placeId 목록을 받아서 순서를 유지하면서 Place 엔티티 배열로 반환합니다.
+   * embedding이 있는 장소만 반환합니다.
+   */
+  private async getPlacesByIdsInOrder(
+    placeIdsWithTime: GetPlaceIdWithTimeDto[],
+  ): Promise<Place[]> {
+    if (placeIdsWithTime.length === 0) {
+      return [];
+    }
+
+    const placeIds = placeIdsWithTime.map((p) => p.placeId);
+
+    // placeIds에 해당하는 Place들을 조회 (embedding이 있는 것만)
     const places = await this.placeRepo
       .createQueryBuilder('place')
-      .innerJoin(
-        'user_behavior_events',
-        'event',
-        'event.place_id = place.id AND event.user_id = :userId AND event.event_type IN (:...eventTypes) AND event.created_at >= :sinceDate',
-        {
-          userId,
-          eventTypes: ['POI_SCHEDULE', 'POI_MARK'],
-          sinceDate,
-        },
-      )
-      .select('place.*')
-      .addSelect('event.created_at', 'event_created_at')
-      .orderBy('event.created_at', 'DESC')
-      .getRawMany<{
-        place_id: string;
-        place_category: string;
-        place_title: string;
-        place_address: string;
-        place_summary?: string;
-        place_image_url?: string;
-        place_longitude: number;
-        place_latitude: number;
-        place_embedding: number[] | null;
-      }>();
+      .where('place.id IN (:...placeIds)', { placeIds })
+      .andWhere('place.embedding IS NOT NULL')
+      .getMany();
 
-    // Place 엔티티로 변환 (embedding이 있는 것만 반환)
-    return places
-      .filter((raw) => raw.place_embedding !== null)
-      .map((raw) => {
-        const place = new Place();
-        place.id = raw.place_id;
-        place.category = raw.place_category;
-        place.title = raw.place_title;
-        place.address = raw.place_address;
-        place.summary = raw.place_summary ?? '';
-        place.image_url = raw.place_image_url;
-        place.longitude = raw.place_longitude;
-        place.latitude = raw.place_latitude;
-        place.embedding = raw.place_embedding;
-        return place;
-      });
+    // id -> Place 매핑
+    const placeMap: Map<string, Place> = new Map(places.map((p) => [p.id, p]));
+
+    // 원래 latestEventAt 순서를 유지하면서 Place 배열 구성
+    return placeIdsWithTime
+      .map(({ placeId }) => placeMap.get(placeId))
+      .filter((p): p is Place => !!p);
   }
 
   /**
