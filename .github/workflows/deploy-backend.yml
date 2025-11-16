@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted     # 방금 설치한 EC2 러너
+    runs-on: [self-hosted, backend]     # 방금 설치한 EC2 러너
     concurrency:
       group: deploy-backend
       cancel-in-progress: true
