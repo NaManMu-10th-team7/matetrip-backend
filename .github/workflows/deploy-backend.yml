@@ -15,3 +15,4 @@ jobs:
     steps:
       - name: Deploy backend on EC2
         run: bash /home/ssm-user/app/matetrip-backend/deploy.sh
+
