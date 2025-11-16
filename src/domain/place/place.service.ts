@@ -17,6 +17,15 @@ export class PlaceService {
     private readonly placeRepo: Repository<Place>,
     private readonly profileService: ProfileService,
   ) {}
+
+  async getPlaceById(id: string): Promise<GetPlacesResDto> {
+    const place: Place | null = await this.placeRepo.findOneBy({ id });
+    if (!place) {
+      throw new NotFoundException(`Place not found ${id}`);
+    }
+    return GetPlacesResDto.from(place);
+  }
+
   async getPlacesInBounds(dto: GetPlacesReqDto): Promise<GetPlacesResDto[]> {
     const {
       southWestLatitude,
