@@ -185,7 +185,10 @@ export class PlaceService {
     const { userId, limit = 10 } = dto;
 
     // 1. 최근 10일간 사용자가 관심 보인 장소들을 조회
-    const interestedPlaces = await this.getRecentInterestedPlaces(userId, 10);
+    const interestedPlaces: Place[] = await this.getRecentInterestedPlaces(
+      userId,
+      10,
+    );
 
     if (interestedPlaces.length === 0) {
       return [];
@@ -210,7 +213,7 @@ export class PlaceService {
       await this.userBehaviorEventRepo.getRecentInterestedPlaceIds(
         userId,
         recentDays,
-        100,
+        10,
       );
 
     // 2. 해당 placeId들에 대한 Place 엔티티 조회 (embedding 있는 것만, 원래 순서 유지)
@@ -249,88 +252,161 @@ export class PlaceService {
   /**
    * 관심 보인 장소들과 유사한 장소를 찾기
    * 카테고리 다양성을 고려하여 추천
+   *
+   * 관심 장소들의 평균 임베딩을 계산하여 한 번의 쿼리로 유사 장소를 조회합니다.
    */
   private async findSimilarPlacesWithDiversity(
     interestedPlaces: Place[],
     limit: number,
   ): Promise<GetBehaviorBasedRecommendationResDto[]> {
+    // 1. 관심 장소들의 평균 임베딩 계산
+    const avgEmbedding = this.calculateAverageEmbedding(interestedPlaces);
+    if (!avgEmbedding) {
+      return [];
+    }
+
+    // 2. 평균 임베딩과 유사한 장소를 한 번에 조회 (여유있게)
+    const interestedPlaceIds = new Set(interestedPlaces.map((p) => p.id));
+    const embeddingString = `[${avgEmbedding.join(', ')}]`;
+
+    const candidatePlaces = await this.placeRepo
+      .createQueryBuilder('p')
+      .where('p.embedding IS NOT NULL')
+      .orderBy('p.embedding <=> :embedding', 'ASC')
+      .setParameters({ embedding: embeddingString })
+      .limit(limit * 5) // 충분한 후보 확보 (필터링 고려)
+      .getMany();
+
+    // 3. 카테고리 다양성을 고려하여 추천 목록 구성
     const recommendations: GetBehaviorBasedRecommendationResDto[] = [];
     const recommendedPlaceIds = new Set<string>();
     const categoryCount = new Map<string, number>();
 
-    // 각 관심 장소에 대해 유사한 장소 찾기
-    for (const interestedPlace of interestedPlaces) {
+    for (const candidatePlace of candidatePlaces) {
       if (recommendations.length >= limit) {
         break;
       }
 
-      const similarPlaces = await this.findSimilarPlaces(
-        interestedPlace,
-        limit,
+      // 관심 보인 장소 자체는 제외
+      if (interestedPlaceIds.has(candidatePlace.id)) {
+        continue;
+      }
+
+      // 이미 추천한 장소는 제외
+      if (recommendedPlaceIds.has(candidatePlace.id)) {
+        continue;
+      }
+
+      // 같은 카테고리가 너무 많으면 건너뛰기 (다양성 확보)
+      const currentCategoryCount =
+        categoryCount.get(candidatePlace.category) || 0;
+      if (currentCategoryCount >= Math.ceil(limit / 3)) {
+        continue;
+      }
+
+      // 추천 이유: 가장 유사한 관심 장소 찾기
+      const mostSimilarPlace = this.findMostSimilarPlace(
+        candidatePlace,
+        interestedPlaces,
       );
 
-      // 카테고리 다양성을 고려하여 추천 목록에 추가
-      for (const similarPlace of similarPlaces) {
-        if (recommendations.length >= limit) {
-          break;
-        }
+      const reason = new RecommendationReasonDto({
+        id: mostSimilarPlace.id,
+        title: mostSimilarPlace.title,
+      });
 
-        // 이미 추천한 장소는 제외
-        if (recommendedPlaceIds.has(similarPlace.id)) {
-          continue;
-        }
+      recommendations.push(
+        GetBehaviorBasedRecommendationResDto.from(candidatePlace, reason),
+      );
 
-        // 관심 보인 장소 자체는 제외
-        const isInterestedPlace = interestedPlaces.some(
-          (p) => p.id === similarPlace.id,
-        );
-        if (isInterestedPlace) {
-          continue;
-        }
-
-        // 같은 카테고리가 너무 많으면 건너뛰기 (다양성 확보)
-        const currentCategoryCount =
-          categoryCount.get(similarPlace.category) || 0;
-        if (currentCategoryCount >= Math.ceil(limit / 3)) {
-          continue;
-        }
-
-        // 추천 목록에 추가
-        const reason = new RecommendationReasonDto({
-          id: interestedPlace.id,
-          title: interestedPlace.title,
-        });
-
-        recommendations.push(
-          GetBehaviorBasedRecommendationResDto.from(similarPlace, reason),
-        );
-
-        recommendedPlaceIds.add(similarPlace.id);
-        categoryCount.set(similarPlace.category, currentCategoryCount + 1);
-      }
+      recommendedPlaceIds.add(candidatePlace.id);
+      categoryCount.set(candidatePlace.category, currentCategoryCount + 1);
     }
 
     return recommendations;
   }
 
   /**
-   * 특정 장소와 임베딩 유사도가 높은 장소들을 조회합니다.
+   * 장소들의 평균 임베딩을 계산합니다.
    */
-  private async findSimilarPlaces(
-    referencePlace: Place,
-    limit: number,
-  ): Promise<Place[]> {
-    if (!referencePlace.embedding) {
-      return [];
+  private calculateAverageEmbedding(places: Place[]): number[] | null {
+    const validEmbeddings = places
+      .map((p) => p.embedding)
+      .filter((e): e is number[] => !!e && e.length > 0);
+
+    if (validEmbeddings.length === 0) {
+      return null;
     }
 
-    const embeddingString = `[${referencePlace.embedding.join(', ')}]`;
+    const embeddingLength = validEmbeddings[0].length;
+    const sumVector = new Array(embeddingLength).fill(0);
 
-    return await this.placeRepo
-      .createQueryBuilder('p')
-      .orderBy('p.embedding <=> :embedding', 'ASC')
-      .setParameters({ embedding: embeddingString })
-      .limit(limit * 3) // 여유있게 조회 (필터링 고려)
-      .getMany();
+    for (const embedding of validEmbeddings) {
+      for (let i = 0; i < embeddingLength; i++) {
+        sumVector[i] += embedding[i];
+      }
+    }
+
+    return sumVector.map((val) => val / validEmbeddings.length);
+  }
+
+  /**
+   * 후보 장소와 가장 유사한 관심 장소를 찾습니다.
+   * (추천 이유를 위해 사용)
+   */
+  private findMostSimilarPlace(
+    candidatePlace: Place,
+    interestedPlaces: Place[],
+  ): Place {
+    if (!candidatePlace.embedding || interestedPlaces.length === 0) {
+      return interestedPlaces[0];
+    }
+
+    let mostSimilar = interestedPlaces[0];
+    let maxSimilarity = -1;
+
+    for (const interestedPlace of interestedPlaces) {
+      if (!interestedPlace.embedding) continue;
+
+      const similarity = this.calculateCosineSimilarity(
+        candidatePlace.embedding,
+        interestedPlace.embedding,
+      );
+
+      if (similarity > maxSimilarity) {
+        maxSimilarity = similarity;
+        mostSimilar = interestedPlace;
+      }
+    }
+
+    return mostSimilar;
+  }
+
+  /**
+   * 두 벡터 간의 코사인 유사도를 계산합니다.
+   * @returns -1 ~ 1 사이의 값 (1에 가까울수록 유사)
+   */
+  private calculateCosineSimilarity(vec1: number[], vec2: number[]): number {
+    if (vec1.length !== vec2.length) {
+      return -1;
+    }
+
+    let dotProduct = 0;
+    let magnitude1 = 0;
+    let magnitude2 = 0;
+
+    for (let i = 0; i < vec1.length; i++) {
+      dotProduct += vec1[i] * vec2[i];
+      magnitude1 += vec1[i] * vec1[i];
+      magnitude2 += vec2[i] * vec2[i];
+    }
+
+    const magnitude = Math.sqrt(magnitude1) * Math.sqrt(magnitude2);
+
+    if (magnitude === 0) {
+      return -1;
+    }
+
+    return dotProduct / magnitude;
   }
 }
