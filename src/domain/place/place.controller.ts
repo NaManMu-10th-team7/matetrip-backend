@@ -5,6 +5,8 @@ import { GetPlacesResDto } from './dto/get-places-res.dto.js';
 import { GetPersonalizedPlacesByRegionReqDto } from './dto/get-personalized-places-by-region-req-dto.js';
 import { GetPopularPlacesReqDto } from './dto/get-popular-places-req.dto.js';
 import { GetPopularPlacesResDto } from './dto/get-popular-places-res.dto.js';
+import { GetBehaviorBasedRecommendationReqDto } from './dto/get-behavior-based-recommendation-req.dto.js';
+import { GetBehaviorBasedRecommendationResDto } from './dto/get-behavior-based-recommendation-res.dto.js';
 
 @Controller('places')
 export class PlaceController {
