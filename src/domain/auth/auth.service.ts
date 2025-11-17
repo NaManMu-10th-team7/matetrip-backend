@@ -104,7 +104,7 @@ export class AuthService {
     }
 
     if (profile.travelStyles?.length) {
-      payload.travelTendencyTypes = profile.travelStyles;
+      payload.travelStyleTypes = profile.travelStyles;
     }
 
     if (profile.tendency?.length) {

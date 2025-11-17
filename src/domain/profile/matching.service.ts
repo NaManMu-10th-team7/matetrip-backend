@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { MatchRequestDto } from './dto/match-request.dto';
 import {
   MatchCandidateDto,
@@ -39,7 +39,7 @@ interface MatchCandidatesResult {
   query: MatchRequestDto;
 }
 
-const DEFAULT_LIMIT = 5;
+const DEFAULT_LIMIT = 150;
 const VECTOR_WEIGHT = 0.3;
 const STYLE_WEIGHT = 0.25;
 const MBTI_WEIGHT = 0.25;
@@ -291,24 +291,126 @@ export class MatchingService {
     userId: string,
     matchRequestDto: MatchRequestDto,
   ): Promise<MatchResponseDto> {
-    // 추천 사용자 계산 + 각 사용자별 최신 모집글을 붙여서 돌려준다.
-    const { matches, query } = await this.buildMatchCandidatesResult(
-      userId,
-      matchRequestDto,
-    );
+    const requesterProfile = await this.profileRepository.findOne({
+      where: { user: { id: userId } },
+      relations: { user: true },
+    });
 
-    const recruitingPostMap = await this.loadRecruitingPostMap(
-      matches.map((candidate) => candidate.userId),
-    );
+    if (!requesterProfile) {
+      throw new NotFoundException('요청한 사용자의 프로필을 찾을 수 없습니다.');
+    }
 
-    const matchesWithPosts = matches.map((candidate) => ({
-      ...candidate,
-      recruitingPost: recruitingPostMap.get(candidate.userId) ?? null,
-    }));
+    if (!requesterProfile.profileEmbedding) {
+      throw new BadRequestException(
+        '요청한 사용자의 임베딩 정보가 아직 준비되지 않았습니다.',
+      );
+    }
+
+    const baseTravelStyles = requesterProfile.travelStyles ?? [];
+    const baseTravelTendencies = requesterProfile.tendency ?? [];
+
+    const qb = this.postRepository
+      .createQueryBuilder('post')
+      .innerJoinAndSelect('post.writer', 'writer')
+      .innerJoinAndSelect('writer.profile', 'profile')
+      .where('writer.id != :userId', { userId })
+      .andWhere('post.status = :status', { status: PostStatus.RECRUITING })
+      .andWhere('profile.profile_embedding IS NOT NULL')
+      .addSelect(
+        'profile.profile_embedding <=> :queryEmbedding',
+        'vectorDistance',
+      )
+      .setParameter(
+        'queryEmbedding',
+        toVectorLiteral(requesterProfile.profileEmbedding),
+      );
+
+    if (matchRequestDto.startDate) {
+      qb.andWhere('post.start_date >= :startDate', {
+        startDate: matchRequestDto.startDate,
+      });
+    }
+    if (matchRequestDto.endDate) {
+      qb.andWhere('post.end_date <= :endDate', {
+        endDate: matchRequestDto.endDate,
+      });
+    }
+    if (matchRequestDto.locationQuery) {
+      qb.andWhere(
+        '(post.location ILIKE :location OR post.title ILIKE :location)',
+        {
+          location: `%${matchRequestDto.locationQuery.trim()}%`,
+        },
+      );
+    }
+    if (matchRequestDto.keywords?.length) {
+      qb.andWhere('post.keywords && :keywords', {
+        keywords: matchRequestDto.keywords,
+      });
+    }
+    if (matchRequestDto.limit) {
+      qb.take(matchRequestDto.limit);
+    }
+
+    const { raw, entities: posts } = await qb.getRawAndEntities();
+    const rawEntries = raw as Array<{
+      vectorDistance?: string | number | null;
+    }>;
+
+    const grouped = new Map<
+      string,
+      {
+        profile: Profile;
+        posts: MatchRecruitingPostDto[];
+        vectorDistance: number;
+      }
+    >();
+
+    posts.forEach((post, index) => {
+      const writer = post.writer;
+      const profile = writer?.profile;
+      if (!writer || !profile) {
+        return;
+      }
+      const dto = this.toRecruitingPostDto(post);
+      const vectorDistance = Number(rawEntries[index]?.vectorDistance ?? 0);
+      const entry = grouped.get(writer.id);
+      if (entry) {
+        entry.posts.push(dto);
+      } else {
+        grouped.set(writer.id, {
+          profile,
+          posts: [dto],
+          vectorDistance,
+        });
+      }
+    });
+
+    const matches = Array.from(grouped.entries())
+      .map(([writerId, { profile, posts, vectorDistance }]) => {
+        const row: RawMatchRow = {
+          userId: writerId,
+          travelStyles: profile.travelStyles,
+          travelTendencies: profile.tendency,
+          vectorDistance,
+          mbti: profile.mbtiTypes ?? null,
+        };
+        const candidate = this.toMatchCandidate(
+          row,
+          baseTravelStyles,
+          baseTravelTendencies,
+          requesterProfile.mbtiTypes ?? null,
+        );
+        return {
+          ...candidate,
+          recruitingPosts: posts,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
 
     return {
-      query,
-      matches: matchesWithPosts,
+      query: matchRequestDto,
+      matches,
     };
   }
 
@@ -375,12 +477,10 @@ export class MatchingService {
         .subQuery()
         .select('1')
         .from(Post, 'post')
-        .where('post.writer_id = profile.user_id') //매칭 후보가 모집 중 글을 올렸는지를 가리는 필터
-        .andWhere('post.status = :recruitingStatus') //게시글이 모집중인지 구별하는 필터
+        .where('post.writer_id = profile.user_id')
         .getQuery();
       return `EXISTS ${subQuery}`;
     });
-    qb.setParameter('recruitingStatus', PostStatus.RECRUITING);
 
     //겹치는 항목이 하나라도 있어야 해당
     // if (filterTravelStyles.length > 0) {
@@ -557,42 +657,6 @@ export class MatchingService {
       MBTI_WEIGHT * mbtiScore;
     const adjustedScore = weightedScore + SCORE_OFFSET;
     return Math.min(adjustedScore, SCORE_CAP);
-  }
-
-  /**
-   * 추천된 사용자들의 ID 목록을 입력으로 받아, 각 사용자별 최신 모집중 게시글 1개를 찾아 매핑한다.
-   */
-  private async loadRecruitingPostMap(
-    userIds: string[],
-  ): Promise<Map<string, MatchRecruitingPostDto>> {
-    const map = new Map<string, MatchRecruitingPostDto>();
-    if (!userIds.length) {
-      return map;
-    }
-
-    // 추천된 사용자 집합 안에서 "모집 중" 상태인 게시글만 싹 모아서 사용자별로 한 건씩 매칭한다.
-    const posts = await this.postRepository.find({
-      where: {
-        writer: { id: In(userIds) },
-        status: PostStatus.RECRUITING,
-      },
-      relations: { writer: true },
-      //order: { createdAt: 'DESC' }를 걸어 최신 글부터 내려받음
-      order: { createdAt: 'DESC' },
-    });
-
-    for (const post of posts) {
-      const writerId = post.writer?.id;
-      //Map 자료구조는 map.has(key)로 해당 키가 등록돼 있는지 O(1)로 검사
-      if (!writerId || map.has(writerId)) {
-        // 사용자마다 최신 글 한 건만 노출하고 싶으므로 이미 맵에 있다면 스킵
-        continue;
-      }
-      // 아직 등록되지 않은 사용자라면 최신 글을 DTO로 변환해 등록
-      map.set(writerId, this.toRecruitingPostDto(post));
-    }
-    //키는 userId, 값은 해당 사용자의 최신 모집 중 게시글 DTO
-    return map;
   }
 
   private toRecruitingPostDto(post: Post): MatchRecruitingPostDto {

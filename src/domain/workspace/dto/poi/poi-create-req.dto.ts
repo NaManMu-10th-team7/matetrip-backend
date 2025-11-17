@@ -24,6 +24,10 @@ export class PoiCreateReqDto {
   @IsUUID()
   planDayId?: string;
 
+  @IsNotEmpty()
+  @IsUUID()
+  placeId: string;
+
   @Type(() => Number)
   @IsNumber()
   longitude: number;

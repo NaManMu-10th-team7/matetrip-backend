@@ -8,6 +8,7 @@ export interface CachedPoi {
   workspaceId: string;
   planDayId?: string;
   createdBy: string;
+  placeId: string;
   placeName: string;
   longitude: number;
   latitude: number;
@@ -17,13 +18,14 @@ export interface CachedPoi {
   isPersisted: boolean;
 }
 
-export const buildCachedPoiFromCreateDto = (
+export const buildToCachedPoiFromCreateDto = (
   dto: PoiCreateReqDto,
 ): CachedPoi => ({
   id: dto.poiId ?? randomUUID(),
   workspaceId: dto.workspaceId,
   planDayId: dto.planDayId,
   createdBy: dto.createdBy,
+  placeId: dto.placeId,
   placeName: dto.placeName,
   longitude: dto.longitude,
   latitude: dto.latitude,
@@ -41,6 +43,7 @@ export const buildCachedPoiFromEntity = (
   workspaceId,
   planDayId: poi.planDay?.id,
   createdBy: poi.createdBy.id,
+  placeId: poi.place.id,
   longitude: poi.longitude,
   latitude: poi.latitude,
   address: poi.address,

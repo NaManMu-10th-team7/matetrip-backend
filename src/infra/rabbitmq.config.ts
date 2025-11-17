@@ -8,11 +8,8 @@ export const RabbitMQConfig = ClientsModule.registerAsync([
     useFactory: (configService: ConfigService) => ({
       transport: Transport.RMQ,
       options: {
-        urls: [
-          configService.get<string>('RABBITMQ_URL') ??
-            'amqp://guest:guest@localhost:5672',
-        ],
-        queue: configService.get<string>('RABBITMQ_PROFILE_QUEUE'),
+        urls: [configService.getOrThrow<string>('AWS_RABBITMQ_URL')],
+        queue: configService.getOrThrow<string>('RABBITMQ_PROFILE_QUEUE'),
         queueOptions: {
           durable: true,
         },
@@ -27,11 +24,8 @@ export const RabbitMQConfig = ClientsModule.registerAsync([
     useFactory: (configService: ConfigService) => ({
       transport: Transport.RMQ,
       options: {
-        urls: [
-          configService.get<string>('RABBITMQ_URL') ??
-            'amqp://guest:guest@localhost:5672',
-        ],
-        queue: configService.get<string>('RABBITMQ_BEHAVIOR_QUEUE'),
+        urls: [configService.getOrThrow<string>('AWS_RABBITMQ_URL')],
+        queue: configService.getOrThrow<string>('RABBITMQ_BEHAVIOR_QUEUE'),
         queueOptions: {
           durable: true,
         },
