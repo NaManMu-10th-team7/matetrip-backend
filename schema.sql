@@ -369,7 +369,10 @@ ALTER TABLE poi
         FOREIGN KEY (plan_day_id) REFERENCES plan_day (id) ON DELETE CASCADE,
     ADD CONSTRAINT fk_poi_creator
         FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE restrict,
-    ADD CONSTRAINT uq_poi_schedule UNIQUE (plan_day_id, sequence);
+    ADD CONSTRAINT uq_poi_schedule 
+        UNIQUE (plan_day_id, sequence);
+    ADD CONSTRAINT fk_poi_place 
+        FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE SET NULL;
 
 
 -- ALTER TABLE poi_connection
@@ -398,11 +401,7 @@ ALTER TABLE follow
         FOREIGN KEY (following_id) REFERENCES users (id) ON DELETE CASCADE,
     ADD CONSTRAINT chk_not_self CHECK ( follower_id <> following_id );
 
-ALTER TABLE poi
-    ADD CONSTRAINT fk_poi_place FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE SET NULL;
-    
         
-
 CREATE UNIQUE INDEX idx_unique_schedule
     on poi (plan_day_id, sequence)
     where sequence > 0;
@@ -455,7 +454,6 @@ ALTER TABLE user_behavior_events
     ADD CONSTRAINT fk_user_behavior_events_plan_day FOREIGN KEY (plan_day_id) REFERENCES plan_day (id) ON DELETE SET NULL,
     ADD CONSTRAINT fk_user_behavior_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspace (id) ON DELETE SET NULL;
 
-
 -- user_behavior_events 인덱스
 CREATE INDEX idx_user_behavior_events_user_created ON user_behavior_events(user_id, created_at DESC);
 CREATE INDEX idx_user_behavior_events_type ON user_behavior_events(event_type);
@@ -464,3 +462,14 @@ CREATE INDEX idx_user_behavior_events_place ON user_behavior_events(place_id);
 -- user_behavior_embeddings 인덱스
 -- ivfflat 인덱스는 데이터가 충분히 쌓인 후 생성 (최소 1000개 벡터 권장)
 -- CREATE INDEX idx_behavior_embedding ON user_behavior_embeddings USING ivfflat (behavior_embedding vector_cosine_ops) WITH (lists = 100);
+
+-- 공간 인덱싱용 
+ALTER TABLE places                                                                                                                                                       │
+    ADD COLUMN location GEOGRAPHY(POINT, 4326);   
+
+UPDATE places                                                                                                                                                            │
+    SET location = ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography                                                                                            │
+    WHERE latitude IS NOT NULL AND longitude IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_places_location                                                                                                                                         │
+    ON places USING GIST(location);  

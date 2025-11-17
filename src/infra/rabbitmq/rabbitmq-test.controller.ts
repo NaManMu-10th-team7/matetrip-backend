@@ -25,7 +25,7 @@ export class RabbitmqController {
       userId: '0c77142e-5fa1-41f4-9a6a-07d80709b660',
       placeId: '2a56ea65-fa1d-4359-80fe-101096665ba5',
       eventType: BehaviorEventType.POI_MARK,
-      timestamp: new Date(),
+      createdAt: new Date(),
       weight: 3.0,
       workspaceId: '531c4952-0c80-43ad-ba47-e086d5961677',
     };
