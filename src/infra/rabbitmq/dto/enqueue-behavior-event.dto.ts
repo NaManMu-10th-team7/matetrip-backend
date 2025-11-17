@@ -22,7 +22,7 @@ export class EnqueueBehaviorEventDto {
   userId: string;
   placeId: string;
   eventType: BehaviorEventType;
-  timestamp: Date;
+  createdAt: Date;
   weight: number;
   plandayId?: string;
   workspaceId?: string;
@@ -42,7 +42,7 @@ export class EnqueueBehaviorEventDto {
     dto.userId = cachedPoi.createdBy;
     dto.placeId = placeId || cachedPoi.id; // placeId가 있으면 사용, 없으면 poi.id 사용
     dto.eventType = eventType;
-    dto.timestamp = new Date();
+    dto.createdAt = new Date();
     dto.weight = BEHAVIOR_EVENT_WEIGHTS[eventType];
     dto.plandayId = cachedPoi.planDayId;
     dto.workspaceId = cachedPoi.workspaceId;

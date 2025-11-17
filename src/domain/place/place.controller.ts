@@ -1,23 +1,16 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { PlaceService } from './place.service';
-import { GetPlacesReqDto } from './dto/get-places-req.dto.js';
 import { GetPlacesResDto } from './dto/get-places-res.dto.js';
 import { GetPersonalizedPlacesByRegionReqDto } from './dto/get-personalized-places-by-region-req-dto.js';
 import { GetPopularPlacesReqDto } from './dto/get-popular-places-req.dto.js';
 import { GetPopularPlacesResDto } from './dto/get-popular-places-res.dto.js';
 import { GetBehaviorBasedRecommendationReqDto } from './dto/get-behavior-based-recommendation-req.dto.js';
 import { GetBehaviorBasedRecommendationResDto } from './dto/get-behavior-based-recommendation-res.dto.js';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('places')
 export class PlaceController {
   constructor(private readonly placeService: PlaceService) {}
-
-  // TODO : Event Driven으로 바꾸기
-  @Get()
-  getPlacesInBounds(@Query() dto: GetPlacesReqDto): Promise<GetPlacesResDto[]> {
-    console.log('dto', dto);
-    return this.placeService.getPlacesInBounds(dto);
-  }
 
   /**
    * 목표 : 현재 places테이블의 데이터 중 addplace_id, title, address, image_url 반환하기
@@ -55,6 +48,7 @@ export class PlaceController {
    * @returns GetBehaviorBasedRecommendationResDto[] - 추천 장소 목록 (추천 이유 포함)
    */
   @Get('/recommendation/behavior')
+  @UseGuards(AuthGuard('jwt'))
   async getBehaviorBasedRecommendation(
     @Query() dto: GetBehaviorBasedRecommendationReqDto,
   ): Promise<GetBehaviorBasedRecommendationResDto[]> {
