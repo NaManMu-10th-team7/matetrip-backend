@@ -21,7 +21,6 @@ import { UserResponseDto } from '../users/dto/user-response.dto';
 import { SearchPostDto } from './dto/search-post.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { MatchingService } from '../profile/matching.service';
-import { PostWithMatchesResponseDto } from './dto/post-response.dto.js';
 import { MatchRequestDto } from '../profile/dto/match-request.dto';
 
 import { Request } from 'express';
@@ -72,21 +71,40 @@ export class PostController {
   // }
 
   @Get(':id')
-  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard('jwt'))
   async getOne(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() matchRequestDto: MatchRequestDto,
-  ): Promise<PostWithMatchesResponseDto> {
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req?: Request & { user: { id: string } },
+    @Query() matchRequestDto?: MatchRequestDto,
+  ): Promise<PostResponseDto> {
     const post = await this.postService.findOne(id);
-    const writerId = post.writer.id;
+    const isWriter = req?.user.id === post.writer.id;
 
-    const matchResult = await this.matchingService.findMatchesWithAllUsers(
-      writerId,
-      matchRequestDto ?? {},
-    );
+    post.matchResult = isWriter
+      ? await this.matchingService.findMatchesWithAllUsers(
+          post.writer.id,
+          matchRequestDto ?? {},
+        )
+      : null;
 
-    return { post, matchResult };
+    return post;
   }
+
+  // @Get(':id')
+  // @HttpCode(HttpStatus.OK)
+  // async getOne(
+  //   @Param('id', new ParseUUIDPipe()) id: string,
+  //   @Req() req?: Request & { user?: { id: string } },
+  // ): Promise<PostWithMatchesResponseDto> {
+  //   const post = await this.postService.findOne(id);
+  //   const requesterId = req?.user?.id;
+  //   const isWriter = requesterId === post.writer.id;
+  //   //작성자 일때만 매칭 정보 뜨게
+  //   const matchResult = isWriter
+  //     ? await this.matchingService.findMatchesWithAllUsers(post.writer.id)
+  //     : null;
+  //   return { post, matchResult };
+  // }
 
   @Get('workspace/:workspaceId/members')
   @HttpCode(HttpStatus.OK)

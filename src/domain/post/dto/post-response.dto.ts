@@ -68,16 +68,11 @@ export class PostResponseDto {
   imageId?: string;
 
   @Expose()
+  matchResult: MatchCandidateDto[] | null;
+
+  @Expose()
   @Type(() => SimplePostParticipationResponseDto)
   @ValidateNested({ each: true })
   @IsArray()
   participations: SimplePostParticipationResponseDto[];
-}
-
-export class PostWithMatchesResponseDto {
-  @Expose()
-  post: PostResponseDto;
-
-  @Expose()
-  matchResult: MatchCandidateDto[];
 }
