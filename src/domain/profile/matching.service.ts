@@ -40,6 +40,7 @@ interface MatchCandidatesResult {
 }
 
 const DEFAULT_LIMIT = 150;
+const POST_DEFAULT_LIMIT = 4;
 const VECTOR_WEIGHT = 0.3;
 const STYLE_WEIGHT = 0.25;
 const MBTI_WEIGHT = 0.25;
@@ -276,6 +277,7 @@ export class MatchingService {
     private readonly titanEmbeddingService: TitanEmbeddingService,
   ) {}
 
+  //전체 유저에서 나와 맞는 유저를 가진 게시글 찾기
   async findMatches(
     userId: string,
     matchRequestDto: MatchRequestDto,
@@ -287,6 +289,69 @@ export class MatchingService {
     return matches;
   }
 
+  //전체 유저에서 나와 맞는 유저 찾기
+  async findMatchesWithAllUsers(
+    userId: string,
+    matchRequestDto: MatchRequestDto,
+  ): Promise<MatchCandidateDto[]> {
+    const requesterProfile = await this.profileRepository.findOne({
+      where: { user: { id: userId } },
+      relations: { user: true },
+    });
+
+    if (!requesterProfile) {
+      throw new NotFoundException('요청한 사용자의 프로필을 찾을 수 없습니다.');
+    }
+
+    if (!requesterProfile.profileEmbedding) {
+      throw new BadRequestException(
+        '요청한 사용자의 임베딩 정보가 아직 준비되지 않았습니다.',
+      );
+    }
+    //MatchRequestDto에서 보낸게 없으면 profile 데이터에서 찾아옴 =baseTravelStyles,baseTravelTendencies
+    const baseTravelStyles = requesterProfile.travelStyles ?? [];
+    const baseTravelTendencies = requesterProfile.tendency ?? [];
+
+    const limit = matchRequestDto.limit ?? POST_DEFAULT_LIMIT;
+
+    const qb = this.profileRepository
+      .createQueryBuilder('profile')
+      .select('profile.user_id', 'userId')
+      .addSelect('profile.travel_styles', 'travelStyles')
+      .addSelect('profile.tendency', 'travelTendencies')
+      .addSelect('profile.mbti', 'mbti')
+      .addSelect(
+        'profile.profile_embedding <=> :queryEmbedding',
+        'vectorDistance',
+      )
+      .where('profile.user_id != :userId', {
+        userId,
+      })
+      .andWhere('profile.profile_embedding IS NOT NULL')
+      .orderBy('profile.profile_embedding <=> :queryEmbedding', 'ASC')
+      .limit(limit)
+      .setParameter(
+        'queryEmbedding',
+        toVectorLiteral(requesterProfile.profileEmbedding),
+      );
+
+    const rawCandidates = await qb.getRawMany<RawMatchRow>();
+    // raw result -> 가중치 기반 점수 계산 -> 점수 내림차순 정렬
+    const matches = rawCandidates
+      .map((row) =>
+        this.toMatchCandidate(
+          row,
+          baseTravelStyles,
+          baseTravelTendencies,
+          requesterProfile.mbtiTypes ?? null,
+        ),
+      )
+      .sort((a, b) => b.score - a.score);
+
+    return matches;
+  }
+
+  //전체글에서 필터링한 글들 유저성향이 나와 가장 맞는 사람들부터 보여주기
   async findMatchesWithRecruitingPosts(
     userId: string,
     matchRequestDto: MatchRequestDto,

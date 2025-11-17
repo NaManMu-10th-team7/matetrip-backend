@@ -20,11 +20,17 @@ import { PostResponseDto } from './dto/post-response.dto.js';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { SearchPostDto } from './dto/search-post.dto';
 import { AuthGuard } from '@nestjs/passport';
+import { MatchingService } from '../profile/matching.service';
+import { PostWithMatchesResponseDto } from './dto/post-response.dto.js';
+import { MatchRequestDto } from '../profile/dto/match-request.dto';
 
 import { Request } from 'express';
 @Controller('posts')
 export class PostController {
-  constructor(private readonly postService: PostService) {}
+  constructor(
+    private readonly postService: PostService,
+    private readonly matchingService: MatchingService,
+  ) {}
 
   @Post()
   @UseGuards(AuthGuard('jwt'))
@@ -57,12 +63,29 @@ export class PostController {
     return this.postService.findPostsByUserId(userId); // 기존 findMyPosts 함수 재활용
   }
 
+  // @Get(':id')
+  // @HttpCode(HttpStatus.OK)
+  // async getOne(
+  //   @Param('id', new ParseUUIDPipe()) id: string,
+  // ): Promise<PostResponseDto> {
+  //   return this.postService.findOne(id);
+  // }
+
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async getOne(
     @Param('id', new ParseUUIDPipe()) id: string,
-  ): Promise<PostResponseDto> {
-    return this.postService.findOne(id);
+    @Body() matchRequestDto: MatchRequestDto,
+  ): Promise<PostWithMatchesResponseDto> {
+    const post = await this.postService.findOne(id);
+    const writerId = post.writer.id;
+
+    const matchResult = await this.matchingService.findMatchesWithAllUsers(
+      writerId,
+      matchRequestDto ?? {},
+    );
+
+    return { post, matchResult };
   }
 
   @Get('workspace/:workspaceId/members')

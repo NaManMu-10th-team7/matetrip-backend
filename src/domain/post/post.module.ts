@@ -7,6 +7,7 @@ import { PostParticipation } from '../post-participation/entities/post-participa
 import { Workspace } from '../workspace/entities/workspace.entity';
 import { BinaryContentModule } from '../binary-content/binary-content.module';
 import { BinaryContent } from '../binary-content/entities/binary-content.entity';
+import { ProfileModule } from '../profile/profile.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { BinaryContent } from '../binary-content/entities/binary-content.entity'
       BinaryContent,
     ]),
     BinaryContentModule,
+    ProfileModule,
   ],
   controllers: [PostController],
   providers: [PostService],

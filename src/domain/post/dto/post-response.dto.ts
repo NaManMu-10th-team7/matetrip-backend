@@ -12,6 +12,7 @@ import {
 import { PostStatus } from '../entities/post-status.enum';
 import { KeywordType } from '../entities/keywords-type.enum';
 import { UserResponseDto } from '../../users/dto/user-response.dto';
+import { MatchCandidateDto } from 'src/domain/profile/dto/match-response.dto';
 import { SimplePostParticipationResponseDto } from '../../post-participation/dto/simple-post-participation-response.dto';
 
 export class PostResponseDto {
@@ -71,4 +72,12 @@ export class PostResponseDto {
   @ValidateNested({ each: true })
   @IsArray()
   participations: SimplePostParticipationResponseDto[];
+}
+
+export class PostWithMatchesResponseDto {
+  @Expose()
+  post: PostResponseDto;
+
+  @Expose()
+  matchResult: MatchCandidateDto[];
 }
