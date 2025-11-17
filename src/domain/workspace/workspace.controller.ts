@@ -33,11 +33,10 @@ export class WorkspaceController {
   }
 
   @Post('generate-ai-plan')
-  async generatePlan(
-    @Param('userId') userId: string,
-    @Body() createPlanDto: PlanReqDto,
-  ) {
-    return this.workspaceService.createAiPlan(userId, createPlanDto);
+  async generatePlan(@Body() createPlanDto: PlanReqDto) {
+    return this.workspaceService.getConsensusRecommendedAccommodations(
+      createPlanDto,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -81,28 +80,11 @@ export class WorkspaceController {
   }
 
   /**
-   * 워크스페이스에 연결된 게시글의 모든 참여자 ID를 조회합니다.
-   */
-  @Get(':workspaceId/participants')
-  async getParticipantUserIds(@Param('workspaceId') workspaceId: string) {
-    return this.workspaceService.getParticipantUserIds(workspaceId);
-  }
-
-  /**
    * 워크스페이스 참여자 모두의 성향을 종합하여 장소를 추천합니다.
    */
   @Get(':workspaceId/recommendations')
-  async getConsensusRecommendations(
-    @Param('workspaceId') workspaceId: string,
-    @Query('region') region: RegionGroup,
-  ) {
-    // TODO: 현재 post에는 region 이 아니라 location 으로 되어 있음.
-    // - 추후에 location을 region 중에서 선택하게 할 것이므로
-    // - 일단은 workspaceId 로 post 를 검색하고, 그 post에 있는 location 을 region 으로 전달해서 처리하기
-    return this.workspaceService.getConsensusRecommendations(
-      workspaceId,
-      region,
-    );
+  async getConsensusRecommendations(@Param('workspaceId') workspaceId: string) {
+    return this.workspaceService.getConsensusRecommendations(workspaceId);
   }
 
   /**
