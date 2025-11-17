@@ -24,7 +24,7 @@ export class EmbeddingMatchingProfileDto {
   @ArrayUnique() // 같은 값이 있으면 에러 반환
   @ArrayNotEmpty()
   @IsEnum(TravelStyleType, { each: true })
-  travelTendencyTypes?: TravelStyleType[];
+  travelStyleTypes?: TravelStyleType[];
 
   @IsOptional()
   @IsArray()

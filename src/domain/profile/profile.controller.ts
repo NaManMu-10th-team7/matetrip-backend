@@ -10,6 +10,7 @@ import {
   Req,
   UseGuards,
   ParseUUIDPipe,
+  Query,
   Logger,
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
@@ -51,6 +52,19 @@ export class ProfileController {
       userId,
       profile,
     };
+  }
+
+  @Get('matching/detailsearch')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  matchingsearchPosts(
+    @Req() req: RequestWithUser,
+    @Query() matchRequestDto: MatchRequestDto,
+  ) {
+    return this.matchingService.findMatchesWithRecruitingPosts(
+      req.user.id,
+      matchRequestDto,
+    );
   }
 
   @Get()
