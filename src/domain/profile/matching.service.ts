@@ -477,10 +477,12 @@ export class MatchingService {
         .subQuery()
         .select('1')
         .from(Post, 'post')
-        .where('post.writer_id = profile.user_id')
+        .where('post.writer_id = profile.user_id') //매칭 후보가 모집 중 글을 올렸는지를 가리는 필터
+        .andWhere('post.status = :recruitingStatus') //게시글이 모집중인지 구별하는 필터
         .getQuery();
       return `EXISTS ${subQuery}`;
     });
+    qb.setParameter('recruitingStatus', PostStatus.RECRUITING);
 
     //겹치는 항목이 하나라도 있어야 해당
     // if (filterTravelStyles.length > 0) {
