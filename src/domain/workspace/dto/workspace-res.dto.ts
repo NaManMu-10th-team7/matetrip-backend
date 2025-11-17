@@ -11,6 +11,10 @@ export class WorkspaceResDto {
 export class PlanReqDto {
   @IsString()
   @IsNotEmpty()
+  workspaceId: string;
+
+  @IsString()
+  @IsNotEmpty()
   region: string;
 
   @IsString()

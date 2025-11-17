@@ -38,6 +38,7 @@ export class PlaceController {
     console.log('테스트');
     return this.placeService.getPersonalizedPlaces(dto);
   }
+
   /**
    * @description 지역 그룹 목록을 조회합니다.
    * @author Hugo
