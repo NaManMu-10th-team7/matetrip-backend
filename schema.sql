@@ -14,6 +14,8 @@ DROP TABLE IF EXISTS post;
 DROP TABLE IF EXISTS profile;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS binary_content;
+DROP TABLE IF EXISTS place_review;
+DROP TABLE IF EXISTS places;
 
 DROP TYPE IF EXISTS keyword_type;
 DROP TYPE IF EXISTS gender;
@@ -24,7 +26,17 @@ DROP TYPE IF EXISTS travel_style_type;
 DROP TYPE IF EXISTS poi_status;
 DROP TYPE if exists mbti_type;
 
-
+CREATE TYPE region_group_type AS ENUM (
+    '서울',
+    '경기도',
+    '인천',
+    '강원',
+    '부산',
+    '경상',
+    '전라도',
+    '충청',
+    '제주도'
+);
 CREATE TYPE keyword_type AS ENUM (
     '도심/야경 위주',
     '자연 위주',
@@ -172,7 +184,7 @@ CREATE TABLE IF NOT EXISTS post
     id               UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
     writer_id        UUID        NOT NULL,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    -- image_id  UUID ON DELETE SET NULL,
+    image_id  UUID,
     title            TEXT        NOT NULL,
     content          TEXT        NOT NULL,
     status           post_status NOT NULL DEFAULT '모집중',
@@ -217,6 +229,7 @@ CREATE TABLE IF NOT EXISTS poi
     plan_day_id  UUID             NOT NULL,
     created_by   UUID             NOT NULL,
     created_at   TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+    place_id     UUID             NULL,
     place_name   TEXT             NOT NULL,
     longitude    DOUBLE PRECISION NOT NULL,
     latitude     DOUBLE PRECISION NOT NULL,
@@ -272,10 +285,51 @@ CREATE TABLE IF NOT EXISTS notification
 
 CREATE TABLE IF NOT EXISTS follow
 (
-    id           uuid PRIMARY KEY     DEFAULT gen_random_uuid(),
-    follower_id  uuid        NOT NULL,
-    following_id uuid        NOT NULL,
+    id           UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
+    follower_id  UUID        NOT NULL,
+    following_id UUID        NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+CREATE TABLE places 
+(
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    title TEXT NOT NULL,
+    address TEXT NOT NULL,
+    region_group region_group_type NOT NULL,
+    sido TEXT,
+    category TEXT NULL,
+    tags jsonb NULL, -- Optional[list[str]] → jsonb (AI 생성 태그)
+    summary TEXT NULL, -- 리뷰 기반 AI 요약
+    image_url TEXT NULL, -- 장소 대표 이미지 URL
+    longitude DOUBLE PRECISION NOT NULL,
+    latitude DOUBLE PRECISION NOT NULL,
+    embedding VECTOR(1024) NULL, -- 장소 대표 임베딩 (리뷰 기반),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now () ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now ()
+);
+
+-- 리뷰 테이블
+CREATE TABLE place_review 
+(
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
+    place_id UUID NOT NULL,
+    content TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    embedding vector (1024) NULL, -- 리뷰 임베딩 (검색 정확도 향상용)
+    is_deleted boolean DEFAULT false NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now () NOT NULL
+);
+
+CREATE TABLE place_user_review
+(
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
+    place_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    content TEXT NOT NULL,
+    rating NUMERIC(2, 1) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now () NOT NULL
 );
 
 -- ========= 2) ALTER TABLE: UNIQUE  =========
@@ -304,8 +358,8 @@ ALTER TABLE profile_embedding
 ALTER TABLE post
     ADD CONSTRAINT fk_post_writer
         FOREIGN KEY (writer_id) REFERENCES users (id) ON DELETE RESTRICT;
--- ADD CONSTRAINT fk_post_image 나중에 추가하기
---     FOREIGN KEY (image_id) REFERENCES binary_content (id) ON DELETE SET NULL;
+    ADD CONSTRAINT fk_post_image
+        FOREIGN KEY (image_id) REFERENCES binary_content (id) ON DELETE SET NULL;
 
 ALTER TABLE workspace
     ADD CONSTRAINT fk_workspace_post
@@ -326,8 +380,16 @@ ALTER TABLE poi
         FOREIGN KEY (plan_day_id) REFERENCES plan_day (id) ON DELETE CASCADE,
     ADD CONSTRAINT fk_poi_creator
         FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE restrict,
-    ADD CONSTRAINT uq_poi_schedule UNIQUE (plan_day_id, sequence);
+    ADD CONSTRAINT uq_poi_schedule 
+        UNIQUE (plan_day_id, sequence),
+    ADD CONSTRAINT fk_poi_place 
+        FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE SET NULL;
 
+ALTER TABLE place_user_review
+    ADD CONSTRAINT fk_place_user_review_place
+        FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE CASCADE,
+    ADD CONSTRAINT fk_place_user_review_user
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE;
 
 -- ALTER TABLE poi_connection
 --     ADD CONSTRAINT fk_conn_prev FOREIGN KEY (prev_poi_id) REFERENCES poi (id) ON DELETE CASCADE,
@@ -355,7 +417,9 @@ ALTER TABLE follow
         FOREIGN KEY (following_id) REFERENCES users (id) ON DELETE CASCADE,
     ADD CONSTRAINT chk_not_self CHECK ( follower_id <> following_id );
 
-
+ALTER TABLE place_review
+    ADD CONSTRAINT fk_place_review_place FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE CASCADE;
+        
 CREATE UNIQUE INDEX idx_unique_schedule
     on poi (plan_day_id, sequence)
     where sequence > 0;
@@ -373,3 +437,61 @@ CREATE UNIQUE INDEX idx_unique_schedule
 -- CREATE INDEX idx_conn_next                 ON poi_connection(next_poi_id);
 -- CREATE INDEX idx_pp_post                   ON post_participation(post_id);
 -- CREATE INDEX idx_pp_user                   ON post_participation(requester_id);
+
+
+CREATE INDEX CONCURRENTLY idx_review_content_not_null
+    ON place_user_review (id)
+    WHERE content IS NOT NULL;
+
+-- ========= 행동 기반 임베딩 테이블 =========
+-- TODO: 나중에 스크립트 순서 조정 
+DROP TABLE IF EXISTS user_behavior_events;
+DROP TABLE IF EXISTS user_behavior_embeddings;
+
+-- 사용자 행동 이벤트 원본 데이터
+CREATE TABLE user_behavior_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    workspace_id UUID,
+    place_id UUID,
+    plan_day_id UUID,
+    event_type TEXT NOT NULL,  -- POI_MARK, POI_SCHEDULE, POI_UNMARK, POI_UNSCHEDULE
+    weight NUMERIC(5, 2) NOT NULL,    -- 행동 가중치
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- 사용자별 집계된 행동 임베딩
+CREATE TABLE user_behavior_embeddings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    behavior_embedding vector(1024),  -- 행동 기반 임베딩 벡터 (장소 임베딩 가중평균)
+    aggregated_data JSONB,            -- 집계된 통계 데이터 (카테고리별 점수 등)
+    last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    total_events_count INTEGER DEFAULT 0 NOT NULL
+);
+
+ALTER TABLE user_behavior_events
+    ADD CONSTRAINT fk_user_behavior_events_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    ADD CONSTRAINT fk_user_behavior_events_place FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE SET NULL,
+    ADD CONSTRAINT fk_user_behavior_events_plan_day FOREIGN KEY (plan_day_id) REFERENCES plan_day (id) ON DELETE SET NULL,
+    ADD CONSTRAINT fk_user_behavior_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspace (id) ON DELETE SET NULL;
+
+-- user_behavior_events 인덱스
+CREATE INDEX idx_user_behavior_events_user_created ON user_behavior_events(user_id, created_at DESC);
+CREATE INDEX idx_user_behavior_events_type ON user_behavior_events(event_type);
+CREATE INDEX idx_user_behavior_events_place ON user_behavior_events(place_id);
+
+-- user_behavior_embeddings 인덱스
+-- ivfflat 인덱스는 데이터가 충분히 쌓인 후 생성 (최소 1000개 벡터 권장)
+-- CREATE INDEX idx_behavior_embedding ON user_behavior_embeddings USING ivfflat (behavior_embedding vector_cosine_ops) WITH (lists = 100);
+
+-- 공간 인덱싱용 
+ALTER TABLE places 
+    ADD COLUMN location GEOGRAPHY(POINT, 4326);   
+
+UPDATE places
+    SET location = ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography                                                                                            │
+    WHERE latitude IS NOT NULL AND longitude IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_places_location                                                                                                                                         │
+    ON places USING GIST(location);  

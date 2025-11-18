@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -7,7 +8,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Post } from './entities/post.entity.js';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Not, Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto.js';
 import { PostsPageQueryDto } from './dto/list-posts-query.dto.js';
@@ -17,6 +18,12 @@ import { PostParticipation } from '../post-participation/entities/post-participa
 import { PostParticipationStatus } from '../post-participation/entities/post-participation-status';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { Workspace } from '../workspace/entities/workspace.entity.js';
+import { BinaryContent } from '../binary-content/entities/binary-content.entity';
+import { BinaryContentService } from '../binary-content/binary-content.service';
+import { Profile } from '../profile/entities/profile.entity';
+import { Users } from '../users/entities/users.entity';
+import { Transactional } from 'typeorm-transactional';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PostService {
@@ -27,17 +34,44 @@ export class PostService {
     private readonly workspaceRepository: Repository<Workspace>,
     @InjectRepository(PostParticipation)
     private readonly postParticipationRepository: Repository<PostParticipation>,
+    @InjectRepository(BinaryContent)
+    private readonly binaryContentRepository: Repository<BinaryContent>,
+    private readonly binaryContentService: BinaryContentService,
     private readonly dataSource: DataSource,
+    @InjectRepository(Users)
+    private readonly usersRepository: Repository<Users>,
+    private readonly notificationService: NotificationsService,
   ) {}
 
   async create(createPostDto: CreatePostDto, userId: string) {
+    const { imageId, ...rest } = createPostDto;
     const post = this.postRepository.create({
-      ...createPostDto,
+      ...rest,
       writer: { id: userId },
     });
 
+    if (imageId) {
+      const image = await this.binaryContentRepository.findOneBy({
+        id: imageId,
+      });
+      post.image = image; // 여기서 관계를 직접 세팅해야 image_id FK가 들어감
+    }
+
     const savedPost = await this.postRepository.save(post);
     // todo : 워크스페이스 생성
+    try {
+      const writer = await this.usersRepository.findOneBy({ id: userId });
+      if (writer) {
+        const message = '동행 모집 게시글이 작성되었습니다.';
+        await this.notificationService.createAndSaveNotification(
+          writer,
+          message,
+          'notification_success',
+        );
+      }
+    } catch (error) {
+      console.error('Failed to send notification for new post: ', error);
+    }
     return this.toPostResponseDto(savedPost);
   }
 
@@ -46,9 +80,15 @@ export class PostService {
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.writer', 'writer')
       .leftJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('profile.profileImage', 'profileImage')
+      .leftJoinAndSelect('post.image', 'image')
       .leftJoinAndSelect('post.participations', 'participations')
       .leftJoinAndSelect('participations.requester', 'requester')
       .leftJoinAndSelect('requester.profile', 'requesterProfile')
+      .leftJoinAndSelect(
+        'requesterProfile.profileImage',
+        'requesterProfileImage',
+      )
       .orderBy('post.createdAt', 'DESC')
       .getMany();
 
@@ -59,10 +99,11 @@ export class PostService {
     const foundedPost = await this.postRepository.findOne({
       where: { id },
       relations: {
-        writer: { profile: true },
+        image: true,
+        writer: { profile: { profileImage: true } },
         participations: {
           requester: {
-            profile: true,
+            profile: { profileImage: true },
           },
         },
       },
@@ -84,12 +125,13 @@ export class PostService {
     const result = await this.postRepository.find({
       where: { writer: { id: userId } },
       relations: {
+        image: true,
         writer: {
-          profile: true,
+          profile: { profileImage: true },
         },
         participations: {
           requester: {
-            profile: true,
+            profile: { profileImage: true },
           },
         },
       },
@@ -106,19 +148,26 @@ export class PostService {
     const writtenPosts = await this.postRepository.find({
       where: { writer: { id: userId } },
       relations: {
-        writer: { profile: true },
-        participations: { requester: { profile: true } },
+        image: true,
+        writer: { profile: { profileImage: true } },
+        participations: { requester: { profile: { profileImage: true } } },
       },
     });
 
     const participatedPosts = await this.postParticipationRepository
       .createQueryBuilder('participation')
       .leftJoinAndSelect('participation.post', 'post')
+      .leftJoinAndSelect('post.image', 'postImage')
       .leftJoinAndSelect('post.writer', 'writer')
       .leftJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('profile.profileImage', 'writerProfileImage')
       .leftJoinAndSelect('post.participations', 'postParticipations')
       .leftJoinAndSelect('postParticipations.requester', 'requester')
       .leftJoinAndSelect('requester.profile', 'requesterProfile')
+      .leftJoinAndSelect(
+        'requesterProfile.profileImage',
+        'requesterProfileImage',
+      )
       .where('participation.requester.id = :userId', { userId })
       .getMany();
 
@@ -132,26 +181,78 @@ export class PostService {
     return uniquePosts.map((post) => this.toPostResponseDto(post));
   }
 
+  @Transactional()
   async update(id: string, userId: string, dto: UpdatePostDto) {
     const post = await this.postRepository.findOne({
       where: { id: id, writer: { id: userId } },
+      relations: ['image'],
     });
     if (!post) {
       throw new NotFoundException('Post update failed');
     }
 
-    // dto의 내용을 post 엔티티에 병합합니다.
-    this.postRepository.merge(post, dto);
-    // 변경된 엔티티를 저장합니다.
-    await this.postRepository.save(post);
+    const { imageId, ...textData } = dto;
+
+    // 텍스트/기타 필드 먼저 병합
+    this.postRepository.merge(post, textData);
+
+    const oldImageId = post.image?.id ?? null;
+
+    if (imageId !== undefined) {
+      if (imageId === null) {
+        post.image = null;
+      } else if (imageId !== oldImageId) {
+        const newImage = await this.binaryContentRepository.findOne({
+          where: { id: imageId },
+        });
+
+        if (!newImage) {
+          throw new NotFoundException(
+            `BinaryContent (Image) with ID ${imageId} not found`,
+          );
+        }
+
+        const otherPostUsingImage = await this.postRepository.findOne({
+          where: {
+            image: { id: imageId },
+            id: Not(post.id),
+          },
+        });
+
+        if (otherPostUsingImage) {
+          throw new ForbiddenException(
+            `BinaryContent (Image) with ID ${imageId} is already linked to another post`,
+          );
+        }
+
+        post.image = newImage;
+      }
+      // imageId가 기존 값과 동일하면 아무 작업도 하지 않음
+    }
+
+    const updatedPost = await this.postRepository.save(post);
+    //기존의 이미지 지우는 작업
+    if (oldImageId && oldImageId !== updatedPost.image?.id) {
+      const remainingReferences = await this.postRepository.count({
+        where: { image: { id: oldImageId } },
+      });
+
+      if (remainingReferences === 0) {
+        await this.binaryContentService.deleteFile(oldImageId);
+      }
+    }
+
     // writer 정보를 포함하여 다시 조회한 후 DTO로 변환하여 반환합니다.
     return this.findOne(id);
   }
 
   async remove(id: string, userId: string) {
+    let orphanImageId: string | null = null;
+
     await this.dataSource.transaction(async (transactionalEntityManager) => {
       const post = await transactionalEntityManager.findOne(Post, {
         where: { id, writer: { id: userId } },
+        relations: ['image'],
       });
 
       if (!post) {
@@ -159,6 +260,8 @@ export class PostService {
           'Post delete failed: Post not found or user not authorized',
         );
       }
+
+      const imageId = post.image?.id ?? null;
 
       await transactionalEntityManager.delete(PostParticipation, {
         post: { id },
@@ -172,7 +275,25 @@ export class PostService {
       if (result.affected === 0) {
         throw new NotFoundException('Post delete failed');
       }
+
+      if (imageId) {
+        // 같은 이미지를 다른 게시글이 참조하고 있는지 확인
+        const remainingReferences = await transactionalEntityManager.count(
+          Post,
+          { where: { image: { id: imageId } } },
+        );
+
+        if (remainingReferences === 0) {
+          // 트랜잭션이 끝난 뒤 실제 S3/BinaryContent 정리를 진행한다.
+          orphanImageId = imageId;
+        }
+      }
     });
+
+    if (orphanImageId) {
+      //s3와 binary 에서 삭제 한다
+      await this.binaryContentService.deleteFile(orphanImageId);
+    }
   }
 
   private toPostResponseDto(post: Post | null) {
@@ -192,13 +313,22 @@ export class PostService {
       writer: {
         id: post.writer.id,
         email: post.writer.email,
-        profile: post.writer.profile,
+        profile: this.attachProfileImageId(post.writer.profile),
       },
-      participations: post.participations?.map((p) =>
-        plainToInstance(SimplePostParticipationResponseDto, p, {
-          excludeExtraneousValues: true,
-        }),
-      ),
+      imageId: post.image?.id ?? null,
+      participations: post.participations?.map((p) => {
+        const requesterWithProfileImage = {
+          ...p.requester,
+          profile: this.attachProfileImageId(p.requester?.profile),
+        };
+        return plainToInstance(
+          SimplePostParticipationResponseDto,
+          { ...p, requester: requesterWithProfileImage },
+          {
+            excludeExtraneousValues: true,
+          },
+        );
+      }),
     };
     return plainToInstance(PostResponseDto, postResponse, {
       excludeExtraneousValues: true,
@@ -231,6 +361,8 @@ export class PostService {
     const posts = await queryBuilder
       .leftJoinAndSelect('post.writer', 'writer')
       .leftJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('profile.profileImage', 'writerProfileImage')
+      .leftJoinAndSelect('post.image', 'image')
       .orderBy('post.createdAt', 'DESC')
       // .skip((page - 1) * limit)
       // .take(limit)
@@ -250,11 +382,19 @@ export class PostService {
         post: { id: postId },
         requester: { id: userId },
       },
+      relations: {
+        post: {
+          writer: true,
+        },
+        requester: {
+          profile: true,
+        },
+      },
     });
 
     if (!participation) {
       throw new NotFoundException(
-        '해당하는 동행 신청을 찾을 수 없습니다. (잘못된 postId, participationId 또는 userId)',
+        '해당하는 동행 신청을 찾을 수 없거나 취소할 권한이 없습니다.',
       );
     }
 
@@ -263,6 +403,40 @@ export class PostService {
 
     if (result.affected === 0) {
       throw new BadRequestException('동행 신청 취소에 실패했습니다.');
+    }
+
+    // --- 알림 전송 로직 ---
+    const { post, requester } = participation;
+    const requesterNickname = requester.profile?.nickname ?? '참여자';
+
+    // 1. 게시물 작성자에게 알림 전송
+    try {
+      const messageToWriter = `'${requesterNickname}'님이 '${post.title}' 동행 신청을 취소했습니다.`;
+      await this.notificationService.createAndSaveNotification(
+        post.writer,
+        messageToWriter,
+        'notification_info',
+      );
+    } catch (error) {
+      console.error(
+        'Failed to send cancellation notification to writer:',
+        error,
+      );
+    }
+
+    // 2. 신청자 본인에게 알림 전송
+    try {
+      const messageToRequester = `'${post.title}' 동행 신청을 취소했습니다.`;
+      await this.notificationService.createAndSaveNotification(
+        requester,
+        messageToRequester,
+        'notification_info',
+      );
+    } catch (error) {
+      console.error(
+        'Failed to send cancellation notification to requester:',
+        error,
+      );
     }
   }
 
@@ -286,7 +460,11 @@ export class PostService {
   async getPostMembers(postId: string): Promise<UserResponseDto[]> {
     const post = await this.postRepository.findOne({
       where: { id: postId },
-      relations: ['writer', 'writer.profile'],
+      relations: {
+        writer: {
+          profile: { profileImage: true },
+        },
+      },
     });
 
     if (!post) {
@@ -298,7 +476,11 @@ export class PostService {
         post: { id: postId },
         status: PostParticipationStatus.APPROVED,
       },
-      relations: ['requester', 'requester.profile'],
+      relations: {
+        requester: {
+          profile: { profileImage: true },
+        },
+      },
     });
 
     const author = post.writer;
@@ -308,7 +490,7 @@ export class PostService {
 
     // 작성자와 참여자 목록을 합치고 중복을 제거합니다.
     // Map을 사용하여 id를 키로 중복을 효율적으로 제거합니다.
-    const membersMap = new Map<string, any>();
+    const membersMap = new Map<string, Users>();
     if (author) {
       membersMap.set(author.id, author);
     }
@@ -318,12 +500,58 @@ export class PostService {
       }
     });
 
-    const members = Array.from(membersMap.values());
+    const members = Array.from(membersMap.values()).map((member) => ({
+      ...member,
+      profile: this.attachProfileImageId(member.profile),
+    }));
 
     return members.map((member) =>
       plainToInstance(UserResponseDto, member, {
         excludeExtraneousValues: true,
       }),
     );
+  }
+
+  /**
+   * 게시글 ID를 기반으로 작성자와 승인된 모든 참여자의 사용자 ID 목록을 반환합니다.
+   * @param postId - 게시글의 ID
+   * @returns 사용자 ID의 배열 (중복 제거됨)
+   */
+  async getParticipantIds(postId: string): Promise<string[]> {
+    const post = await this.postRepository.findOne({
+      where: { id: postId },
+      relations: ['writer'], // 작성자 정보 로드
+    });
+
+    if (!post || !post.writer) {
+      throw new NotFoundException(
+        `Post with ID "${postId}" not found or has no writer.`,
+      );
+    }
+
+    const approvedParticipations = await this.postParticipationRepository.find({
+      where: {
+        post: { id: postId },
+        status: PostParticipationStatus.APPROVED,
+      },
+      relations: ['requester'], // 신청자 정보 로드
+    });
+
+    const writerId = post.writer.id;
+    const participantIds = approvedParticipations.map((p) => p.requester.id);
+
+    // 작성자와 참여자 ID를 합치고 Set을 이용해 중복을 제거
+    const allMemberIds = new Set([writerId, ...participantIds]);
+
+    return Array.from(allMemberIds);
+  }
+
+  private attachProfileImageId(profile?: Profile | null): Profile | null {
+    if (!profile) {
+      return null;
+    }
+    return Object.assign(profile, {
+      profileImageId: profile.profileImage?.id ?? null,
+    });
   }
 }

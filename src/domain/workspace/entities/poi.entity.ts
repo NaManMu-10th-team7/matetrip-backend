@@ -3,6 +3,7 @@ import { Users } from '../../users/entities/users.entity';
 import { PlanDay } from './plan-day.entity';
 import { BaseTimestampEntity } from '../../../base.entity';
 import { PoiStatus } from './poi-status.enum.js';
+import { Place } from '../../place/entities/place.entity.js';
 
 @Entity('poi', { schema: 'public' })
 export class Poi extends BaseTimestampEntity {
@@ -13,6 +14,10 @@ export class Poi extends BaseTimestampEntity {
   @ManyToOne(() => PlanDay, { onDelete: 'CASCADE' })
   @JoinColumn([{ name: 'plan_day_id', referencedColumnName: 'id' }])
   planDay: PlanDay;
+
+  @ManyToOne(() => Place, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn([{ name: 'place_id', referencedColumnName: 'id' }])
+  place: Place;
 
   @Column({ type: 'text', name: 'place_name', nullable: false })
   placeName: string;

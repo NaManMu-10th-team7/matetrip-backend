@@ -3,6 +3,7 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
+  IsUUID,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -43,4 +44,8 @@ export class CreatePostDto {
   @IsArray()
   @IsEnum(KeywordType, { each: true })
   keywords?: KeywordType[];
+
+  @IsOptional()
+  @IsUUID()
+  imageId?: string;
 }

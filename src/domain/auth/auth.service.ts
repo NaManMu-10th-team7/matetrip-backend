@@ -5,15 +5,20 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
+import { MatchingService } from '../profile/matching.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UserPayloadDto } from '../users/dto/user.payload.dto';
+import { CreateProfileDto } from '../profile/dto/create-profile.dto';
+import { EmbeddingMatchingProfileDto } from '../profile/dto/embedding-matching-profile.dto';
+import { buildEmbeddingPayloadFromSource } from '../profile/utils/embedding-payload.util';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
+    private readonly matchingService: MatchingService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -56,6 +61,15 @@ export class AuthService {
       // UserService의 create 메서드 호출. 안에서 트랜잭션, 해싱, 중복 검사 모두 일어남
       const newUser = await this.usersService.create(createUserDto);
 
+      //임베딩 처리(임베딩 dto 대로 보냄)
+      const embeddingPayload = buildEmbeddingPayloadFromSource(
+        createUserDto.profile,
+      );
+      await this.matchingService.embeddingMatchingProfile(
+        newUser.id,
+        embeddingPayload,
+      );
+
       return newUser;
     } catch (error) {
       // UserService에서 던진 에러를 여기서 처리
@@ -74,5 +88,29 @@ export class AuthService {
         '회원가입 처리 중 오류가 발생했습니다.',
       );
     }
+  }
+
+  private buildEmbeddingPayload(
+    profile?: CreateProfileDto,
+  ): EmbeddingMatchingProfileDto {
+    const payload: EmbeddingMatchingProfileDto = {};
+    if (!profile) {
+      return payload;
+    }
+
+    if (profile.description?.trim() || profile.intro?.trim()) {
+      payload.description =
+        profile.description?.trim() || profile.intro?.trim();
+    }
+
+    if (profile.travelStyles?.length) {
+      payload.travelStyleTypes = profile.travelStyles;
+    }
+
+    if (profile.tendency?.length) {
+      payload.travelTendencies = profile.tendency;
+    }
+
+    return payload;
   }
 }

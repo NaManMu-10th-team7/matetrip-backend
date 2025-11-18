@@ -17,6 +17,7 @@ import { PoiCreateReqDto } from '../dto/poi/poi-create-req.dto.js';
 import { WorkspaceService } from '../service/workspace.service.js';
 import { PoiService } from '../service/poi.service.js';
 import { PoiCacheService } from '../service/poi-cache.service.js';
+import { PlaceService } from '../../place/place.service.js';
 import { PoiRemoveReqDto } from '../dto/poi/poi-remove-req.dto.js';
 import { PoiResDto } from '../dto/poi/poi-res.dto.js';
 import { PoiAddScheduleReqDto } from '../dto/poi/poi-add-schedule-req.dto.js';
@@ -24,6 +25,13 @@ import { PoiReorderReqDto } from '../dto/poi/poi-reorder-req.dto.js';
 import { CursorMoveDto } from '../dto/poi/cursor-move.dto.js';
 import { PoiHoverReqDto } from '../dto/poi/poi-hover-req.dto.js';
 import { MapClickReqDto } from '../dto/poi/map-click-req.dto.js';
+import { PlaceFocusReqDto } from '../dto/poi/place-focus-req.dto.js';
+import { RabbitmqProducer } from '../../../infra/rabbitmq/rabbitmq.producer.js';
+import {
+  BehaviorEventType,
+  EnqueueBehaviorEventDto,
+} from '../../../infra/rabbitmq/dto/enqueue-behavior-event.dto.js';
+import { CachedPoi } from '../types/cached-poi.js';
 
 const PoiSocketEvent = {
   JOIN: 'join',
@@ -52,6 +60,8 @@ const PoiSocketEvent = {
   POI_HOVERED: 'poi:hovered',
   MAP_CLICK: 'map:click',
   MAP_CLICKED: 'map:clicked',
+  PLACE_FOCUS: 'place:focus',
+  PLACE_FOCUSED: 'place:focused',
 } as const;
 
 @UsePipes(
@@ -78,6 +88,8 @@ export class PoiGateway {
     private readonly workspaceService: WorkspaceService,
     private readonly poiService: PoiService,
     private readonly poiCacheService: PoiCacheService,
+    private readonly rabbitMQProducer: RabbitmqProducer,
+    private readonly placeService: PlaceService,
   ) {}
 
   @SubscribeMessage(PoiSocketEvent.JOIN)
@@ -131,33 +143,26 @@ export class PoiGateway {
   async handlePoiMark(
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: PoiCreateReqDto,
-  ): Promise<PoiResDto | { error: string }> {
+  ): Promise<void> {
     try {
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
 
       const cachedPoi = await this.workspaceService.cachePoi(data);
 
-      const markedPoi: PoiResDto = PoiResDto.of(cachedPoi);
+      this.server.to(roomName).emit(PoiSocketEvent.MARKED, cachedPoi);
 
-      // 같은 워크스페이스의 모든 클라이언트에게 'marked' 이벤트를 전파합니다.
-      this.server.to(roomName).emit(PoiSocketEvent.MARKED, markedPoi);
+      // 행동 이벤트 전송
+      this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_MARK);
 
       this.logger.debug(
-        `Socket ${socket.id} marked POI ${cachedPoi.id} in workspace ${data.workspaceId}`,
+        `Socket ${socket.id} marked POI in workspace ${data.workspaceId}`,
       );
-
-      // 이벤트를 발생시킨 클라이언트에게 생성된 POI 정보를 응답(ack)으로 보냅니다.
-      return markedPoi;
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Socket ${socket.id} failed to mark POI in workspace ${data.workspaceId}: ${(error as Error).message}`,
+        `Socket ${socket.id} failed to mark POI in workspace ${data.workspaceId}: ${message}`,
       );
-
-      // 에러 발생 시, 이벤트를 발생시킨 클라이언트에게 에러 응답(ack)을 보냅니다.
-      return {
-        error: (error as Error).message || 'Failed to mark POI.',
-      };
     }
   }
 
@@ -169,6 +174,21 @@ export class PoiGateway {
     try {
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
+
+      // 삭제 전에 캐시에서 POI 정보 가져오기 (행동 이벤트용)
+      const cachedPoi: CachedPoi | undefined =
+        await this.poiCacheService.getPoi(data.workspaceId, data.poiId);
+
+      if (!cachedPoi) {
+        this.logger.warn(
+          `Failed to unmark POI ${data.poiId} POI not found in cache`,
+        );
+        return;
+      }
+
+      // UnmarkEvent 전달
+      console.log(`UNMARK Event : ${data.poiId}`);
+      this.sendBehaviorEvent(cachedPoi, BehaviorEventType.POI_UNMARK);
 
       const removedPoi = await this.poiService.removeWorkspacePoi(
         data.workspaceId,
@@ -182,7 +202,10 @@ export class PoiGateway {
         return;
       }
 
-      this.server.to(roomName).emit(PoiSocketEvent.UNMARKED, removedPoi);
+      this.server
+        .to(roomName)
+        .emit(PoiSocketEvent.UNMARKED, { poiId: data.poiId });
+
       this.logger.debug(
         `Socket ${socket.id} unmarked POI ${data.poiId} in workspace ${data.workspaceId}`,
       );
@@ -228,15 +251,26 @@ export class PoiGateway {
         data.poiId,
       );
 
+      const poi: CachedPoi | undefined = await this.poiCacheService.getPoi(
+        data.workspaceId,
+        data.poiId,
+      );
+
+      if (!poi) {
+        this.logger.warn(`Failed to add POI to schedule`);
+        return;
+      }
+
+      // ScheduleEvent 전달
+      this.sendBehaviorEvent(poi, BehaviorEventType.POI_SCHEDULE);
+
       // 모든 클라이언트에 알림
       this.server.to(roomName).emit(PoiSocketEvent.ADD_SCHEDULE, {
         poiId: data.poiId,
         planDayId: data.planDayId,
       });
 
-      this.logger.debug(
-        `Socket ${socket.id} added POI ${data.poiId} to schedule in planDay ${data.planDayId}`,
-      );
+      this.logger.debug(`Added POI to schedule in planDay ${data.planDayId}`);
     } catch (error) {
       this.logger.error(
         `Socket ${socket.id} failed to add POI to schedule`,
@@ -255,6 +289,18 @@ export class PoiGateway {
       this.validateRoomAuth(roomName, socket);
 
       // POI를 MARKED로 전환하고 List에서 제거
+      const poi: CachedPoi | undefined = await this.poiCacheService.getPoi(
+        data.workspaceId,
+        data.poiId,
+      );
+
+      if (!poi) {
+        this.logger.warn(`Failed to remove POI from schedule`);
+        return;
+      }
+
+      // RemoveScheduleEvent 전달
+      this.sendBehaviorEvent(poi, BehaviorEventType.POI_UNSCHEDULE);
       await this.poiCacheService.removeFromSchedule(
         data.workspaceId,
         data.planDayId,
@@ -321,10 +367,6 @@ export class PoiGateway {
       this.validateRoomAuth(roomName, socket);
 
       socket.to(roomName).emit(PoiSocketEvent.CURSOR_MOVED, data);
-
-      this.logger.debug(
-        `Socket ${socket.id} moved cursor in workspace ${data.workspaceId}`,
-      );
     } catch (error) {
       this.logger.error(
         `Socket ${socket.id} failed to move cursor in workspace ${data.workspaceId}`,
@@ -342,20 +384,12 @@ export class PoiGateway {
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
 
-      this.logger.debug(
-        `[POI_HOVER] Received from socket ${socket.id} for workspace ${data.workspaceId}. POI ID: ${data.poiId}, User ID: ${data.userId}`,
-      );
-
       // 자신을 제외한 다른 클라이언트에게만 이벤트 전송
       const payload = {
         poiId: data.poiId,
         userId: data.userId,
       };
       socket.to(roomName).emit(PoiSocketEvent.POI_HOVERED, payload);
-
-      this.logger.debug(
-        `[POI_HOVERED] Emitted to room ${roomName}. Payload: ${JSON.stringify(payload)}`,
-      );
     } catch (error) {
       this.logger.error(
         `Socket ${socket.id} failed to handle POI hover in workspace ${data.workspaceId}`,
@@ -396,68 +430,40 @@ export class PoiGateway {
     }
   }
 
-  // @SubscribeMessage(PoiSocketEvent.POI_CONNECT)
-  // async handlePoiConnection(
-  //   @ConnectedSocket() socket: Socket,
-  //   @MessageBody() data: CreatePoiConnectionReqDto,
-  // ) {
-  //   try {
-  //     const roomName = this.getPoiRoomName(data.workspaceId);
-  //     if (!socket.rooms.has(roomName)) {
-  //       this.logger.warn(
-  //         `Socket ${socket.id} tried to connect without joining ${data.workspaceId}`,
-  //       );
-  //       return;
-  //     }
-
-  //     const cachedPoiConnection =
-  //       await this.workspaceService.cachePoiConnection(data);
-
-  //     this.server
-  //       .to(roomName)
-  //       .emit(PoiSocketEvent.CONNECTED, cachedPoiConnection);
-
-  //     this.logger.debug(
-  //       `Socket ${socket.id} connected to POI connection ${cachedPoiConnection.id}`,
-  //     );
-  //   } catch {
-  //     this.logger.error(
-  //       `Socket ${socket.id} failed to connect to POI connection`,
-  //     );
-  //   }
-  // }
-
-  // @SubscribeMessage(PoiSocketEvent.POI_DISCONNECT)
-  // async handlePoiDisConnection(
-  //   @ConnectedSocket() socket: Socket,
-  //   @MessageBody() data: RemovePoiConnectionReqDto,
-  // ) {
-  //   try {
-  //     const roomName = this.getPoiRoomName(data.workspaceId);
-  //     if (!socket.rooms.has(roomName)) {
-  //       this.logger.warn(
-  //         `Socket ${socket.id} tried to disconnect without joining ${data.workspaceId}`,
-  //       );
-  //       return;
-  //     }
-
-  //     // this.server.to(roomName).emit(PoiSocketEvent.DISCONNECTED, removedId);
-  //   } catch {
-  //     this.logger.error(
-  //       `Socket ${socket.id} failed to disconnect from POI connection`,
-  //     );
-  //   }
-  // }
-
-  /**
-   * Poi 위치를 드래그앤 드랍으로 바꾸는 경우
-   */
-  @SubscribeMessage(PoiSocketEvent.POIDRAG)
-  async handlePoiDrag(
+  @SubscribeMessage(PoiSocketEvent.PLACE_FOCUS)
+  async handlePlaceFocus(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: PoiSocketDto,
-  ) {}
+    @MessageBody() data: PlaceFocusReqDto,
+  ) {
+    try {
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      this.validateRoomAuth(roomName, socket);
 
+      // 지도 bounds 내의 장소 목록 가져오기
+      const places = await this.placeService.getPlacesInBounds({
+        southWestLatitude: data.southWestLatitude,
+        southWestLongitude: data.southWestLongitude,
+        northEastLatitude: data.northEastLatitude,
+        northEastLongitude: data.northEastLongitude,
+      });
+
+      // 요청한 클라이언트에게 장소 목록 반환
+      socket.emit(PoiSocketEvent.PLACE_FOCUSED, {
+        userId: data.userId,
+        userName: data.userName,
+        places,
+      });
+      // TODO : Focus는 특정 클라이언트에만 보내주고 프론트에서 버튼이나 뭐 누르면 그 사용자의 Focus로 가는거
+      this.logger.debug(
+        `[PLACE_FOCUS] User ${data.userName} focused, returned ${places.length} places in bounds`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Socket ${socket.id} failed to handle place focus in workspace ${data.workspaceId}`,
+        error,
+      );
+    }
+  }
   /**
    * Python AI 서버 등 외부에서 호출 가능한 broadcast 메서드
    * Socket 연결 없이 특정 workspace의 모든 클라이언트에게 REORDER 이벤트 전파
@@ -509,6 +515,29 @@ export class PoiGateway {
     }
   }
 
+  /**
+   * 특정 워크스페이스의 모든 클라이언트에게 현재 POI 목록 전체를 브로드캐스트합니다.
+   * @param workspaceId 동기화할 워크스페이스 ID
+   */
+  async broadcastSync(workspaceId: string) {
+    try {
+      const roomName = this.getPoiRoomName(workspaceId);
+      const pois: PoiResDto[] =
+        await this.poiService.getWorkspacePois(workspaceId);
+
+      this.server.to(roomName).emit(PoiSocketEvent.SYNC, { pois });
+
+      this.logger.log(
+        `[BROADCAST_SYNC] Synced ${pois.length} POIs to room: ${roomName}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to broadcast sync for workspace ${workspaceId}`,
+        error,
+      );
+    }
+  }
+
   private getPoiRoomName(workspaceId: string) {
     return `poi:${workspaceId}`;
   }
@@ -517,6 +546,35 @@ export class PoiGateway {
     if (!socket.rooms.has(roomName)) {
       this.logger.warn(`Socket ${socket.id} tried to unmark`);
       throw new UnauthorizedException();
+    }
+  }
+
+  /**
+   * 행동 이벤트를 RabbitMQ에 전송하는 공통 메서드
+   * @param cachedPoi - 캐시된 POI 정보
+   * @param eventType - 행동 이벤트 타입
+   * @param placeId - focus에서 추천받은 place의 ID (옵셔널)
+   */
+  private sendBehaviorEvent(
+    cachedPoi: CachedPoi,
+    eventType: BehaviorEventType,
+  ): void {
+    if (!cachedPoi) {
+      this.logger.warn(`행동 Event 전송 건너뜀: cachedPoi가 없습니다.`);
+      return;
+    }
+
+    const placeId = cachedPoi.placeId;
+    try {
+      const behaviorEvent = EnqueueBehaviorEventDto.fromCachedPoi(
+        cachedPoi,
+        eventType,
+        placeId,
+      );
+      this.rabbitMQProducer.enqueueBehaviorEvent(behaviorEvent);
+      this.logger.debug(`행동 Event 전송 : ${eventType} for place ${placeId}`);
+    } catch (error) {
+      this.logger.error(`행동 Event 전송 실패 : ${eventType}`, error);
     }
   }
 }

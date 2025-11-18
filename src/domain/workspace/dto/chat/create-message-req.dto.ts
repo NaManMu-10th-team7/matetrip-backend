@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateMessageReqDto {
   @IsNotEmpty()
@@ -16,4 +16,8 @@ export class CreateMessageReqDto {
   @IsNotEmpty()
   @IsString()
   message: string;
+
+  @IsOptional()
+  @IsString()
+  tempId?: string;
 }

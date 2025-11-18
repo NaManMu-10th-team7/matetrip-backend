@@ -12,13 +12,16 @@ import { PostParticipationModule } from './domain/post-participation/post-partic
 import { ReviewModule } from './domain/review/review.module';
 import { WorkspaceModule } from './domain/workspace/workspace.module';
 import { AuthModule } from './domain/auth/auth.module';
-import { RedisModule } from './redis/redis.module';
+import { RedisModule } from './infra/redis/redis.module';
 import { NotificationsModule } from './domain/notifications/notifications.module';
 // import { OpenviduModule } from './openvidu/openvidu.module';
-import { MatchingModule } from './domain/matching/matching.module';
 import { AiModule } from './ai/ai.module';
 import { HttpModule } from '@nestjs/axios';
 import { PlaceModule } from './domain/place/place.module';
+import { RabbitmqModule } from './infra/rabbitmq/rabbitmq.module';
+import { ProxyModule } from './domain/proxy/proxy.module';
+import { UserBehaviorModule } from './domain/user_behavior/user_behavior.module';
+import { PlaceUserReviewModule } from './domain/place_user_review/place_user_review.module';
 
 @Module({
   imports: [
@@ -43,9 +46,12 @@ import { PlaceModule } from './domain/place/place.module';
     RedisModule,
     NotificationsModule,
     // OpenviduModule,
-    MatchingModule,
     AiModule,
     PlaceModule,
+    RabbitmqModule,
+    ProxyModule,
+    UserBehaviorModule,
+    PlaceUserReviewModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -7,7 +7,7 @@ import { PlanDay } from './entities/plan-day.entity.js';
 import { PostModule } from '../post/post.module.js';
 import { PoiGateway } from './gateway/poi.gateway.js';
 import { PoiCacheService } from './service/poi-cache.service.js';
-import { RedisModule } from '../../redis/redis.module.js';
+import { RedisModule } from '../../infra/redis/redis.module.js';
 import { Poi } from './entities/poi.entity.js';
 import { PoiService } from './service/poi.service.js';
 import { PlanDayService } from './service/plan-day.service.js';
@@ -20,6 +20,8 @@ import { ReviewModule } from '../review/review.module.js';
 import { AiModule } from '../../ai/ai.module.js';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
+import { PlaceModule } from '../place/place.module';
+import { RabbitmqModule } from '../../infra/rabbitmq/rabbitmq.module.js';
 
 @Module({
   imports: [
@@ -37,6 +39,8 @@ import { ConfigModule } from '@nestjs/config';
     AiModule,
     HttpModule,
     ConfigModule,
+    RabbitmqModule,
+    PlaceModule,
   ],
   controllers: [WorkspaceController],
   providers: [

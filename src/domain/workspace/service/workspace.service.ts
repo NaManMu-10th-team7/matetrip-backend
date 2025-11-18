@@ -1,26 +1,45 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateWorkspaceReqDto } from '../dto/create-workspace-req.dto';
 import { PostService } from '../../post/post.service.js';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Workspace } from '../entities/workspace.entity.js';
 import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
-import { WorkspaceResDto } from '../dto/workspace-res.dto.js';
+import { PlanReqDto, WorkspaceResDto } from '../dto/workspace-res.dto.js';
 import { Transactional } from 'typeorm-transactional';
 import { PlanDay } from '../entities/plan-day.entity.js';
 import { PoiCreateReqDto } from '../dto/poi/poi-create-req.dto.js';
 import { PoiCacheService } from './poi-cache.service.js';
-import { CachedPoi, buildCachedPoiFromCreateDto } from '../types/cached-poi.js';
+import {
+  buildToCachedPoiFromCreateDto,
+  CachedPoi,
+} from '../types/cached-poi.js';
 import { PlanDayService } from './plan-day.service.js';
+import { PoiStatus } from '../entities/poi-status.enum.js';
 import { PoiService } from './poi.service.js';
 import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { lastValueFrom } from 'rxjs';
+import { v4 as uuidv4 } from 'uuid';
 import { AxiosError } from 'axios';
+import { KakaoResponse } from '../types/kakao-document.js';
+import { AiSearchPlaceDto } from '../../../ai/dto/ai-search-place.dto.js';
+import { PlaceService } from 'src/domain/place/place.service';
+import { AiService } from 'src/ai/ai.service';
+import { RegionGroup } from 'src/domain/place/entities/region_group.enum';
+import { differenceInCalendarDays } from 'date-fns';
+import { DailyPlanResDto } from '../dto/daily-plan-recommendation-res.dto';
+import { GetPlacesResDto } from 'src/domain/place/dto/get-places-res.dto';
 
 @Injectable()
 export class WorkspaceService {
+  private readonly logger = new Logger(WorkspaceService.name);
   constructor(
     private readonly postService: PostService,
     @InjectRepository(Workspace)
@@ -32,6 +51,8 @@ export class WorkspaceService {
     private readonly planDayService: PlanDayService,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly placesService: PlaceService,
+    private readonly aiService: AiService,
   ) {}
 
   @Transactional()
@@ -90,9 +111,56 @@ export class WorkspaceService {
   }
 
   async cachePoi(dto: PoiCreateReqDto): Promise<CachedPoi> {
-    const cachedPoi: CachedPoi = buildCachedPoiFromCreateDto(dto);
+    const cachedPoi: CachedPoi = buildToCachedPoiFromCreateDto(dto);
     await this.poiCacheService.upsertPoi(dto.workspaceId, cachedPoi);
     return cachedPoi;
+  }
+
+  /**
+   * AI가 검색한 장소 목록을 받아서 POI로 변환하고 캐시에 저장합니다.
+   * @param workspaceId 워크스페이스 ID
+   * @param places 카카오 지도 API에서 받은 장소 데이터 배열
+   * @returns 생성된 CachedPoi 배열
+   */
+  async markPoisFromSearch(
+    workspaceId: string,
+    places: AiSearchPlaceDto[],
+  ): Promise<CachedPoi[]> {
+    this.logger.debug(
+      `Marking ${places.length} POIs from AI search in workspace ${workspaceId}`,
+    );
+    this.logger.debug(
+      `[DEBUG] markPoisFromSearch received places:`,
+      JSON.stringify(places, null, 2),
+    );
+    const newPois: CachedPoi[] = [];
+
+    for (const place of places) {
+      // PoiCreateReqDto를 생성하는 대신, 서버에서 직접 CachedPoi 객체를 생성합니다.
+      // 이 객체는 buildCachedPoiFromCreateDto의 결과물과 동일한 구조를 가집니다.
+      const newCachedPoi: CachedPoi = {
+        id: uuidv4(),
+        workspaceId,
+        createdBy: '00000000-0000-0000-0000-000000000000', // AI Agent User ID
+        placeId: place.id, // AI가 검색한 장소의 ID
+        placeName: place.name,
+        address: place.address,
+        longitude: place.longitude,
+        latitude: place.latitude,
+        status: PoiStatus.MARKED,
+        sequence: 0,
+        isPersisted: false,
+      };
+
+      this.logger.debug(
+        `[DEBUG] Creating newCachedPoi:`,
+        JSON.stringify(newCachedPoi, null, 2),
+      );
+      await this.poiCacheService.upsertPoi(workspaceId, newCachedPoi);
+      newPois.push(newCachedPoi);
+    }
+    this.logger.log(`Successfully marked ${newPois.length} new POIs.`);
+    return newPois;
   }
 
   async isExist(workspaceId: string): Promise<boolean> {
@@ -173,34 +241,298 @@ export class WorkspaceService {
   // }
 
   async searchPlaces(query: string) {
-    const kakaoKey = this.configService.get<string>('KAKAOMAP_REST_API_KEY');
+    this.logger.log(`Searching places with query: "${query}" by AI agent.`);
+    const kakaoKey = this.configService.get<string>('KAKAO_REST_API_KEY');
     const url = 'https://dapi.kakao.com/v2/local/search/keyword.json';
 
     try {
       const response = await lastValueFrom(
-        this.httpService.get(url, {
+        this.httpService.get<KakaoResponse>(url, {
           headers: { Authorization: `KakaoAK ${kakaoKey}` },
           params: { query: query, size: 10 },
         }),
       );
 
-      console.log('API 호출 성공 ^^!');
+      this.logger.log(
+        `Successfully fetched ${response.data.documents.length} places from Kakao API.`,
+      );
 
-      return response.data.documents.map((place) => ({
+      const mappedPlaces = response.data.documents.map((place) => ({
         name: place.place_name,
         address: place.address_name,
         road_address: place.road_address_name,
         phone: place.phone,
-        x: parseFloat(place.x),
-        y: parseFloat(place.y),
+        longitude: parseFloat(place.x),
+        latitude: parseFloat(place.y),
         url: place.place_url,
         category: place.category_name,
       }));
+
+      this.logger.debug(
+        `[DEBUG] Mapped places for AI:`,
+        JSON.stringify(mappedPlaces, null, 2),
+      );
+      return mappedPlaces;
     } catch (error: unknown) {
+      this.logger.error(`Failed to call Kakao API. Query: ${query}`, error);
       if (error instanceof AxiosError) {
-        console.error('Kakao API Error:', error.response?.data);
+        this.logger.error('Kakao API Error Details:', error.response?.data);
       }
-      throw new Error('Kakao API를 호출하는 중 오류가 발생했습니다.');
+      throw new InternalServerErrorException(
+        '카카오 지도 API 호출 중 오류가 발생했습니다.',
+      );
     }
+  }
+
+  async createAiPlan(userId: string, planDto: PlanReqDto) {
+    console.log(new Date(Date.now()));
+
+    // 1단계 : NestJS가 직접 DB에서 성향 기반 장소 DTO 리스트를 가져옴
+    const recommendedPlaces = await this.placesService.getPersonalizedPlaces({
+      userId,
+      region: planDto.region as RegionGroup,
+    });
+    console.log(new Date(Date.now()));
+
+    if (!recommendedPlaces || recommendedPlaces.length === 0) {
+      throw new Error('추천 장소를 찾을 수 없습니다.');
+    }
+
+    const sendPlaces = recommendedPlaces.map((p) => ({
+      id: p.id,
+      category: p.category,
+      title: p.title,
+      summary: p.summary,
+      longitude: p.longitude,
+      latitude: p.latitude,
+    }));
+
+    // 여행 총 일수 계산 (종료일 - 시작일 + 1)
+    const startDate = new Date(planDto.startDate);
+    const endDate = new Date(planDto.endDate);
+
+    const daysDiff = differenceInCalendarDays(endDate, startDate);
+    const totalDays = daysDiff + 1;
+
+    // 2단계 : AI에게 장소 리스트와 날짜를 전달해 여행 계획 생성
+    const aiResult = await this.aiService.generatePlan(sendPlaces, totalDays);
+
+    console.log(new Date(Date.now()));
+
+    if (aiResult.error) {
+      throw new Error(aiResult.error);
+    }
+
+    // 3단계 : NestJS가 데이터 조립
+    const finalResponse = {
+      recommendations: aiResult.daily_plans.map((day) => {
+        // AI가 준 ID 목록
+        const pois = day.placeIDs.map((id) => {
+          // 원본 DTO 리스트에서 ID로 해당 장소의 전체 정보를 찾음
+          return recommendedPlaces.find((p) => p.id === id);
+        });
+
+        return { pois: pois };
+      }),
+    };
+
+    console.log(new Date(Date.now()));
+
+    // 4단계 : AI가 생성한 텍스트와 원본 장소 데이터를 함께 반환
+    return finalResponse;
+  }
+
+  /**
+   * 워크스페이스의 모든 참여자 성향을 종합하여 장소를 추천합니다.
+   * @param workspaceId - 워크스페이스의 ID
+   * @returns 추천 장소 DTO의 배열
+   */
+  async getConsensusRecommendations(workspaceId: string) {
+    this.logger.log(
+      `Fetching consensus recommendations for workspace: ${workspaceId}`,
+    );
+
+    // 1. 워크스페이스의 모든 참여자 ID를 가져옵니다.
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspaceId },
+      relations: ['post'], // 'post' 관계를 함께 로드합니다.
+    });
+
+    if (!workspace || !workspace.post) {
+      throw new NotFoundException(
+        `Workspace with ID ${workspaceId} or its associated post not found.`,
+      );
+    }
+
+    // PostService를 통해 해당 게시글의 참여자 ID 목록을 가져옵니다.
+    // PostService에 getParticipantIds와 같은 메서드가 구현되어 있어야 합니다.
+    const participantUserIds = await this.postService.getParticipantIds(
+      workspace.post.id,
+    );
+
+    if (!participantUserIds || participantUserIds.length === 0) {
+      this.logger.warn(`No participants found for workspace: ${workspaceId}`);
+      return [];
+    }
+
+    // 2. PlaceService에 사용자 ID 목록을 전달하여 종합 추천 장소를 요청합니다.
+    const placeList = await this.placesService.getConsensusRecommendedPlaces(
+      participantUserIds,
+      workspace.post.location as RegionGroup,
+    );
+
+    // placeList에서 임의로 5개 장소를 선택합니다.
+    const shuffled = [...placeList].sort(() => 0.5 - Math.random());
+    const selectedPlaces = shuffled.slice(0, 5);
+
+    return selectedPlaces;
+  }
+
+  /**
+   * @description 워크스페이스에 연결된 게시글 정보를 조회합니다.
+   * @param workspaceId - 워크스페이스의 ID
+   * @returns 게시글 정보 DTO
+   */
+  async getPostByWorkspaceId(workspaceId: string) {
+    this.logger.log(`Fetching post info for workspace: ${workspaceId}`);
+
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspaceId },
+      relations: ['post'], // 'post' 관계를 함께 로드합니다.
+    });
+
+    if (!workspace || !workspace.post) {
+      throw new NotFoundException(
+        `Workspace with ID ${workspaceId} or its associated post not found.`,
+      );
+    }
+
+    // PostService의 findOne을 사용하여 PostResDto로 변환하여 반환합니다.
+    return this.postService.findOne(workspace.post.id);
+  }
+
+  /**
+   * @description 워크스페이스 참여자 모두의 성향을 종합하여 숙소를 추천합니다.
+   * @param planDto - 여행 기간 및 지역 정보
+   * @returns 추천 숙소 DTO 배열
+   */
+  async getConsensusRecommendedAccommodations(
+    planDto: PlanReqDto,
+  ): Promise<DailyPlanResDto[]> {
+    this.logger.log(
+      `Fetching consensus recommended accommodations for workspace: ${planDto.workspaceId}`,
+    );
+
+    // 1. 총 여행 일수 계산
+    const startDate = new Date(planDto.startDate);
+    const endDate = new Date(planDto.endDate);
+    const totalDays = differenceInCalendarDays(endDate, startDate) + 1;
+
+    if (totalDays <= 0) {
+      return [];
+    }
+
+    // 2. 워크스페이스 참여자 ID 및 지역 정보 조회
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: planDto.workspaceId },
+      relations: ['post'],
+    });
+
+    if (!workspace || !workspace.post) {
+      throw new NotFoundException(
+        `Workspace with ID ${planDto.workspaceId} or its associated post not found.`,
+      );
+    }
+
+    const participantUserIds = await this.postService.getParticipantIds(
+      workspace.post.id,
+    );
+
+    // 3. PlaceService를 통해 그룹의 종합 성향 벡터를 계산합니다.
+    const avgVector =
+      await this.placesService.calculateConsensusVector(participantUserIds);
+
+    if (!avgVector) {
+      return [];
+    }
+
+    // 4. 노이즈를 추가한 벡터로 숙소를 추천받습니다.
+    const noisyVectorForAccommodations = this.addNoiseToVector(avgVector);
+    const accommodations =
+      await this.placesService.getConsensusRecommendedAccommodations(
+        noisyVectorForAccommodations,
+        planDto.region as RegionGroup,
+        totalDays, // 여행 일수만큼 숙소 추천
+      );
+
+    if (accommodations.length === 0) {
+      return [];
+    }
+
+    // 5. 각 숙소에 대해 다른 장소들을 추천받아 일일 계획 생성
+    const dailyPlans: DailyPlanResDto[] = [];
+    const recommendedPlaceIds = new Set<string>(
+      accommodations.map((acc) => acc.id),
+    );
+
+    // '음식', '숙박'을 제외한 추천 가능 카테고리 목록
+    const baseAvailableCategories = ['인문(문화/예술/역사)', '레포츠', '자연'];
+
+    for (const accommodation of accommodations) {
+      const interleavedPlaces: GetPlacesResDto[] = [];
+
+      // 1. 필요한 장소들을 한 번에 요청 (음식 2, 기타 4)
+      const categoriesToRecommend = new Map<string, number>([
+        ['음식', 2],
+        ...baseAvailableCategories.map((cat) => [cat, 4] as [string, number]), // 각 카테고리에서 충분히 가져오기
+      ]);
+
+      // 추천에 다양성을 주기 위해 노이즈 추가
+      const noisyVectorForPois = this.addNoiseToVector(avgVector);
+
+      const placesForDay =
+        await this.placesService.getConsensusRecommendedPlacesForCategories(
+          noisyVectorForPois,
+          planDto.region as RegionGroup,
+          categoriesToRecommend,
+          Array.from(recommendedPlaceIds),
+          accommodation.latitude,
+          accommodation.longitude,
+        );
+
+      // 2. 가져온 장소들을 카테고리별로 분류
+      const foodPlaces = placesForDay.filter((p) => p.category === '음식');
+      const otherPlaces = placesForDay.filter((p) => p.category !== '음식');
+
+      // 3. [장소, 장소, 음식] 순서로 2번 조합
+      for (let i = 0; i < 2; i++) {
+        if (otherPlaces[i * 2]) interleavedPlaces.push(otherPlaces[i * 2]);
+        if (otherPlaces[i * 2 + 1])
+          interleavedPlaces.push(otherPlaces[i * 2 + 1]);
+        if (foodPlaces[i]) interleavedPlaces.push(foodPlaces[i]);
+      }
+
+      // 4. 추천된 장소 ID들을 Set에 추가하여 다음 날 추천에서 제외
+      interleavedPlaces.forEach((p) => recommendedPlaceIds.add(p.id));
+
+      // 5. 마지막에 숙소를 추가
+      interleavedPlaces.push(accommodation);
+
+      dailyPlans.push({ pois: interleavedPlaces });
+    }
+
+    return dailyPlans;
+  }
+
+  /**
+   * @description 임베딩 벡터에 약간의 노이즈를 추가하여 추천 결과에 다양성을 부여합니다.
+   * @param vector 원본 임베딩 벡터
+   * @param noiseLevel 노이즈의 강도 (표준편차)
+   * @returns 노이즈가 추가된 새로운 벡터
+   */
+  private addNoiseToVector(vector: number[], noiseLevel = 0.05): number[] {
+    return vector.map(
+      (value) => value + (Math.random() - 0.5) * 2 * noiseLevel,
+    );
   }
 }

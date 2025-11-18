@@ -2,13 +2,13 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
-import { RedisIoAdapter } from './redis/redis-io.adapter.js';
+import { RedisIoAdapter } from './infra/redis/redis-io.adapter.js';
 import {
   initializeTransactionalContext,
   addTransactionalDataSource,
 } from 'typeorm-transactional';
 import { DataSource } from 'typeorm';
-import { RedisService } from './redis/redis.service.js';
+import { RedisService } from './infra/redis/redis.service.js';
 
 async function bootstrap() {
   initializeTransactionalContext();
@@ -37,7 +37,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       process.env.FRONTEND_URL || 'http://13.125.171.175:5173',
-      'http://localhost:3001'
+      'http://localhost:3001',
     ], // 프론트엔드 주소
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'], // 허용할 HTTP 메서드 (OPTIONS 명시)
     credentials: true, // 쿠키나 인증 헤더(Authorization)를 주고받을 때 필요
@@ -46,6 +46,15 @@ async function bootstrap() {
     preflightContinue: false, // preflight 요청을 자동으로 처리
     optionsSuccessStatus: 204, // OPTIONS 요청 성공 시 상태 코드
   });
+
+  // // RabbitMQ 설정
+  // app.connectMicroservice<MicroserviceOptions>({
+  //   transport: Transport.RMQ,
+  //   options: {
+  //     urls: [process.env.RABBITMQ_URL ?? 'amqp://localhost:5672'],
+  //     queue: process.env.RABBITMQ_QUEUE ?? 'nest-queue',
+  //   },
+  // });
 
   app.use(cookieParser());
 
