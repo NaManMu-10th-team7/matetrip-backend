@@ -285,9 +285,9 @@ CREATE TABLE IF NOT EXISTS notification
 
 CREATE TABLE IF NOT EXISTS follow
 (
-    id           uuid PRIMARY KEY     DEFAULT gen_random_uuid(),
-    follower_id  uuid        NOT NULL,
-    following_id uuid        NOT NULL,
+    id           UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
+    follower_id  UUID        NOT NULL,
+    following_id UUID        NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -295,15 +295,16 @@ CREATE TABLE IF NOT EXISTS follow
 CREATE TABLE places 
 (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    title text NOT NULL,
-    address text NOT NULL,
+    title TEXT NOT NULL,
+    address TEXT NOT NULL,
     region_group region_group_type NOT NULL,
-    category text NULL,
+    sido TEXT,
+    category TEXT NULL,
     tags jsonb NULL, -- Optional[list[str]] → jsonb (AI 생성 태그)
-    summary text NULL, -- 리뷰 기반 AI 요약
-    image_url text NULL, -- 장소 대표 이미지 URL
-    longitude double precision NOT NULL,
-    latitude double precision NOT NULL,
+    summary TEXT NULL, -- 리뷰 기반 AI 요약
+    image_url TEXT NULL, -- 장소 대표 이미지 URL
+    longitude DOUBLE PRECISION NOT NULL,
+    latitude DOUBLE PRECISION NOT NULL,
     embedding VECTOR(1024) NULL, -- 장소 대표 임베딩 (리뷰 기반),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now () ,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now ()
@@ -312,12 +313,21 @@ CREATE TABLE places
 -- 리뷰 테이블
 CREATE TABLE place_review 
 (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    place_id uuid NOT NULL REFERENCES places (id) ON DELETE CASCADE,
-    content text NOT NULL,
-    source_url text NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
+    place_id UUID NOT
+    content TEXT NOT NULL,
+    source_url TEXT NOT NULL,
     embedding vector (1024) NULL, -- 리뷰 임베딩 (검색 정확도 향상용)
     is_deleted boolean DEFAULT false NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now () NOT NULL
+);
+
+CREATE TABLE place_user_review
+(
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
+    place_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    content TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now () NOT NULL
 );
 
@@ -374,6 +384,11 @@ ALTER TABLE poi
     ADD CONSTRAINT fk_poi_place 
         FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE SET NULL;
 
+ALTER TABLE place_user_review
+    ADD CONSTRAINT fk_place_user_review_place
+        FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE CASCADE,
+    ADD CONSTRAINT fk_place_user_review_user
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE;
 
 -- ALTER TABLE poi_connection
 --     ADD CONSTRAINT fk_conn_prev FOREIGN KEY (prev_poi_id) REFERENCES poi (id) ON DELETE CASCADE,
@@ -401,6 +416,8 @@ ALTER TABLE follow
         FOREIGN KEY (following_id) REFERENCES users (id) ON DELETE CASCADE,
     ADD CONSTRAINT chk_not_self CHECK ( follower_id <> following_id );
 
+ALTER TABLE place_review
+    ADD CONSTRAINT fk_place_review_place FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE CASCADE;
         
 CREATE UNIQUE INDEX idx_unique_schedule
     on poi (plan_day_id, sequence)
@@ -420,6 +437,10 @@ CREATE UNIQUE INDEX idx_unique_schedule
 -- CREATE INDEX idx_pp_post                   ON post_participation(post_id);
 -- CREATE INDEX idx_pp_user                   ON post_participation(requester_id);
 
+
+CREATE INDEX CONCURRENTLY idx_review_content_not_null
+    ON place_user_review (id)
+    WHERE content IS NOT NULL;
 
 -- ========= 행동 기반 임베딩 테이블 =========
 -- TODO: 나중에 스크립트 순서 조정 
