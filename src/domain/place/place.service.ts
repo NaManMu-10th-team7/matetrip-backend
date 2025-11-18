@@ -57,9 +57,11 @@ export class PlaceService {
   /**
    * @description 장소 이름으로 장소를 검색하여 ID 목록을 반환합니다. (부분 일치, 대소문자 무시)
    * @param dto - 검색할 장소 이름이 담긴 DTO
-   * @returns string[] - 검색된 장소의 ID 목록
+   * @returns { placeIds: string[] } - 검색된 장소의 ID 목록을 담은 객체
    */
-  async findPlacesByName(dto: SearchPlaceByNameQueryDto): Promise<string[]> {
+  async findPlacesByName(
+    dto: SearchPlaceByNameQueryDto,
+  ): Promise<{ placeIds: string[] }> {
     const { name } = dto;
     const results = await this.placeRepo
       .createQueryBuilder('place')
@@ -80,7 +82,8 @@ export class PlaceService {
       })
       .take(5) // 너무 많은 결과를 방지하기 위해 5개로 제한
       .getRawMany<{ id: string }>();
-    return results.map((result) => result.id);
+
+    return { placeIds: results.map((result) => result.id) };
   }
 
   async getPersonalizedPlaces(

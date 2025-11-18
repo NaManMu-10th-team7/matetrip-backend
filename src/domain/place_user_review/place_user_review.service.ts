@@ -62,7 +62,6 @@ export class PlaceUserReviewService {
     placeId: string,
     query: GetReviewsQueryDto,
   ): Promise<PaginatedReviewsResponseDto> {
-    console.log('in');
     const page = query.page || 1;
     const limit = query.limit || 10;
     const skip = (page - 1) * limit;
