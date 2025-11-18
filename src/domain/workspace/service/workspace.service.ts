@@ -126,7 +126,7 @@ export class WorkspaceService {
     workspaceId: string,
     places: AiSearchPlaceDto[],
   ): Promise<CachedPoi[]> {
-    this.logger.log(
+    this.logger.debug(
       `Marking ${places.length} POIs from AI search in workspace ${workspaceId}`,
     );
     this.logger.debug(
