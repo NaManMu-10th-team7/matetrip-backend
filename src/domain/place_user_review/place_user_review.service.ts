@@ -2,14 +2,14 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PlaceUserReview } from './entities/place_user_review.entity';
 import { CreatePlaceUserReviewDto } from './dto/create-place_user_review.dto';
-import { UpdatePlaceUserReviewDto } from './dto/update-place_user_review.dto';
 import { PlaceUserReviewResponseDto } from './dto/place-user-review-response.dto';
+import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
+import { PaginatedReviewsResponseDto } from './dto/paginated-reviews-response.dto';
 
 @Injectable()
 export class PlaceUserReviewService {
@@ -21,7 +21,6 @@ export class PlaceUserReviewService {
   async create(
     createDto: CreatePlaceUserReviewDto,
   ): Promise<PlaceUserReviewResponseDto> {
-    // 중복 리뷰 체크 - exists 쿼리 사용
     const alreadyExists = await this.placeUserReviewRepo.exists({
       where: {
         place: { id: createDto.placeId },
@@ -71,8 +70,15 @@ export class PlaceUserReviewService {
     return PlaceUserReviewResponseDto.fromEntity(reviewWithUser);
   }
 
-  async findByPlaceId(placeId: string): Promise<PlaceUserReviewResponseDto[]> {
-    const reviews = await this.placeUserReviewRepo.find({
+  async findByPlaceId(
+    placeId: string,
+    query: GetReviewsQueryDto,
+  ): Promise<PaginatedReviewsResponseDto> {
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const [reviews, total] = await this.placeUserReviewRepo.findAndCount({
       where: { place: { id: placeId } },
       relations: ['user', 'user.profile'],
       select: {
@@ -88,15 +94,22 @@ export class PlaceUserReviewService {
         },
       },
       order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
     });
 
-    return reviews.map((review) =>
-      PlaceUserReviewResponseDto.fromEntity(review),
-    );
+    return PaginatedReviewsResponseDto.create(reviews, total, page, limit);
   }
 
-  async findByUserId(userId: string): Promise<PlaceUserReviewResponseDto[]> {
-    const reviews = await this.placeUserReviewRepo.find({
+  async findByUserId(
+    userId: string,
+    query: GetReviewsQueryDto,
+  ): Promise<PaginatedReviewsResponseDto> {
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const [reviews, total] = await this.placeUserReviewRepo.findAndCount({
       where: { user: { id: userId } },
       relations: ['user', 'user.profile', 'place'],
       select: {
@@ -115,11 +128,11 @@ export class PlaceUserReviewService {
         },
       },
       order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
     });
 
-    return reviews.map((review) =>
-      PlaceUserReviewResponseDto.fromEntity(review),
-    );
+    return PaginatedReviewsResponseDto.create(reviews, total, page, limit);
   }
 
   async remove(reviewId: string, userId: string): Promise<void> {
@@ -132,7 +145,7 @@ export class PlaceUserReviewService {
 
     if (!exists) {
       throw new NotFoundException(
-        `Review ${reviewId} not found or user ${userId} is not authorized`,
+        '[Review 제거 실패] ReviewId가 잘못됐거나 허용되지 않는 사용자 입니다.',
       );
     }
 

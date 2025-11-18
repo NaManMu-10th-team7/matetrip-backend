@@ -15,7 +15,7 @@ export class PlaceUserReview extends BaseTimestampEntity {
   @JoinColumn({ name: 'place_id', referencedColumnName: 'id' })
   place: Place;
 
-  @ManyToOne(() => Users, { nullable: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => Users, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
   user: Users;
 

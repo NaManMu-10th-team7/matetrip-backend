@@ -11,12 +11,15 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PlaceUserReviewService } from './place_user_review.service';
 import { CreatePlaceUserReviewDto } from './dto/create-place_user_review.dto';
 import { UpdatePlaceUserReviewDto } from './dto/update-place_user_review.dto';
 import { PlaceUserReviewResponseDto } from './dto/place-user-review-response.dto';
+import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
+import { PaginatedReviewsResponseDto } from './dto/paginated-reviews-response.dto';
 
 @Controller('place-user-reviews')
 export class PlaceUserReviewController {
@@ -35,15 +38,17 @@ export class PlaceUserReviewController {
   @Get('place/:placeId')
   async findByPlaceId(
     @Param('placeId', ParseUUIDPipe) placeId: string,
-  ): Promise<PlaceUserReviewResponseDto[]> {
-    return this.placeUserReviewService.findByPlaceId(placeId);
+    @Query() query: GetReviewsQueryDto,
+  ): Promise<PaginatedReviewsResponseDto> {
+    return this.placeUserReviewService.findByPlaceId(placeId, query);
   }
 
   @Get('user/:userId')
   async findByUserId(
     @Param('userId', ParseUUIDPipe) userId: string,
-  ): Promise<PlaceUserReviewResponseDto[]> {
-    return this.placeUserReviewService.findByUserId(userId);
+    @Query() query: GetReviewsQueryDto,
+  ): Promise<PaginatedReviewsResponseDto> {
+    return this.placeUserReviewService.findByUserId(userId, query);
   }
 
   @UseGuards(AuthGuard('jwt'))
