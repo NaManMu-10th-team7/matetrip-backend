@@ -16,7 +16,7 @@ import { TravelStyleType } from './entities/travel-style-type.enum';
 import { TendencyType } from './entities/tendency-type.enum';
 import { Post } from '../post/entities/post.entity';
 import { PostStatus } from '../post/entities/post-status.enum';
-//import { PostParticipation } from '../post-participation/entities/post-participation.entity';
+import { PostParticipation } from '../post-participation/entities/post-participation.entity.js';
 import { MBTI_TYPES } from './entities/mbti.enum';
 import { EmbeddingMatchingProfileDto } from './dto/embedding-matching-profile.dto';
 import { NovaService } from '../../ai/summaryLLM.service';
@@ -277,15 +277,52 @@ export class MatchingService {
     private readonly titanEmbeddingService: TitanEmbeddingService,
   ) {}
 
+  // 유저별 매칭 정보 + 신청 가능한 모집글 한 건씩 묶어서 반환한다.
   async findMatches(
     userId: string,
     matchRequestDto: MatchRequestDto,
   ): Promise<MatchCandidateDto[]> {
-    const { matches } = await this.buildMatchCandidatesResult(
+    // 유사도 상위 후보를 넉넉하게 불러와서 이후 게시글 필터링으로 탈락해도 원하는 수량을 유지한다.
+    const matchResult = await this.buildMatchCandidatesResult(
       userId,
       matchRequestDto,
     );
-    return matches;
+    const requestedLimit = matchResult.query.limit ?? DEFAULT_LIMIT;
+
+    if (!matchResult.matches.length) {
+      return [];
+    }
+
+    const writerIds = matchResult.matches.map((match) => match.userId);
+    // 사용자가 이미 참가/신청한 게시글은 제외한 뒤, 각 사용자별 대표 모집글을 찾는다.
+    //“각 후보 사용자에게 아직 신청하지 않은 모집글이 있는가?”
+    const recruitingPostMap = await this.fetchAvailableRecruitingPosts(
+      writerIds,
+      userId,
+    );
+    //응답 형식은 MatchCandidateDto에 recruitingPosts 배열을 붙이는 작업
+    const candidatesWithPosts = matchResult.matches
+      .map((candidate) => {
+        const post = recruitingPostMap.get(candidate.userId);
+        if (!post) {
+          // 해당 사용자에게 조건을 만족하는 모집글이 없으면 제외한다.
+          return null;
+        }
+        // 매칭 정보 + 모집글 1건을 묶어서 반환할 DTO로 변환한다.
+        return {
+          ...candidate,
+          recruitingPosts: [this.toRecruitingPostDto(post)],
+        };
+      })
+      .filter(
+        (
+          candidate,
+        ): candidate is MatchCandidateDto & {
+          recruitingPosts: MatchRecruitingPostDto[];
+        } => candidate !== null,
+      );
+
+    return candidatesWithPosts.slice(0, requestedLimit);
   }
 
   async findMatchesWithRecruitingPosts(
@@ -451,6 +488,8 @@ export class MatchingService {
         : baseTravelTendencies;
 
     const limit = matchRequestDto.limit ?? DEFAULT_LIMIT;
+    // 게시글 조건 필터로 탈락할 후보를 대비해 넉넉히 가져온다.
+    const candidateLimit = Math.min(DEFAULT_LIMIT, limit + 15);
 
     const qb = this.profileRepository
       .createQueryBuilder('profile')
@@ -467,7 +506,7 @@ export class MatchingService {
       })
       .andWhere('profile.profile_embedding IS NOT NULL')
       .orderBy('profile.profile_embedding <=> :queryEmbedding', 'ASC')
-      .limit(limit + 10) //백터 기준으로 잘라 버리기에 조금 더 limit 을 크게 둠
+      .limit(candidateLimit) //백터 기준으로 잘라 버리기에 조금 더 limit 을 크게 둠
       .setParameter(
         'queryEmbedding',
         toVectorLiteral(requesterProfile.profileEmbedding),
@@ -483,6 +522,17 @@ export class MatchingService {
         // 현재 모집 중인 글이 하나라도 있는지를 체크한다.
         .andWhere('post.status = :recruitingStatus')
         // 이미 내가 신청/참여한 게시글은 제외해야 하므로 NOT EXISTS로 필터링
+        .andWhere((qb3) => {
+          const participationSubQuery = qb3
+            .subQuery()
+            .select('1')
+            .from(PostParticipation, 'pp')
+            // post_participation에 현재 글 + 내가 신청한 기록이 있으면 제외한다.
+            .where('pp.post_id = post.id')
+            .andWhere('pp.requester_id = :userId')
+            .getQuery();
+          return `NOT EXISTS ${participationSubQuery}`;
+        })
         .getQuery();
       return `EXISTS ${subQuery}`;
     });
@@ -514,10 +564,8 @@ export class MatchingService {
       )
       .sort((a, b) => b.score - a.score);
 
-    const slicedMatches = matches.slice(0, limit);
-
     return {
-      matches: slicedMatches,
+      matches,
       query: {
         ...matchRequestDto,
         limit,
@@ -525,6 +573,49 @@ export class MatchingService {
         travelTendencies: filterTravelTendencies,
       },
     };
+  }
+
+  private async fetchAvailableRecruitingPosts(
+    writerIds: string[],
+    userId: string,
+  ): Promise<Map<string, Post>> {
+    // 후보 사용자별로 아직 신청하지 않은 모집글을 한 건씩 매핑하기 위한 헬퍼
+    if (!writerIds.length) {
+      return new Map();
+    }
+
+    const qb = this.postRepository
+      .createQueryBuilder('post')
+      // 후보 사용자(writer)의 모집 중(post.status=RECRUITING) 게시글만 조회한다.
+      .innerJoinAndSelect('post.writer', 'writer')
+      .where('writer.id IN (:...writerIds)', { writerIds })
+      .andWhere('post.status = :status', { status: PostStatus.RECRUITING })
+      // 내가 작성한 글은 제외한다.
+      .andWhere('post.writer_id != :userId', { userId })
+      // post_participation에서 내가 신청한 기록이 있는 글은 제외한다.
+      .andWhere((qb2) => {
+        const participationSubQuery = qb2
+          .subQuery()
+          .select('1')
+          .from(PostParticipation, 'pp')
+          .where('pp.post_id = post.id')
+          .andWhere('pp.requester_id = :userId')
+          .getQuery();
+        return `NOT EXISTS ${participationSubQuery}`;
+      });
+
+    const posts = await qb.getMany();
+    const map = new Map<string, Post>();
+
+    posts.forEach((post) => {
+      const writerId = post.writer?.id;
+      if (!writerId || map.has(writerId)) {
+        return;
+      }
+      map.set(writerId, post);
+    });
+
+    return map;
   }
 
   private toMatchCandidate(
