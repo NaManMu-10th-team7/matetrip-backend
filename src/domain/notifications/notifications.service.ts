@@ -4,7 +4,6 @@ import { NotificationEventDto } from './dto/notification-event.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Users } from '../users/entities/users.entity';
-import { Post } from '../post/entities/post.entity';
 import { Notification } from './entities/notification.entity';
 import { GetNotificationsDto } from './dto/get-notifications.dto';
 
@@ -79,9 +78,14 @@ export class NotificationsService {
    * 다른 서비스에서 호출
    * 특정 유저에게 실시간 알림 전송
    * @param userId - 알림을 받을 유저의 ID
+   * @param type - 알림 타입 (e.g., 'new_notification', 'new_message')
    * @param data - 전송할 알림 데이터
    */
-  async sendNotification(userId: string, data: NotificationEventDto) {
+  async sendNotification(
+    userId: string,
+    type: string,
+    data: NotificationEventDto,
+  ) {
     // 알림을 받을 유저의 Subject Set을 찾음
     const subjects = this.userSubjects.get(userId);
 
@@ -90,8 +94,8 @@ export class NotificationsService {
       subjects.forEach((subject) => {
         try {
           // MessageEvent 형식에 맞춰 데이터 전송
-          // 'type'을 지정하면 클라이언트에서 addEventListener로 특정 이벤트를 구분 가능
-          subject.next({ type: 'new_notification', data: data });
+          // 'type'을 지정하면 클라이언트에서 addEventListener로 특정 이벤트를 구분 가능합니다.
+          subject.next({ type: type, data: data });
         } catch (error) {
           console.error(
             `Failed to send notification to user ${userId} : `,
@@ -137,10 +141,12 @@ export class NotificationsService {
    * 알림을 생성하고 DB에 저장
    * 실시간 SSE 전송
    */
-  async createAndSaveNotification(recipient: Users, post: Post) {
-    // 1. 알림 메시지 및 URL 생성
-    const message = `'${post.title}' 동행에 참여하고 싶은 사람이 있어요!`;
-
+  async createAndSaveNotification(
+    recipient: Users,
+    message: string,
+    type: string, // type 파라미터 추가
+    // TODO: 나중에 알림 클릭 시 이동할 URL도 받을 수 있도록 파라미터 추가 고려
+  ) {
     // 2. Notification 엔티티 생성
     const newNotification = this.notificationRepository.create({
       user: { id: recipient.id },
@@ -152,9 +158,9 @@ export class NotificationsService {
     const savedNotification =
       await this.notificationRepository.save(newNotification);
 
-    // 4. 실시간 알림 전송 로직 호출
+    // 4. 실시간 SSE 알림 전송
     try {
-      await this.sendNotification(recipient.id, savedNotification);
+      await this.sendNotification(recipient.id, type, savedNotification);
     } catch (error) {
       console.warn(`Failed to send real-time notification: ${error.message}`);
     }
@@ -162,8 +168,8 @@ export class NotificationsService {
     // 5. 뱃지 카운트 갱신
     await this.sendUnreadCountUpdate(recipient.id);
 
-    // 6. 목록 갱신 신호 전송
-    await this.sendListStaleUpdate(recipient.id);
+    // 6. 목록 갱신 신호 전송 (중복 알림 문제로 주석 처리)
+    // await this.sendListStaleUpdate(recipient.id);
 
     return savedNotification;
   }
