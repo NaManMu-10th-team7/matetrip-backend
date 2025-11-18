@@ -44,22 +44,7 @@ export class PlaceUserReviewService {
     const savedReview = await this.placeUserReviewRepo.save(review);
 
     // 저장된 리뷰를 다시 조회 - userId와 nickname만 필요
-    const reviewWithUser = await this.placeUserReviewRepo.findOne({
-      where: { id: savedReview.id },
-      relations: ['user', 'user.profile'],
-      select: {
-        id: true,
-        content: true,
-        rating: true,
-        createdAt: true,
-        user: {
-          id: true,
-          profile: {
-            nickname: true,
-          },
-        },
-      },
-    });
+    const reviewWithUser = await this.findOneWithUser(savedReview.id);
 
     if (!reviewWithUser) {
       throw new NotFoundException(
@@ -163,5 +148,24 @@ export class PlaceUserReviewService {
     );
 
     return PaginatedReviewsResponseDto.create(responseDtos, total, page, limit);
+  }
+
+  private findOneWithUser(id: string): Promise<PlaceUserReview | null> {
+    return this.placeUserReviewRepo.findOne({
+      where: { id },
+      relations: ['user', 'user.profile'],
+      select: {
+        id: true,
+        content: true,
+        rating: true,
+        createdAt: true,
+        user: {
+          id: true,
+          profile: {
+            nickname: true,
+          },
+        },
+      },
+    });
   }
 }

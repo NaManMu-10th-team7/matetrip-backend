@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   ParseUUIDPipe,
@@ -16,7 +15,6 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { PlaceUserReviewService } from './place_user_review.service';
 import { CreatePlaceUserReviewDto } from './dto/create-place_user_review.dto';
-import { UpdatePlaceUserReviewDto } from './dto/update-place_user_review.dto';
 import { PlaceUserReviewResponseDto } from './dto/place-user-review-response.dto';
 import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
 import { PaginatedReviewsResponseDto } from './dto/paginated-reviews-response.dto';
