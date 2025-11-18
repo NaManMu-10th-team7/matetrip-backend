@@ -1,4 +1,3 @@
-import { PlaceUserReview } from '../entities/place_user_review.entity';
 import { PlaceUserReviewResponseDto } from './place-user-review-response.dto';
 
 export class PaginatedReviewsResponseDto {
@@ -11,15 +10,13 @@ export class PaginatedReviewsResponseDto {
   private constructor() {}
 
   static create(
-    reviews: PlaceUserReview[],
+    reviewDtos: PlaceUserReviewResponseDto[],
     total: number,
     page: number,
     limit: number,
   ): PaginatedReviewsResponseDto {
     const dto = new PaginatedReviewsResponseDto();
-    dto.data = reviews.map((review) =>
-      PlaceUserReviewResponseDto.fromEntity(review),
-    );
+    dto.data = reviewDtos;
     dto.total = total;
     dto.page = page;
     dto.limit = limit;

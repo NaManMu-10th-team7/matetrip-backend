@@ -98,7 +98,7 @@ export class PlaceUserReviewService {
       take: limit,
     });
 
-    return PaginatedReviewsResponseDto.create(reviews, total, page, limit);
+    return this.buildPaginatedResponse(reviews, total, page, limit);
   }
 
   async findByUserId(
@@ -132,7 +132,7 @@ export class PlaceUserReviewService {
       take: limit,
     });
 
-    return PaginatedReviewsResponseDto.create(reviews, total, page, limit);
+    return this.buildPaginatedResponse(reviews, total, page, limit);
   }
 
   async remove(reviewId: string, userId: string): Promise<void> {
@@ -150,5 +150,18 @@ export class PlaceUserReviewService {
     }
 
     await this.placeUserReviewRepo.delete({ id: reviewId });
+  }
+
+  private buildPaginatedResponse(
+    reviews: PlaceUserReview[],
+    total: number,
+    page: number,
+    limit: number,
+  ): PaginatedReviewsResponseDto {
+    const responseDtos = reviews.map((review) =>
+      PlaceUserReviewResponseDto.fromEntity(review),
+    );
+
+    return PaginatedReviewsResponseDto.create(responseDtos, total, page, limit);
   }
 }
