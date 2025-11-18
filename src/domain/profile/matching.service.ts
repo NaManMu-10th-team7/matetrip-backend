@@ -16,7 +16,7 @@ import { TravelStyleType } from './entities/travel-style-type.enum';
 import { TendencyType } from './entities/tendency-type.enum';
 import { Post } from '../post/entities/post.entity';
 import { PostStatus } from '../post/entities/post-status.enum';
-import { PostParticipation } from '../post-participation/entities/post-participation.entity';
+//import { PostParticipation } from '../post-participation/entities/post-participation.entity';
 import { MBTI_TYPES } from './entities/mbti.enum';
 import { EmbeddingMatchingProfileDto } from './dto/embedding-matching-profile.dto';
 import { NovaService } from '../../ai/summaryLLM.service';
