@@ -2,17 +2,15 @@ name: deploy-backend
 
 on:
   push:
-    branches: ["main"]       # main 브랜치에 push(=merge)될 때마다 실행
-  workflow_dispatch:         # 필요하면 수동 실행도 가능
+    branches: [ "main" ]
 
 jobs:
   deploy:
-    runs-on: [self-hosted, backend]     # 방금 설치한 EC2 러너
-    concurrency:
-      group: deploy-backend
-      cancel-in-progress: true
+    runs-on: 
+      - self-hosted
+      - matetrip-backend-main   # 아까 runner 만들 때 넣은 라벨과 동일해야 합니다.
 
     steps:
-      - name: Deploy backend on EC2
-        run: bash /home/ssm-user/app/matetrip-backend/deploy.sh
-
+      - name: Run deploy script on EC2
+        run: |
+          bash /home/ubuntu/app/matetrip-backend/deploy.sh
