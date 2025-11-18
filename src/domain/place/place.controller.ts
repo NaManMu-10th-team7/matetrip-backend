@@ -7,15 +7,17 @@ import { GetPopularPlacesResDto } from './dto/get-popular-places-res.dto.js';
 import { GetBehaviorBasedRecommendationReqDto } from './dto/get-behavior-based-recommendation-req.dto.js';
 import { GetBehaviorBasedRecommendationResDto } from './dto/get-behavior-based-recommendation-res.dto.js';
 import { AuthGuard } from '@nestjs/passport';
+import { GetMostReviewedPlacesReqDto } from './dto/get-most-reviewed-places-req.dto.js';
+import { GetMostReviewedPlacesResDto } from './dto/get-most-reviewed-places-res.dto.js';
 
 @Controller('places')
 export class PlaceController {
   constructor(private readonly placeService: PlaceService) {}
 
   /**
-   * 목표 : 현재 places테이블의 데이터 중 addplace_id, title, address, image_url 반환하기
-   * 순서: user_behavior_events테이블에서 POI_SCHEDULE타입의 이벤트가 많은 순서대로 하기
-   * 목표 = 무한 스크롤 방식
+   * @description  무한 스크롤 방식으로 가장 인기있는 장소들을 조회합니다(인기의 기준 = POI_SCHEDULE타입의 이벤트가 많은 순서대로(향후 MARKING도 추가할지 고려))
+   * @param dto - 페이지네이션 파라미터 (limit, page) : todo => offset 기반으로 바꾸기 (프론트 코드도 바꿔야되서 일단 나둠)
+   * @returns 현재 places테이블의 데이터 중 addplace_id, title, address, image_url 반환하기
    */
   @Get('popular')
   getPopularPlaces(
@@ -24,11 +26,24 @@ export class PlaceController {
     return this.placeService.getPopularPlaces(dto);
   }
 
+  /**
+   * @description 리뷰가 많은 순서대로 장소를 조회합니다.
+   * 평균 rating 점수와 리뷰 개수를 포함합니다.
+   * @param dto - 페이지네이션 파라미터 (limit, offset)
+   * @returns GetMostReviewedPlacesResDto[] - 리뷰가 많은 장소 목록
+   */
+  @Get('most-reviewed')
+  getMostReviewedPlaces(
+    @Query() dto: GetMostReviewedPlacesReqDto,
+  ): Promise<GetMostReviewedPlacesResDto[]> {
+    return this.placeService.getMostReviewedPlaces(dto);
+  }
+
   @Get('/recommendation')
   async getPersonalizedPlaces(
     @Query() dto: GetPersonalizedPlacesByRegionReqDto,
   ): Promise<GetPlacesResDto[]> {
-    console.log('테스트');
+    console.debug('[getPersonalizedPlaces] 호출');
     return this.placeService.getPersonalizedPlaces(dto);
   }
 

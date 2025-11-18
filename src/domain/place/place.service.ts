@@ -14,7 +14,8 @@ import { GetBehaviorBasedRecommendationResDto } from './dto/get-behavior-based-r
 import { RecommendationReasonDto } from './dto/recommendation-reason.dto.js';
 import { UserBehaviorEventRepository } from '../user_behavior/user_behavior_event.repository.js';
 import { GetPlaceIdWithTimeDto } from './dto/get-placeId-with-time.dto.js';
-import { GetPersonalizedAccommodationsReqDto } from './dto/get-personalized-accommodations-req.dto.js';
+import { GetMostReviewedPlacesReqDto } from './dto/get-most-reviewed-places-req.dto.js';
+import { GetMostReviewedPlacesResDto } from './dto/get-most-reviewed-places-res.dto.js';
 
 @Injectable()
 export class PlaceService {
@@ -320,6 +321,49 @@ export class PlaceService {
       }>();
 
     return places.map((place) => GetPopularPlacesResDto.from(place));
+  }
+
+  /**
+   * @description 리뷰가 많은 순서대로 장소를 조회합니다. (무한 스크롤)
+   * @param dto - 페이지네이션 파라미터 (limit, offset)
+   * @returns GetMostReviewedPlacesResDto[] - 리뷰가 많은 장소 목록 (평균 rating 포함)
+   */
+  async getMostReviewedPlaces(
+    dto: GetMostReviewedPlacesReqDto,
+  ): Promise<GetMostReviewedPlacesResDto[]> {
+    const { limit, offset } = dto;
+
+    const places = await this.placeRepo
+      .createQueryBuilder('place')
+      .leftJoin('place_user_review', 'review', 'review.place_id = place.id')
+      .select('place.id', 'id')
+      .addSelect('place.title', 'title')
+      .addSelect('place.address', 'address')
+      .addSelect('place.image_url', 'image_url')
+      .addSelect('place.category', 'category')
+      .addSelect('COUNT(review.id)', 'review_count')
+      .addSelect('AVG(review.rating)', 'average_rating')
+      .groupBy('place.id')
+      .addGroupBy('place.title')
+      .addGroupBy('place.address')
+      .addGroupBy('place.image_url')
+      .addGroupBy('place.category')
+      .orderBy('review_count', 'DESC')
+      .addOrderBy('average_rating', 'DESC')
+      .addOrderBy('place.created_at', 'DESC')
+      .offset(offset)
+      .limit(limit)
+      .getRawMany<{
+        id: string;
+        title: string;
+        address: string;
+        image_url?: string;
+        category: string;
+        review_count: string;
+        average_rating: string | null;
+      }>();
+
+    return places.map((place) => GetMostReviewedPlacesResDto.from(place));
   }
 
   /**
