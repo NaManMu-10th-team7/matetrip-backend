@@ -39,6 +39,9 @@ export class Place extends BaseTimestampEntity {
   @Column({ type: 'text', nullable: true })
   summary: string;
 
+  @Column({ type: 'text', nullable: true }) // todo: nullable false로 바꾸기 (DB 바뀌면)
+  sido: string;
+
   @Column({
     type: 'vector' as ColumnType,
     length: 1024,

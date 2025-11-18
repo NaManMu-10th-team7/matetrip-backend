@@ -35,7 +35,7 @@ export class UserBehaviorEventRepository extends Repository<UserBehaviorEvent> {
       .andWhere('event.eventType IN (:...eventTypes)', { eventTypes })
       .andWhere('event.createdAt >= :sinceDate', { sinceDate })
       .groupBy('place.id')
-      .orderBy('latestEventAt', 'DESC')
+      .orderBy('MAX(event.createdAt)', 'DESC') // 집계 표현식으로 정렬
       .limit(limit)
       .getRawMany<GetPlaceIdWithTimeDto>();
   }

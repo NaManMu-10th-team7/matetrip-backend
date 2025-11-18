@@ -34,6 +34,8 @@ import { PlaceService } from 'src/domain/place/place.service';
 import { AiService } from 'src/ai/ai.service';
 import { RegionGroup } from 'src/domain/place/entities/region_group.enum';
 import { differenceInCalendarDays } from 'date-fns';
+import { DailyPlanResDto } from '../dto/daily-plan-recommendation-res.dto';
+import { GetPlacesResDto } from 'src/domain/place/dto/get-places-res.dto';
 
 @Injectable()
 export class WorkspaceService {
@@ -124,7 +126,7 @@ export class WorkspaceService {
     workspaceId: string,
     places: AiSearchPlaceDto[],
   ): Promise<CachedPoi[]> {
-    this.logger.log(
+    this.logger.debug(
       `Marking ${places.length} POIs from AI search in workspace ${workspaceId}`,
     );
     this.logger.debug(
@@ -341,15 +343,16 @@ export class WorkspaceService {
   }
 
   /**
-   * 워크스페이스 ID를 기반으로 해당 게시글에 참여중인 모든 사용자의 ID 목록을 반환합니다.
+   * 워크스페이스의 모든 참여자 성향을 종합하여 장소를 추천합니다.
    * @param workspaceId - 워크스페이스의 ID
-   * @returns 사용자 ID의 배열
+   * @returns 추천 장소 DTO의 배열
    */
-  async getParticipantUserIds(workspaceId: string): Promise<string[]> {
+  async getConsensusRecommendations(workspaceId: string) {
     this.logger.log(
-      `Fetching participant user IDs for workspace: ${workspaceId}`,
+      `Fetching consensus recommendations for workspace: ${workspaceId}`,
     );
 
+    // 1. 워크스페이스의 모든 참여자 ID를 가져옵니다.
     const workspace = await this.workspaceRepository.findOne({
       where: { id: workspaceId },
       relations: ['post'], // 'post' 관계를 함께 로드합니다.
@@ -363,32 +366,26 @@ export class WorkspaceService {
 
     // PostService를 통해 해당 게시글의 참여자 ID 목록을 가져옵니다.
     // PostService에 getParticipantIds와 같은 메서드가 구현되어 있어야 합니다.
-    return this.postService.getParticipantIds(workspace.post.id);
-  }
-
-  /**
-   * 워크스페이스의 모든 참여자 성향을 종합하여 장소를 추천합니다.
-   * @param workspaceId - 워크스페이스의 ID
-   * @returns 추천 장소 DTO의 배열
-   */
-  async getConsensusRecommendations(workspaceId: string, region: RegionGroup) {
-    this.logger.log(
-      `Fetching consensus recommendations for workspace: ${workspaceId}`,
+    const participantUserIds = await this.postService.getParticipantIds(
+      workspace.post.id,
     );
 
-    // 1. 워크스페이스의 모든 참여자 ID를 가져옵니다.
-    const participantUserIds = await this.getParticipantUserIds(workspaceId);
-
-    if (participantUserIds.length === 0) {
+    if (!participantUserIds || participantUserIds.length === 0) {
       this.logger.warn(`No participants found for workspace: ${workspaceId}`);
       return [];
     }
 
     // 2. PlaceService에 사용자 ID 목록을 전달하여 종합 추천 장소를 요청합니다.
-    return this.placesService.getConsensusRecommendedPlaces(
+    const placeList = await this.placesService.getConsensusRecommendedPlaces(
       participantUserIds,
-      region,
+      workspace.post.location as RegionGroup,
     );
+
+    // placeList에서 임의로 5개 장소를 선택합니다.
+    const shuffled = [...placeList].sort(() => 0.5 - Math.random());
+    const selectedPlaces = shuffled.slice(0, 5);
+
+    return selectedPlaces;
   }
 
   /**
@@ -412,5 +409,130 @@ export class WorkspaceService {
 
     // PostService의 findOne을 사용하여 PostResDto로 변환하여 반환합니다.
     return this.postService.findOne(workspace.post.id);
+  }
+
+  /**
+   * @description 워크스페이스 참여자 모두의 성향을 종합하여 숙소를 추천합니다.
+   * @param planDto - 여행 기간 및 지역 정보
+   * @returns 추천 숙소 DTO 배열
+   */
+  async getConsensusRecommendedAccommodations(
+    planDto: PlanReqDto,
+  ): Promise<DailyPlanResDto[]> {
+    this.logger.log(
+      `Fetching consensus recommended accommodations for workspace: ${planDto.workspaceId}`,
+    );
+
+    // 1. 총 여행 일수 계산
+    const startDate = new Date(planDto.startDate);
+    const endDate = new Date(planDto.endDate);
+    const totalDays = differenceInCalendarDays(endDate, startDate) + 1;
+
+    if (totalDays <= 0) {
+      return [];
+    }
+
+    // 2. 워크스페이스 참여자 ID 및 지역 정보 조회
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: planDto.workspaceId },
+      relations: ['post'],
+    });
+
+    if (!workspace || !workspace.post) {
+      throw new NotFoundException(
+        `Workspace with ID ${planDto.workspaceId} or its associated post not found.`,
+      );
+    }
+
+    const participantUserIds = await this.postService.getParticipantIds(
+      workspace.post.id,
+    );
+
+    // 3. PlaceService를 통해 그룹의 종합 성향 벡터를 계산합니다.
+    const avgVector =
+      await this.placesService.calculateConsensusVector(participantUserIds);
+
+    if (!avgVector) {
+      return [];
+    }
+
+    // 4. 노이즈를 추가한 벡터로 숙소를 추천받습니다.
+    const noisyVectorForAccommodations = this.addNoiseToVector(avgVector);
+    const accommodations =
+      await this.placesService.getConsensusRecommendedAccommodations(
+        noisyVectorForAccommodations,
+        planDto.region as RegionGroup,
+        totalDays, // 여행 일수만큼 숙소 추천
+      );
+
+    if (accommodations.length === 0) {
+      return [];
+    }
+
+    // 5. 각 숙소에 대해 다른 장소들을 추천받아 일일 계획 생성
+    const dailyPlans: DailyPlanResDto[] = [];
+    const recommendedPlaceIds = new Set<string>(
+      accommodations.map((acc) => acc.id),
+    );
+
+    // '음식', '숙박'을 제외한 추천 가능 카테고리 목록
+    const baseAvailableCategories = ['인문(문화/예술/역사)', '레포츠', '자연'];
+
+    for (const accommodation of accommodations) {
+      const interleavedPlaces: GetPlacesResDto[] = [];
+
+      // 1. 필요한 장소들을 한 번에 요청 (음식 2, 기타 4)
+      const categoriesToRecommend = new Map<string, number>([
+        ['음식', 2],
+        ...baseAvailableCategories.map((cat) => [cat, 4] as [string, number]), // 각 카테고리에서 충분히 가져오기
+      ]);
+
+      // 추천에 다양성을 주기 위해 노이즈 추가
+      const noisyVectorForPois = this.addNoiseToVector(avgVector);
+
+      const placesForDay =
+        await this.placesService.getConsensusRecommendedPlacesForCategories(
+          noisyVectorForPois,
+          planDto.region as RegionGroup,
+          categoriesToRecommend,
+          Array.from(recommendedPlaceIds),
+          accommodation.latitude,
+          accommodation.longitude,
+        );
+
+      // 2. 가져온 장소들을 카테고리별로 분류
+      const foodPlaces = placesForDay.filter((p) => p.category === '음식');
+      const otherPlaces = placesForDay.filter((p) => p.category !== '음식');
+
+      // 3. [장소, 장소, 음식] 순서로 2번 조합
+      for (let i = 0; i < 2; i++) {
+        if (otherPlaces[i * 2]) interleavedPlaces.push(otherPlaces[i * 2]);
+        if (otherPlaces[i * 2 + 1])
+          interleavedPlaces.push(otherPlaces[i * 2 + 1]);
+        if (foodPlaces[i]) interleavedPlaces.push(foodPlaces[i]);
+      }
+
+      // 4. 추천된 장소 ID들을 Set에 추가하여 다음 날 추천에서 제외
+      interleavedPlaces.forEach((p) => recommendedPlaceIds.add(p.id));
+
+      // 5. 마지막에 숙소를 추가
+      interleavedPlaces.push(accommodation);
+
+      dailyPlans.push({ pois: interleavedPlaces });
+    }
+
+    return dailyPlans;
+  }
+
+  /**
+   * @description 임베딩 벡터에 약간의 노이즈를 추가하여 추천 결과에 다양성을 부여합니다.
+   * @param vector 원본 임베딩 벡터
+   * @param noiseLevel 노이즈의 강도 (표준편차)
+   * @returns 노이즈가 추가된 새로운 벡터
+   */
+  private addNoiseToVector(vector: number[], noiseLevel = 0.05): number[] {
+    return vector.map(
+      (value) => value + (Math.random() - 0.5) * 2 * noiseLevel,
+    );
   }
 }

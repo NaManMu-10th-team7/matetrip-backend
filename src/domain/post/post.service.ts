@@ -23,6 +23,7 @@ import { BinaryContentService } from '../binary-content/binary-content.service';
 import { Profile } from '../profile/entities/profile.entity';
 import { Users } from '../users/entities/users.entity';
 import { Transactional } from 'typeorm-transactional';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PostService {
@@ -37,6 +38,9 @@ export class PostService {
     private readonly binaryContentRepository: Repository<BinaryContent>,
     private readonly binaryContentService: BinaryContentService,
     private readonly dataSource: DataSource,
+    @InjectRepository(Users)
+    private readonly usersRepository: Repository<Users>,
+    private readonly notificationService: NotificationsService,
   ) {}
 
   async create(createPostDto: CreatePostDto, userId: string) {
@@ -55,6 +59,19 @@ export class PostService {
 
     const savedPost = await this.postRepository.save(post);
     // todo : 워크스페이스 생성
+    try {
+      const writer = await this.usersRepository.findOneBy({ id: userId });
+      if (writer) {
+        const message = '동행 모집 게시글이 작성되었습니다.';
+        await this.notificationService.createAndSaveNotification(
+          writer,
+          message,
+          'notification_success',
+        );
+      }
+    } catch (error) {
+      console.error('Failed to send notification for new post: ', error);
+    }
     return this.toPostResponseDto(savedPost);
   }
 
@@ -365,11 +382,19 @@ export class PostService {
         post: { id: postId },
         requester: { id: userId },
       },
+      relations: {
+        post: {
+          writer: true,
+        },
+        requester: {
+          profile: true,
+        },
+      },
     });
 
     if (!participation) {
       throw new NotFoundException(
-        '해당하는 동행 신청을 찾을 수 없습니다. (잘못된 postId, participationId 또는 userId)',
+        '해당하는 동행 신청을 찾을 수 없거나 취소할 권한이 없습니다.',
       );
     }
 
@@ -378,6 +403,40 @@ export class PostService {
 
     if (result.affected === 0) {
       throw new BadRequestException('동행 신청 취소에 실패했습니다.');
+    }
+
+    // --- 알림 전송 로직 ---
+    const { post, requester } = participation;
+    const requesterNickname = requester.profile?.nickname ?? '참여자';
+
+    // 1. 게시물 작성자에게 알림 전송
+    try {
+      const messageToWriter = `'${requesterNickname}'님이 '${post.title}' 동행 신청을 취소했습니다.`;
+      await this.notificationService.createAndSaveNotification(
+        post.writer,
+        messageToWriter,
+        'notification_info',
+      );
+    } catch (error) {
+      console.error(
+        'Failed to send cancellation notification to writer:',
+        error,
+      );
+    }
+
+    // 2. 신청자 본인에게 알림 전송
+    try {
+      const messageToRequester = `'${post.title}' 동행 신청을 취소했습니다.`;
+      await this.notificationService.createAndSaveNotification(
+        requester,
+        messageToRequester,
+        'notification_info',
+      );
+    } catch (error) {
+      console.error(
+        'Failed to send cancellation notification to requester:',
+        error,
+      );
     }
   }
 

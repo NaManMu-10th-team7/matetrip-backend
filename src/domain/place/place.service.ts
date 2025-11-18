@@ -14,6 +14,8 @@ import { GetBehaviorBasedRecommendationResDto } from './dto/get-behavior-based-r
 import { RecommendationReasonDto } from './dto/recommendation-reason.dto.js';
 import { UserBehaviorEventRepository } from '../user_behavior/user_behavior_event.repository.js';
 import { GetPlaceIdWithTimeDto } from './dto/get-placeId-with-time.dto.js';
+import { GetMostReviewedPlacesReqDto } from './dto/get-most-reviewed-places-req.dto.js';
+import { GetMostReviewedPlacesResDto } from './dto/get-most-reviewed-places-res.dto.js';
 
 @Injectable()
 export class PlaceService {
@@ -74,6 +76,127 @@ export class PlaceService {
   }
 
   /**
+   * @description 여러 사용자의 성향을 종합하여 모두가 좋아할 만한 숙소를 추천합니다.
+   * @param userIds - 사용자 ID 배열
+   * @param region - 추천을 원하는 지역
+   * @param limit - 추천받을 숙소 개수
+   * @returns 추천 숙소 DTO 배열
+   */
+  async getConsensusRecommendedAccommodations(
+    avgVector: number[],
+    region: RegionGroup,
+    limit: number,
+  ): Promise<GetPlacesResDto[]> {
+    if (!avgVector) {
+      return [];
+    }
+
+    const avgEmbeddingString = `[${avgVector.join(',')}]`;
+
+    const places: Place[] = await this.placeRepo
+      .createQueryBuilder('p')
+      .where('p.region = :region', { region })
+      .andWhere("p.category = '숙박'")
+      .orderBy('p.embedding <=> :embedding', 'ASC')
+      .setParameters({ embedding: avgEmbeddingString })
+      .limit(limit)
+      .getMany();
+
+    return places.map((place) => GetPlacesResDto.from(place));
+  }
+
+  /**
+   * @description 여러 사용자의 ID를 기반으로 종합 성향 벡터를 계산합니다.
+   * @param userIds - 사용자 ID 배열
+   * @returns 종합 성향 벡터 또는 null
+   */
+  async calculateConsensusVector(userIds: string[]): Promise<number[] | null> {
+    if (!userIds || userIds.length === 0) {
+      return null;
+    }
+
+    const embeddings = await Promise.all(
+      userIds.map((userId) =>
+        this.profileService.getUserEmbeddingValueByUserId(userId),
+      ),
+    );
+
+    const validEmbeddings = embeddings.filter((e) => e && e.length > 0);
+
+    if (validEmbeddings.length === 0) {
+      return null;
+    }
+
+    return this.calculateAverageEmbeddingFromVectors(validEmbeddings);
+  }
+
+  /**
+   * @description 종합 성향 벡터를 기반으로 여러 카테고리의 장소를 추천합니다.
+   * @param avgVector - 종합 성향 벡터
+   * @param region - 지역
+   * @param categories - 추천받을 카테고리 맵 (e.g. { '관광지': 2, '음식점': 2 })
+   * @param excludeIds - 추천에서 제외할 장소 ID 목록
+   * @param centerLat - 중심 위도 (숙소)
+   * @param centerLon - 중심 경도 (숙소)
+   * @param radius - 검색 반경 (km)
+   * @returns 카테고리별 추천 장소 목록
+   */
+  async getConsensusRecommendedPlacesForCategories(
+    avgVector: number[],
+    region: RegionGroup,
+    categories: Map<string, number>,
+    excludeIds: string[],
+    centerLat: number,
+    centerLon: number,
+  ): Promise<GetPlacesResDto[]> {
+    if (!avgVector || avgVector.length === 0) {
+      return [];
+    }
+    const avgEmbeddingString = `[${avgVector.join(',')}]`;
+    const categoryNames = Array.from(categories.keys());
+    const totalLimit = Array.from(categories.values()).reduce(
+      (sum, count) => sum + count,
+      0,
+    );
+
+    const queryBuilder = this.placeRepo
+      .createQueryBuilder('p')
+      .where('p.region = :region', { region })
+      .andWhere('p.category IN (:...categories)', { categories: categoryNames })
+      // 10km 반경 필터 추가 (Haversine formula)
+      .andWhere(
+        `( 6371 * acos( cos( radians(:centerLat) ) * cos( radians( p.latitude ) ) * cos( radians( p.longitude ) - radians(:centerLon) ) + sin( radians(:centerLat) ) * sin( radians( p.latitude ) ) ) ) < :radius`,
+      )
+      // 1순위: 성향 유사도, 2순위: 거리 순으로 정렬
+      .orderBy('p.embedding <=> :embedding', 'ASC')
+      .addOrderBy(
+        `( 6371 * acos( cos( radians(:centerLat) ) * cos( radians( p.latitude ) ) * cos( radians( p.longitude ) - radians(:centerLon) ) + sin( radians(:centerLat) ) * sin( radians( p.latitude ) ) ) )`,
+        'ASC',
+      )
+      .setParameters({
+        embedding: avgEmbeddingString,
+        centerLat,
+        centerLon,
+        radius: 5, // 검색 반경 5km로 설정
+      })
+      // 필터링을 위해 넉넉하게 조회 (예: 50개)
+      .limit(100);
+
+    if (excludeIds.length > 0) {
+      queryBuilder.andWhere('p.id NOT IN (:...excludeIds)', { excludeIds });
+    }
+
+    const candidatePlaces = await queryBuilder.getMany();
+
+    // 각 카테고리별로 필요한 개수만큼 필터링
+    const result: Place[] = this.filterPlacesByCategories(
+      candidatePlaces,
+      categories,
+    );
+    return result.map((place) => GetPlacesResDto.from(place));
+  }
+
+  /**
    * 여러 사용자의 성향을 종합하여 모두가 좋아할 만한 장소를 추천합니다.
    * @param userIds - 사용자 ID 배열
    * @param region - 추천을 원하는 지역
@@ -102,16 +225,13 @@ export class PlaceService {
     }
 
     // 2. 임베딩 벡터의 평균을 계산하여 '종합 성향 벡터'를 생성합니다.
-    const embeddingLength = validEmbeddings[0].length;
-    const sumVector = new Array(embeddingLength).fill(0);
+    const avgVector =
+      this.calculateAverageEmbeddingFromVectors(validEmbeddings);
 
-    for (const embedding of validEmbeddings) {
-      for (let i = 0; i < embeddingLength; i++) {
-        sumVector[i] += embedding[i];
-      }
+    if (!avgVector) {
+      return [];
     }
 
-    const avgVector = sumVector.map((val) => val / validEmbeddings.length);
     const avgEmbeddingString = `[${avgVector.join(',')}]`;
 
     // 3. 종합 성향 벡터와 코사인 유사도가 높은 장소를 50개 조회합니다.
@@ -123,7 +243,36 @@ export class PlaceService {
       .limit(50)
       .getMany();
 
+    console.log(places);
+
     return places.map((place) => GetPlacesResDto.from(place));
+  }
+
+  private filterPlacesByCategories(
+    places: Place[],
+    categories: Map<string, number>,
+  ): Place[] {
+    const result: Place[] = [];
+    const categoryCount = new Map<string, number>();
+
+    for (const place of places) {
+      const requiredCount = categories.get(place.category);
+      if (!requiredCount) continue;
+
+      const currentCount = categoryCount.get(place.category) || 0;
+      if (currentCount < requiredCount) {
+        result.push(place);
+        categoryCount.set(place.category, currentCount + 1);
+      }
+    }
+
+    // 모든 카테고리가 채워졌는지 확인 (선택사항, 더 빠른 종료를 위해)
+    const allFilled = Array.from(categories.entries()).every(
+      ([cat, count]) => (categoryCount.get(cat) || 0) >= count,
+    );
+    if (allFilled) return result;
+
+    return result;
   }
 
   /**
@@ -133,7 +282,6 @@ export class PlaceService {
   getRegionGroups(): { key: string; value: string }[] {
     return Object.entries(RegionGroup).map(([key, value]) => ({ key, value }));
   }
-
   /**
    * @description POI_SCHEDULE 이벤트가 많은 순서대로 장소를 조회합니다. (무한 스크롤)
    * @param dto - 페이지네이션 파라미터 (page, limit)
@@ -173,6 +321,49 @@ export class PlaceService {
       }>();
 
     return places.map((place) => GetPopularPlacesResDto.from(place));
+  }
+
+  /**
+   * @description 리뷰가 많은 순서대로 장소를 조회합니다. (무한 스크롤)
+   * @param dto - 페이지네이션 파라미터 (limit, offset)
+   * @returns GetMostReviewedPlacesResDto[] - 리뷰가 많은 장소 목록 (평균 rating 포함)
+   */
+  async getMostReviewedPlaces(
+    dto: GetMostReviewedPlacesReqDto,
+  ): Promise<GetMostReviewedPlacesResDto[]> {
+    const { limit, offset } = dto;
+
+    const places = await this.placeRepo
+      .createQueryBuilder('place')
+      .leftJoin('place_user_review', 'review', 'review.place_id = place.id')
+      .select('place.id', 'id')
+      .addSelect('place.title', 'title')
+      .addSelect('place.address', 'address')
+      .addSelect('place.image_url', 'image_url')
+      .addSelect('place.category', 'category')
+      .addSelect('COUNT(review.id)', 'review_count')
+      .addSelect('AVG(review.rating)', 'average_rating')
+      .groupBy('place.id')
+      .addGroupBy('place.title')
+      .addGroupBy('place.address')
+      .addGroupBy('place.image_url')
+      .addGroupBy('place.category')
+      .orderBy('review_count', 'DESC')
+      .addOrderBy('average_rating', 'DESC')
+      .addOrderBy('place.created_at', 'DESC')
+      .offset(offset)
+      .limit(limit)
+      .getRawMany<{
+        id: string;
+        title: string;
+        address: string;
+        image_url?: string;
+        category: string;
+        review_count: string;
+        average_rating: string | null;
+      }>();
+
+    return places.map((place) => GetMostReviewedPlacesResDto.from(place));
   }
 
   /**
@@ -329,11 +520,9 @@ export class PlaceService {
   /**
    * 장소들의 평균 임베딩을 계산합니다.
    */
-  private calculateAverageEmbedding(places: Place[]): number[] | null {
-    const validEmbeddings = places
-      .map((p) => p.embedding)
-      .filter((e): e is number[] => !!e && e.length > 0);
-
+  private calculateAverageEmbeddingFromVectors(
+    validEmbeddings: number[][],
+  ): number[] | null {
     if (validEmbeddings.length === 0) {
       return null;
     }
@@ -350,6 +539,19 @@ export class PlaceService {
     return sumVector.map((val) => val / validEmbeddings.length);
   }
 
+  /**
+   * 장소들의 평균 임베딩을 계산합니다.
+   */
+  private calculateAverageEmbedding(places: Place[]): number[] | null {
+    const validEmbeddings = places
+      .map((p) => p.embedding)
+      .filter((e): e is number[] => !!e && e.length > 0);
+
+    if (validEmbeddings.length === 0) {
+      return null;
+    }
+    return this.calculateAverageEmbeddingFromVectors(validEmbeddings);
+  }
   /**
    * 후보 장소와 가장 유사한 관심 장소를 찾습니다.
    * (추천 이유를 위해 사용)

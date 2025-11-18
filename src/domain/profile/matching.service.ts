@@ -16,6 +16,7 @@ import { TravelStyleType } from './entities/travel-style-type.enum';
 import { TendencyType } from './entities/tendency-type.enum';
 import { Post } from '../post/entities/post.entity';
 import { PostStatus } from '../post/entities/post-status.enum';
+//import { PostParticipation } from '../post-participation/entities/post-participation.entity';
 import { MBTI_TYPES } from './entities/mbti.enum';
 import { EmbeddingMatchingProfileDto } from './dto/embedding-matching-profile.dto';
 import { NovaService } from '../../ai/summaryLLM.service';
@@ -534,7 +535,7 @@ export class MatchingService {
       })
       .andWhere('profile.profile_embedding IS NOT NULL')
       .orderBy('profile.profile_embedding <=> :queryEmbedding', 'ASC')
-      .limit(limit)
+      .limit(limit + 10) //백터 기준으로 잘라 버리기에 조금 더 limit 을 크게 둠
       .setParameter(
         'queryEmbedding',
         toVectorLiteral(requesterProfile.profileEmbedding),
@@ -545,8 +546,11 @@ export class MatchingService {
         .subQuery()
         .select('1')
         .from(Post, 'post')
-        .where('post.writer_id = profile.user_id') //매칭 후보가 모집 중 글을 올렸는지를 가리는 필터
-        .andWhere('post.status = :recruitingStatus') //게시글이 모집중인지 구별하는 필터
+        // 후보 프로필이 작성한 게시글 중
+        .where('post.writer_id = profile.user_id')
+        // 현재 모집 중인 글이 하나라도 있는지를 체크한다.
+        .andWhere('post.status = :recruitingStatus')
+        // 이미 내가 신청/참여한 게시글은 제외해야 하므로 NOT EXISTS로 필터링
         .getQuery();
       return `EXISTS ${subQuery}`;
     });
@@ -578,8 +582,10 @@ export class MatchingService {
       )
       .sort((a, b) => b.score - a.score);
 
+    const slicedMatches = matches.slice(0, limit);
+
     return {
-      matches,
+      matches: slicedMatches,
       query: {
         ...matchRequestDto,
         limit,
