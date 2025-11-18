@@ -22,7 +22,7 @@ export class PlaceUserReviewResponseDto {
   placeId: string;
 
   @Expose()
-  user: SimpleUserDto;
+  user: SimpleUserDto | null;
 
   @Expose()
   @IsString()
@@ -42,10 +42,14 @@ export class PlaceUserReviewResponseDto {
     const dto = new PlaceUserReviewResponseDto();
     dto.id = entity.id;
     dto.placeId = entity.place?.id;
-    dto.user = {
-      userId: entity.user?.id,
-      nickname: entity.user?.profile?.nickname,
-    };
+
+    dto.user = entity.user
+      ? {
+          userId: entity.user?.id,
+          nickname: entity.user?.profile?.nickname,
+        }
+      : null;
+
     dto.content = entity.content;
     dto.rating = entity.rating;
     dto.createdAt = entity.createdAt;
