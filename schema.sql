@@ -328,6 +328,7 @@ CREATE TABLE place_user_review
     place_id UUID NOT NULL,
     user_id UUID NOT NULL,
     content TEXT NOT NULL,
+    rating NUMERIC(2, 1) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now () NOT NULL
 );
 

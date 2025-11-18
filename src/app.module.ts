@@ -21,6 +21,7 @@ import { PlaceModule } from './domain/place/place.module';
 import { RabbitmqModule } from './infra/rabbitmq/rabbitmq.module';
 import { ProxyModule } from './domain/proxy/proxy.module';
 import { UserBehaviorModule } from './domain/user_behavior/user_behavior.module';
+import { PlaceUserReviewModule } from './domain/place_user_review/place_user_review.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { UserBehaviorModule } from './domain/user_behavior/user_behavior.module'
     RabbitmqModule,
     ProxyModule,
     UserBehaviorModule,
+    PlaceUserReviewModule,
   ],
   controllers: [AppController],
   providers: [AppService],
