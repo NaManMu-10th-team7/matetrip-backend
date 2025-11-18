@@ -136,48 +136,6 @@ export class ChatGateway {
         this.logger.log(
           `[AI_MESSAGE] Emitting to room: ${roomName}, Payload: ${JSON.stringify(aiMessagePayload)}`,
         );
-
-        // 4. [핵심] AI가 장소 검색 결과를 반환했는지 확인하고 백엔드에서 처리
-        if (aiResponse.tool_data && Array.isArray(aiResponse.tool_data)) {
-          for (const toolData of aiResponse.tool_data) {
-            if (
-              PLACE_RELATED_TOOLS.includes(toolData.tool_name) &&
-              toolData.tool_output
-            ) {
-              this.logger.log(
-                `[AI_TOOL] Processing '${toolData.tool_name}' tool result.`,
-              );
-              try {
-                // 4-1. tool_output이 이미 파싱된 객체인지 문자열인지 확인
-                let places: AiSearchPlaceDto[];
-
-                if (typeof toolData.tool_output === 'string') {
-                  // 문자열인 경우 파싱 (기존 로직 유지)
-                  const placesString = toolData.tool_output.replace(/'/g, '"');
-                  places = JSON.parse(placesString) as AiSearchPlaceDto[];
-                } else {
-                  // 이미 파싱된 객체인 경우 직접 사용
-                  places = toolData.tool_output as AiSearchPlaceDto[];
-                }
-
-                if (Array.isArray(places) && places.length > 0) {
-                  // 4-2. 검색된 장소들을 POI로 생성 및 캐시 저장
-                  await this.workspaceService.markPoisFromSearch(
-                    workspaceId,
-                    places,
-                  );
-                  // 4-3. POI가 추가되었으므로, 모든 클라이언트에게 POI 목록을 다시 동기화
-                  await this.poiGateway.broadcastSync(workspaceId);
-                }
-              } catch (parseError) {
-                this.logger.error(
-                  `Failed to process tool_output from AI tool '${toolData.tool_name}'`,
-                  parseError,
-                );
-              }
-            }
-          }
-        }
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
