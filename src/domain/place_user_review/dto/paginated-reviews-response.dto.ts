@@ -15,6 +15,12 @@ export class PaginatedReviewsResponseDto {
     page: number,
     limit: number,
   ): PaginatedReviewsResponseDto {
+    if (limit <= 0) {
+      throw new Error('limit must be greater than 0');
+    }
+    if (total < 0 || page < 1) {
+      throw new Error('total must be non-negative and page must be at least 1');
+    }
     const dto = new PaginatedReviewsResponseDto();
     dto.data = reviewDtos;
     dto.total = total;

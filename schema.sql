@@ -314,7 +314,7 @@ CREATE TABLE places
 CREATE TABLE place_review 
 (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
-    place_id UUID NOT
+    place_id UUID NOT NULL,
     content TEXT NOT NULL,
     source_url TEXT NOT NULL,
     embedding vector (1024) NULL, -- 리뷰 임베딩 (검색 정확도 향상용)
@@ -381,7 +381,7 @@ ALTER TABLE poi
     ADD CONSTRAINT fk_poi_creator
         FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE restrict,
     ADD CONSTRAINT uq_poi_schedule 
-        UNIQUE (plan_day_id, sequence);
+        UNIQUE (plan_day_id, sequence),
     ADD CONSTRAINT fk_poi_place 
         FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE SET NULL;
 
@@ -486,10 +486,10 @@ CREATE INDEX idx_user_behavior_events_place ON user_behavior_events(place_id);
 -- CREATE INDEX idx_behavior_embedding ON user_behavior_embeddings USING ivfflat (behavior_embedding vector_cosine_ops) WITH (lists = 100);
 
 -- 공간 인덱싱용 
-ALTER TABLE places                                                                                                                                                       │
+ALTER TABLE places 
     ADD COLUMN location GEOGRAPHY(POINT, 4326);   
 
-UPDATE places                                                                                                                                                            │
+UPDATE places
     SET location = ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography                                                                                            │
     WHERE latitude IS NOT NULL AND longitude IS NOT NULL;
 

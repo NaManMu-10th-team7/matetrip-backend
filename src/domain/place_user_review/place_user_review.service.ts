@@ -10,6 +10,7 @@ import { CreatePlaceUserReviewDto } from './dto/create-place_user_review.dto';
 import { PlaceUserReviewResponseDto } from './dto/place-user-review-response.dto';
 import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
 import { PaginatedReviewsResponseDto } from './dto/paginated-reviews-response.dto';
+import { Transactional } from 'typeorm-transactional';
 
 @Injectable()
 export class PlaceUserReviewService {
@@ -18,25 +19,27 @@ export class PlaceUserReviewService {
     private readonly placeUserReviewRepo: Repository<PlaceUserReview>,
   ) {}
 
+  @Transactional()
   async create(
     createDto: CreatePlaceUserReviewDto,
+    userId: string,
   ): Promise<PlaceUserReviewResponseDto> {
     const alreadyExists = await this.placeUserReviewRepo.exists({
       where: {
         place: { id: createDto.placeId },
-        user: { id: createDto.userId },
+        user: { id: userId },
       },
     });
 
     if (alreadyExists) {
       throw new ConflictException(
-        `User ${createDto.userId} has already reviewed place ${createDto.placeId}`,
+        `User ${userId} has already reviewed place ${createDto.placeId}`,
       );
     }
-
+    // TODO: 경쟁 조건 고려해서 수정
     const review = this.placeUserReviewRepo.create({
       place: { id: createDto.placeId },
-      user: { id: createDto.userId },
+      user: { id: userId },
       content: createDto.content,
       rating: createDto.rating,
     });
@@ -120,6 +123,7 @@ export class PlaceUserReviewService {
     return this.buildPaginatedResponse(reviews, total, page, limit);
   }
 
+  @Transactional()
   async remove(reviewId: string, userId: string): Promise<void> {
     const exists = await this.placeUserReviewRepo.exists({
       where: {
