@@ -11,12 +11,12 @@ import { Post } from '../post/entities/post.entity';
 import { PostParticipationResponseDto } from './dto/post-participation-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { UpdatePostParticipationDto } from './dto/update-post-participation.dto';
-import { Users } from '../users/entities/users.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PostResponseDto } from '../post/dto/post-response.dto';
 import { SimplePostParticipationResponseDto } from './dto/simple-post-participation-response.dto';
 import { PostStatus } from '../post/entities/post-status.enum'; // PostStatus 임포트
 import { PostParticipationStatus } from './entities/post-participation-status'; // 이미 임포트되어 있음
+import { Users } from '../users/entities/users.entity';
 
 @Injectable()
 export class PostParticipationService {
@@ -111,13 +111,28 @@ export class PostParticipationService {
     const savedParticipation =
       await this.postParticipationRepository.save(participation);
 
+    // 게시글 작성자에게 알림 전송
     try {
+      const messageToWriter = `'${post.title}' 동행에 참여하고 싶은 사람이 있어요!`;
       await this.notificationService.createAndSaveNotification(
         post.writer,
-        post,
+        messageToWriter,
+        'notification_info',
       );
     } catch (error) {
-      console.error('Failed to send notification : ', error);
+      console.error('Failed to send notification to writer: ', error);
+    }
+
+    // 신청자 본인에게 알림 전송
+    try {
+      const messageToRequester = '동행 신청이 완료되었습니다.';
+      await this.notificationService.createAndSaveNotification(
+        { id: requesterId } as Users, // Users 엔티티가 필요하지만 id만으로도 동작
+        messageToRequester,
+        'notification_success',
+      );
+    } catch (error) {
+      console.error('Failed to send notification to requester: ', error);
     }
 
     return plainToInstance(
@@ -196,8 +211,14 @@ export class PostParticipationService {
     const participation = await this.postParticipationRepository.findOne({
       where: { id: participationId, post: { id: postId } },
       relations: {
-        requester: true,
-        post: true,
+        requester: {
+          profile: true, // requester의 profile 정보 로드
+        },
+        post: {
+          writer: {
+            profile: true, // post 작성자의 profile 정보 로드
+          },
+        },
       },
     });
 
@@ -260,6 +281,59 @@ export class PostParticipationService {
         );
       }
     }
+
+    // --- 알림 전송 로직 시작 ---
+    const { status: newStatus } = updatedParticipation;
+    const { title: postTitle } = post;
+    const requester = participation.requester;
+    const writer = post.writer;
+
+    let messageToWriter: string | null = null;
+    let messageToRequester: string | null = null;
+    let messageType: string | null = null;
+
+    if (newStatus === PostParticipationStatus.APPROVED) {
+      messageToWriter = `'${requester.profile.nickname}'님의 신청을 수락했습니다.`;
+      messageToRequester = `'${postTitle}' 동행이 수락됐습니다.`;
+      messageType = 'notification_success';
+    } else if (newStatus === PostParticipationStatus.REJECTED) {
+      messageToWriter = `'${requester.profile.nickname}'님의 신청을 거절했습니다.`;
+      messageToRequester = `'${postTitle}' 동행이 거절됐습니다.`;
+      messageType = 'notification_error';
+    }
+
+    // 작성자에게 알림 전송
+    if (messageToWriter && messageType) {
+      try {
+        await this.notificationService.createAndSaveNotification(
+          writer,
+          messageToWriter,
+          messageType, // 이제 messageType은 string 타입으로 추론됩니다.
+        );
+      } catch (error) {
+        console.error(
+          `[updateParticipationStatus] Failed to send notification to writer ${writer.id}:`,
+          error,
+        );
+      }
+    }
+
+    // 신청자에게 알림 전송
+    if (messageToRequester && messageType) {
+      try {
+        await this.notificationService.createAndSaveNotification(
+          requester,
+          messageToRequester,
+          messageType,
+        );
+      } catch (error) {
+        console.error(
+          `[updateParticipationStatus] Failed to send notification to requester ${requester.id}:`,
+          error,
+        );
+      }
+    }
+    // --- 알림 전송 로직 끝 ---
 
     return plainToInstance(PostParticipationResponseDto, updatedParticipation);
   }
