@@ -31,6 +31,7 @@ interface RawMatchRow {
   travelStyles: DbEnumArray<TravelStyleType>;
   travelTendencies: DbEnumArray<TendencyType>;
   vectorDistance: number | null;
+  mannerTemperature?: number | null;
   mbti: MBTI_TYPES | null;
 }
 
@@ -277,7 +278,7 @@ export class MatchingService {
     private readonly titanEmbeddingService: TitanEmbeddingService,
   ) {}
 
-  //전체 유저에서 나와 맞는 유저를 가진 게시글 찾기
+  //전체 유저에서 나와 맞는 게시글이 모집중인 유저 찾기
   async findMatches(
     userId: string,
     matchRequestDto: MatchRequestDto,
@@ -320,6 +321,7 @@ export class MatchingService {
       .addSelect('profile.travel_styles', 'travelStyles')
       .addSelect('profile.tendency', 'travelTendencies')
       .addSelect('profile.mbti', 'mbti')
+      .addSelect('profile.manner_temperature', 'mannerTemperature')
       .addSelect(
         'profile.profile_embedding <=> :queryEmbedding',
         'vectorDistance',
@@ -522,6 +524,7 @@ export class MatchingService {
       .addSelect('profile.travel_styles', 'travelStyles')
       .addSelect('profile.tendency', 'travelTendencies')
       .addSelect('profile.mbti', 'mbti')
+      .addSelect('profile.manner_temperature', 'mannerTemperature')
       .addSelect(
         'profile.profile_embedding <=> :queryEmbedding',
         'vectorDistance',
@@ -616,7 +619,7 @@ export class MatchingService {
 
     const mbtiScore = this.calculateMbtiScore(baseMbti, row.mbti);
 
-    return {
+    const candidate = {
       userId: row.userId,
       score: this.composeScore(
         vectorScore,
@@ -630,7 +633,10 @@ export class MatchingService {
       overlappingTravelStyles: styleOverlap,
       overlappingTendencies: tendencyOverlap.slice(0, MAX_TENDENCY_OVERLAPS),
       mbtiMatchScore: mbtiScore,
-    };
+      mannerTemperature: this.normalizeNumber(row.mannerTemperature),
+    } as MatchCandidateDto & { mannerTemperature: number | null };
+
+    return candidate;
   }
 
   private calculateOverlap<T>(base: T[], candidate: T[]): T[] {
@@ -660,6 +666,19 @@ export class MatchingService {
       .split(',')
       .map((item) => item.replace(/^"(.*)"$/, '$1') as T)
       .filter((item) => item !== undefined && item !== null && item !== '');
+  }
+  //문자열 number로 변환(36.5도를 문자열로 인식)
+  private normalizeNumber(
+    value: number | string | null | undefined,
+  ): number | null {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
   }
 
   private calculateRatio(overlapCount: number, baseTotal: number): number {
