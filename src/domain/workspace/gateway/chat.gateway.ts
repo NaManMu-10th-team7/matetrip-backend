@@ -19,6 +19,7 @@ import { AiSearchPlaceDto } from '../../../ai/dto/ai-search-place.dto.js';
 import { ChatMessage } from '../entities/chat-message.entity.js';
 import { ChatMessageService } from '../service/chat-message.service.js';
 import { PoiGateway } from './poi.gateway.js';
+import { PLACE_RELATED_TOOLS } from './place-tools.constant.js';
 
 const ChatEvent = {
   JOIN: 'join',
@@ -61,6 +62,7 @@ export class ChatGateway {
     const roomName = this.getChatRoomName(workspaceId);
 
     let savedMessage: ChatMessage;
+    this.logger.debug('[MESSAGE] Received from socket: ' + socket.id);
     try {
       // 1. 사용자 메시지를 DB에 저장
       savedMessage = await this.chatMessageService.create(data);
@@ -70,6 +72,10 @@ export class ChatGateway {
       );
       return; // DB 저장 실패 시 메시지 전송 로직을 중단
     }
+
+    this.logger.debug(
+      `[MESSAGE] Saved to DB. Message: ${JSON.stringify(savedMessage)}`,
+    );
 
     // 2. 클라이언트로 전송할 페이로드 생성 (DB에 저장된 ID 사용)
     const messagePayload = {
@@ -81,7 +87,7 @@ export class ChatGateway {
       tempId, // [추가] 클라이언트가 보낸 임시 ID를 다시 전달
     };
 
-    this.logger.log(
+    this.logger.debug(
       `[MESSAGE] Emitting to room: ${roomName}, Payload: ${JSON.stringify(messagePayload)}`,
     );
     this.server.to(roomName).emit(ChatEvent.MESSAGE, messagePayload);
@@ -101,7 +107,7 @@ export class ChatGateway {
         isLoading: true, // 로딩 상태임을 명시
       };
       this.server.to(roomName).emit(ChatEvent.MESSAGE, aiLoadingPayload);
-      this.logger.log(
+      this.logger.debug(
         `[AI_LOADING] Emitting to room: ${roomName}, Payload: ${JSON.stringify(
           aiLoadingPayload,
         )}`,
@@ -111,10 +117,7 @@ export class ChatGateway {
         const aiResponse: AiAgentResponseDto =
           await this.aiService.getAgentResponse(prompt, sessionId);
 
-        this.logger.debug(
-          `[DEBUG] Full AI Response:`,
-          JSON.stringify(aiResponse, null, 2),
-        );
+        this.logger.debug(`[DEBUG] Full AI Response:`);
         // 3-2. AI 응답은 DB에 저장하지 않습니다.
 
         // 3-3. 클라이언트로 전송할 최종 AI 페이로드 생성 (role, toolData 포함)
@@ -138,18 +141,24 @@ export class ChatGateway {
         if (aiResponse.tool_data && Array.isArray(aiResponse.tool_data)) {
           for (const toolData of aiResponse.tool_data) {
             if (
-              toolData.tool_name === 'search_places' &&
-              toolData.tool_output &&
-              toolData.tool_output.trim().startsWith('[') // tool_output이 배열 형태의 문자열인지 확인
+              PLACE_RELATED_TOOLS.includes(toolData.tool_name) &&
+              toolData.tool_output
             ) {
               this.logger.log(
-                `[AI_TOOL] Processing 'search_places' tool result.`,
+                `[AI_TOOL] Processing '${toolData.tool_name}' tool result.`,
               );
               try {
-                // 4-1. AI가 반환한 문자열을 JSON 배열로 파싱합니다.
-                // Python의 dict 표현식(')을 JSON 표준(")으로 변경합니다.
-                const placesString = toolData.tool_output.replace(/'/g, '"');
-                const places = JSON.parse(placesString) as AiSearchPlaceDto[];
+                // 4-1. tool_output이 이미 파싱된 객체인지 문자열인지 확인
+                let places: AiSearchPlaceDto[];
+
+                if (typeof toolData.tool_output === 'string') {
+                  // 문자열인 경우 파싱 (기존 로직 유지)
+                  const placesString = toolData.tool_output.replace(/'/g, '"');
+                  places = JSON.parse(placesString) as AiSearchPlaceDto[];
+                } else {
+                  // 이미 파싱된 객체인 경우 직접 사용
+                  places = toolData.tool_output as AiSearchPlaceDto[];
+                }
 
                 if (Array.isArray(places) && places.length > 0) {
                   // 4-2. 검색된 장소들을 POI로 생성 및 캐시 저장
@@ -162,7 +171,7 @@ export class ChatGateway {
                 }
               } catch (parseError) {
                 this.logger.error(
-                  'Failed to parse tool_output from AI response',
+                  `Failed to process tool_output from AI tool '${toolData.tool_name}'`,
                   parseError,
                 );
               }
