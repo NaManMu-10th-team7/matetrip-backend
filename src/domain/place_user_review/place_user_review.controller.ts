@@ -27,13 +27,16 @@ export class PlaceUserReviewController {
 
   @UseGuards(AuthGuard('jwt'))
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   async create(
     @Body() dto: CreatePlaceUserReviewDto,
+    @Req() req: Request & { user: { id: string } },
   ): Promise<PlaceUserReviewResponseDto> {
-    return this.placeUserReviewService.create(dto);
+    return this.placeUserReviewService.create(dto, req.user.id);
   }
 
   @Get('place/:placeId')
+  @HttpCode(HttpStatus.OK)
   async findByPlaceId(
     @Param('placeId', ParseUUIDPipe) placeId: string,
     @Query() query: GetReviewsQueryDto,
@@ -42,6 +45,7 @@ export class PlaceUserReviewController {
   }
 
   @Get('user/:userId')
+  @HttpCode(HttpStatus.OK)
   async findByUserId(
     @Param('userId', ParseUUIDPipe) userId: string,
     @Query() query: GetReviewsQueryDto,
@@ -54,7 +58,7 @@ export class PlaceUserReviewController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
     @Param('reviewId', ParseUUIDPipe) reviewId: string,
-    @Req() req: { user: { id: string } },
+    @Req() req: Request & { user: { id: string } },
   ): Promise<void> {
     return this.placeUserReviewService.remove(reviewId, req.user.id);
   }

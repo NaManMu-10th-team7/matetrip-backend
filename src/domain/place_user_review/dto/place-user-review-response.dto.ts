@@ -34,7 +34,7 @@ export class PlaceUserReviewResponseDto {
   rating: number;
 
   @Expose()
-  createdAt: string;
+  createdAt: Date;
 
   private constructor() {}
 
@@ -48,7 +48,7 @@ export class PlaceUserReviewResponseDto {
     };
     dto.content = entity.content;
     dto.rating = entity.rating;
-    dto.createdAt = entity.createdAt.toISOString();
+    dto.createdAt = entity.createdAt;
     return dto;
   }
 }

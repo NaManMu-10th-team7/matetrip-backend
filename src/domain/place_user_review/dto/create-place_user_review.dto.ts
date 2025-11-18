@@ -5,10 +5,6 @@ export class CreatePlaceUserReviewDto {
   @IsNotEmpty()
   placeId: string;
 
-  @IsUUID()
-  @IsNotEmpty()
-  userId: string;
-
   @IsNumber({ maxDecimalPlaces: 1 })
   @Min(0)
   @Max(5)

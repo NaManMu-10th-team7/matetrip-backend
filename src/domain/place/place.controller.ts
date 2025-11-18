@@ -27,7 +27,7 @@ export class PlaceController {
   }
 
   /**
-   * @description 리뷰가 많은 순서대로 장소를 조회합니다.
+   * @description 리뷰가 많은 순서대로 장소를 조회합니다.(무한 스크롤)
    * 평균 rating 점수와 리뷰 개수를 포함합니다.
    * @param dto - 페이지네이션 파라미터 (limit, offset)
    * @returns GetMostReviewedPlacesResDto[] - 리뷰가 많은 장소 목록
