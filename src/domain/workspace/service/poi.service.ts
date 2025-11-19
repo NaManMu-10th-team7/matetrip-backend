@@ -134,4 +134,26 @@ export class PoiService {
       newlyPersistedCount,
     };
   }
+
+  // async getScheduledPoisWithDate(workspaceId: string): Promise<Poi[]> {
+  //   const planDays: PlanDayResDto[] =
+  //     await this.planDayService.getWorkspacePlanDays(workspaceId);
+
+  //   if (planDays.length === 0) {
+  //     return [];
+  //   }
+
+  //   const planDayIds = planDays.map((planDay) => planDay.id);
+  //   // 캐시 찾기
+  //   // planDayIds.map(() -> {
+  //   //   poiCacheService.getsh
+  //   // })
+  //   return this.poiRepository.find({
+  //     where: {
+  //       planDay: {
+  //         workspace: { id: workspaceId },
+  //         status: PlanDayStatus.SCHEDULED,
+  //       },
+  //     },
+  //   });
 }
