@@ -32,6 +32,7 @@ interface RawMatchRow {
   travelTendencies: DbEnumArray<TendencyType>;
   vectorDistance: number | null;
   mbti: MBTI_TYPES | null;
+  profileImageId?: string; // Add profileImageId field
 }
 
 interface MatchCandidatesResult {
@@ -313,6 +314,8 @@ export class MatchingService {
       .createQueryBuilder('post')
       .innerJoinAndSelect('post.writer', 'writer')
       .innerJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('post.image', 'image') // Join with post image entity
+      .leftJoinAndSelect('profile.profileImage', 'profileImage') // Join with profile image entity
       .where('writer.id != :userId', { userId })
       .andWhere('post.status = :status', { status: PostStatus.RECRUITING })
       .andWhere('profile.profile_embedding IS NOT NULL')
@@ -394,6 +397,7 @@ export class MatchingService {
           travelTendencies: profile.tendency,
           vectorDistance,
           mbti: profile.mbtiTypes ?? null,
+          profileImageId: profile.profileImage?.id, // Assign profileImageId
         };
         const candidate = this.toMatchCandidate(
           row,
@@ -565,6 +569,7 @@ export class MatchingService {
       overlappingTravelStyles: styleOverlap,
       overlappingTendencies: tendencyOverlap.slice(0, MAX_TENDENCY_OVERLAPS),
       mbtiMatchScore: mbtiScore,
+      profileImageId: row.profileImageId, // Assign profileImageId
     };
   }
 
@@ -670,6 +675,7 @@ export class MatchingService {
       endDate: post.endDate,
       maxParticipants: post.maxParticipants,
       keywords: post.keywords ?? [],
+      imageId: post.image?.id, // Add imageId from post.image.id
     };
   }
 
