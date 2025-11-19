@@ -11,6 +11,7 @@ export class MatchRecruitingPostDto {
   endDate: string | null;
   maxParticipants: number;
   keywords: KeywordType[];
+  imageId?: string; // Add imageId field
 }
 
 export class MatchCandidateDto {
@@ -24,6 +25,7 @@ export class MatchCandidateDto {
   mbtiMatchScore: number;
   mannerTemperature?: number;
   recruitingPosts?: MatchRecruitingPostDto[];
+  profileImageId?: string; // Add profileImageId field
 }
 
 export class MatchResponseDto {

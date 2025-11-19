@@ -34,6 +34,7 @@ interface RawMatchRow {
   vectorDistance: number | null;
   mannerTemperature?: number | null;
   mbti: MBTI_TYPES | null;
+  profileImageId?: string; // Add profileImageId field
 }
 
 interface MatchCandidatesResult {
@@ -298,7 +299,7 @@ export class MatchingService {
   ): Promise<MatchCandidateDto[]> {
     const requesterProfile = await this.profileRepository.findOne({
       where: { user: { id: userId } },
-      relations: { user: true },
+      relations: { user: true, profileImage: true }, // Add profileImage relation
     });
 
     if (!requesterProfile) {
@@ -327,6 +328,7 @@ export class MatchingService {
         'profile.profile_embedding <=> :queryEmbedding',
         'vectorDistance',
       )
+      .leftJoinAndSelect('profile.profileImage', 'profileImage') // Join with profile image entity
       .where('profile.user_id != :userId', {
         userId,
       })
@@ -381,6 +383,8 @@ export class MatchingService {
       .createQueryBuilder('post')
       .innerJoinAndSelect('post.writer', 'writer')
       .innerJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('post.image', 'image') // Join with post image entity
+      .leftJoinAndSelect('profile.profileImage', 'profileImage') // Join with profile image entity
       .where('writer.id != :userId', { userId })
       .andWhere('post.status = :status', { status: PostStatus.RECRUITING })
       .andWhere('profile.profile_embedding IS NOT NULL')
@@ -462,6 +466,8 @@ export class MatchingService {
           travelTendencies: profile.tendency,
           vectorDistance,
           mbti: profile.mbtiTypes ?? null,
+          mannerTemperature: profile.mannerTemperature, // Add mannerTemperature
+          profileImageId: profile.profileImage?.id, // Assign profileImageId
         };
         const candidate = this.toMatchCandidate(
           row,
@@ -489,7 +495,7 @@ export class MatchingService {
   ): Promise<MatchCandidatesResult> {
     const requesterProfile = await this.profileRepository.findOne({
       where: { user: { id: userId } },
-      relations: { user: true },
+      relations: { user: true, profileImage: true }, // Add profileImage relation
     });
 
     if (!requesterProfile) {
@@ -530,6 +536,7 @@ export class MatchingService {
         'profile.profile_embedding <=> :queryEmbedding',
         'vectorDistance',
       )
+      .leftJoinAndSelect('profile.profileImage', 'profileImage') // Join with profile image entity
       .where('profile.user_id != :userId', {
         userId,
       })
@@ -640,6 +647,7 @@ export class MatchingService {
       overlappingTendencies: tendencyOverlap.slice(0, MAX_TENDENCY_OVERLAPS),
       mbtiMatchScore: mbtiScore,
       mannerTemperature: this.normalizeNumber(row.mannerTemperature),
+      profileImageId: row.profileImageId, // Assign profileImageId
     } as MatchCandidateDto & { mannerTemperature: number | null };
 
     return candidate;
@@ -760,6 +768,7 @@ export class MatchingService {
       endDate: post.endDate,
       maxParticipants: post.maxParticipants,
       keywords: post.keywords ?? [],
+      imageId: post.image?.id, // Add imageId from post.image.id
     };
   }
 
