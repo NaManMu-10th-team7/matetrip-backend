@@ -22,6 +22,7 @@ export class MatchCandidateDto {
   overlappingTravelStyles: TravelStyleType[];
   overlappingTendencies: TendencyType[];
   mbtiMatchScore: number;
+  mannerTemperature?: number;
   recruitingPosts?: MatchRecruitingPostDto[];
 }
 
