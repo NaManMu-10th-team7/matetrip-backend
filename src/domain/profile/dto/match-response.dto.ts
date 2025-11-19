@@ -11,6 +11,7 @@ export class MatchRecruitingPostDto {
   endDate: string | null;
   maxParticipants: number;
   keywords: KeywordType[];
+  imageId?: string; // Add imageId field
 }
 
 export class MatchCandidateDto {
@@ -22,7 +23,9 @@ export class MatchCandidateDto {
   overlappingTravelStyles: TravelStyleType[];
   overlappingTendencies: TendencyType[];
   mbtiMatchScore: number;
+  mannerTemperature?: number;
   recruitingPosts?: MatchRecruitingPostDto[];
+  profileImageId?: string; // Add profileImageId field
 }
 
 export class MatchResponseDto {

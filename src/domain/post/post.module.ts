@@ -6,6 +6,7 @@ import { Post } from './entities/post.entity';
 import { Workspace } from '../workspace/entities/workspace.entity';
 import { PostParticipation } from '../post-participation/entities/post-participation.entity';
 import { BinaryContent } from '../binary-content/entities/binary-content.entity';
+import { ProfileModule } from '../profile/profile.module';
 import { BinaryContentModule } from '../binary-content/binary-content.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { Users } from '../users/entities/users.entity';
@@ -21,6 +22,7 @@ import { Users } from '../users/entities/users.entity';
     ]),
     BinaryContentModule,
     NotificationsModule,
+    ProfileModule,
   ],
   controllers: [PostController],
   providers: [PostService],

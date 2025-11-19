@@ -16,6 +16,7 @@ import { TravelStyleType } from './entities/travel-style-type.enum';
 import { TendencyType } from './entities/tendency-type.enum';
 import { Post } from '../post/entities/post.entity';
 import { PostStatus } from '../post/entities/post-status.enum';
+//import { PostParticipation } from '../post-participation/entities/post-participation.entity';
 import { MBTI_TYPES } from './entities/mbti.enum';
 import { EmbeddingMatchingProfileDto } from './dto/embedding-matching-profile.dto';
 import { NovaService } from '../../ai/summaryLLM.service';
@@ -31,7 +32,9 @@ interface RawMatchRow {
   travelStyles: DbEnumArray<TravelStyleType>;
   travelTendencies: DbEnumArray<TendencyType>;
   vectorDistance: number | null;
+  mannerTemperature?: number | null;
   mbti: MBTI_TYPES | null;
+  profileImageId?: string; // Add profileImageId field
 }
 
 interface MatchCandidatesResult {
@@ -40,6 +43,7 @@ interface MatchCandidatesResult {
 }
 
 const DEFAULT_LIMIT = 150;
+const POST_DEFAULT_LIMIT = 4;
 const VECTOR_WEIGHT = 0.3;
 const STYLE_WEIGHT = 0.25;
 const MBTI_WEIGHT = 0.25;
@@ -276,6 +280,7 @@ export class MatchingService {
     private readonly titanEmbeddingService: TitanEmbeddingService,
   ) {}
 
+  //전체 유저에서 나와 맞는 게시글이 모집중인 유저 찾기
   async findMatches(
     userId: string,
     matchRequestDto: MatchRequestDto,
@@ -287,6 +292,71 @@ export class MatchingService {
     return matches;
   }
 
+  //전체 유저에서 나와 맞는 유저 찾기
+  async findMatchesWithAllUsers(
+    userId: string,
+    matchRequestDto: MatchRequestDto,
+  ): Promise<MatchCandidateDto[]> {
+    const requesterProfile = await this.profileRepository.findOne({
+      where: { user: { id: userId } },
+      relations: { user: true, profileImage: true }, // Add profileImage relation
+    });
+
+    if (!requesterProfile) {
+      throw new NotFoundException('요청한 사용자의 프로필을 찾을 수 없습니다.');
+    }
+
+    if (!requesterProfile.profileEmbedding) {
+      throw new BadRequestException(
+        '요청한 사용자의 임베딩 정보가 아직 준비되지 않았습니다.',
+      );
+    }
+    //MatchRequestDto에서 보낸게 없으면 profile 데이터에서 찾아옴 =baseTravelStyles,baseTravelTendencies
+    const baseTravelStyles = requesterProfile.travelStyles ?? [];
+    const baseTravelTendencies = requesterProfile.tendency ?? [];
+
+    const limit = matchRequestDto.limit ?? POST_DEFAULT_LIMIT;
+
+    const qb = this.profileRepository
+      .createQueryBuilder('profile')
+      .select('profile.user_id', 'userId')
+      .addSelect('profile.travel_styles', 'travelStyles')
+      .addSelect('profile.tendency', 'travelTendencies')
+      .addSelect('profile.mbti', 'mbti')
+      .addSelect('profile.manner_temperature', 'mannerTemperature')
+      .addSelect(
+        'profile.profile_embedding <=> :queryEmbedding',
+        'vectorDistance',
+      )
+      .leftJoinAndSelect('profile.profileImage', 'profileImage') // Join with profile image entity
+      .where('profile.user_id != :userId', {
+        userId,
+      })
+      .andWhere('profile.profile_embedding IS NOT NULL')
+      .orderBy('profile.profile_embedding <=> :queryEmbedding', 'ASC')
+      .limit(limit)
+      .setParameter(
+        'queryEmbedding',
+        toVectorLiteral(requesterProfile.profileEmbedding),
+      );
+
+    const rawCandidates = await qb.getRawMany<RawMatchRow>();
+    // raw result -> 가중치 기반 점수 계산 -> 점수 내림차순 정렬
+    const matches = rawCandidates
+      .map((row) =>
+        this.toMatchCandidate(
+          row,
+          baseTravelStyles,
+          baseTravelTendencies,
+          requesterProfile.mbtiTypes ?? null,
+        ),
+      )
+      .sort((a, b) => b.score - a.score);
+
+    return matches;
+  }
+
+  //전체글에서 필터링한 글들 유저성향이 나와 가장 맞는 사람들부터 보여주기
   async findMatchesWithRecruitingPosts(
     userId: string,
     matchRequestDto: MatchRequestDto,
@@ -313,6 +383,8 @@ export class MatchingService {
       .createQueryBuilder('post')
       .innerJoinAndSelect('post.writer', 'writer')
       .innerJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('post.image', 'image') // Join with post image entity
+      .leftJoinAndSelect('profile.profileImage', 'profileImage') // Join with profile image entity
       .where('writer.id != :userId', { userId })
       .andWhere('post.status = :status', { status: PostStatus.RECRUITING })
       .andWhere('profile.profile_embedding IS NOT NULL')
@@ -394,6 +466,8 @@ export class MatchingService {
           travelTendencies: profile.tendency,
           vectorDistance,
           mbti: profile.mbtiTypes ?? null,
+          mannerTemperature: profile.mannerTemperature, // Add mannerTemperature
+          profileImageId: profile.profileImage?.id, // Assign profileImageId
         };
         const candidate = this.toMatchCandidate(
           row,
@@ -421,7 +495,7 @@ export class MatchingService {
   ): Promise<MatchCandidatesResult> {
     const requesterProfile = await this.profileRepository.findOne({
       where: { user: { id: userId } },
-      relations: { user: true },
+      relations: { user: true, profileImage: true }, // Add profileImage relation
     });
 
     if (!requesterProfile) {
@@ -457,16 +531,18 @@ export class MatchingService {
       .addSelect('profile.travel_styles', 'travelStyles')
       .addSelect('profile.tendency', 'travelTendencies')
       .addSelect('profile.mbti', 'mbti')
+      .addSelect('profile.manner_temperature', 'mannerTemperature')
       .addSelect(
         'profile.profile_embedding <=> :queryEmbedding',
         'vectorDistance',
       )
+      .leftJoinAndSelect('profile.profileImage', 'profileImage') // Join with profile image entity
       .where('profile.user_id != :userId', {
         userId,
       })
       .andWhere('profile.profile_embedding IS NOT NULL')
       .orderBy('profile.profile_embedding <=> :queryEmbedding', 'ASC')
-      .limit(limit)
+      .limit(limit + 10) //백터 기준으로 잘라 버리기에 조금 더 limit 을 크게 둠
       .setParameter(
         'queryEmbedding',
         toVectorLiteral(requesterProfile.profileEmbedding),
@@ -477,8 +553,11 @@ export class MatchingService {
         .subQuery()
         .select('1')
         .from(Post, 'post')
-        .where('post.writer_id = profile.user_id') //매칭 후보가 모집 중 글을 올렸는지를 가리는 필터
-        .andWhere('post.status = :recruitingStatus') //게시글이 모집중인지 구별하는 필터
+        // 후보 프로필이 작성한 게시글 중
+        .where('post.writer_id = profile.user_id')
+        // 현재 모집 중인 글이 하나라도 있는지를 체크한다.
+        .andWhere('post.status = :recruitingStatus')
+        // 이미 내가 신청/참여한 게시글은 제외해야 하므로 NOT EXISTS로 필터링
         .getQuery();
       return `EXISTS ${subQuery}`;
     });
@@ -510,8 +589,10 @@ export class MatchingService {
       )
       .sort((a, b) => b.score - a.score);
 
+    const slicedMatches = matches.slice(0, limit);
+
     return {
-      matches,
+      matches: slicedMatches,
       query: {
         ...matchRequestDto,
         limit,
@@ -551,7 +632,7 @@ export class MatchingService {
 
     const mbtiScore = this.calculateMbtiScore(baseMbti, row.mbti);
 
-    return {
+    const candidate = {
       userId: row.userId,
       score: this.composeScore(
         vectorScore,
@@ -565,7 +646,11 @@ export class MatchingService {
       overlappingTravelStyles: styleOverlap,
       overlappingTendencies: tendencyOverlap.slice(0, MAX_TENDENCY_OVERLAPS),
       mbtiMatchScore: mbtiScore,
-    };
+      mannerTemperature: this.normalizeNumber(row.mannerTemperature),
+      profileImageId: row.profileImageId, // Assign profileImageId
+    } as MatchCandidateDto & { mannerTemperature: number | null };
+
+    return candidate;
   }
 
   private calculateOverlap<T>(base: T[], candidate: T[]): T[] {
@@ -595,6 +680,19 @@ export class MatchingService {
       .split(',')
       .map((item) => item.replace(/^"(.*)"$/, '$1') as T)
       .filter((item) => item !== undefined && item !== null && item !== '');
+  }
+  //문자열 number로 변환(36.5도를 문자열로 인식)
+  private normalizeNumber(
+    value: number | string | null | undefined,
+  ): number | null {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
   }
 
   private calculateRatio(overlapCount: number, baseTotal: number): number {
@@ -670,6 +768,7 @@ export class MatchingService {
       endDate: post.endDate,
       maxParticipants: post.maxParticipants,
       keywords: post.keywords ?? [],
+      imageId: post.image?.id, // Add imageId from post.image.id
     };
   }
 

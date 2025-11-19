@@ -12,6 +12,7 @@ import {
 import { PostStatus } from '../entities/post-status.enum';
 import { KeywordType } from '../entities/keywords-type.enum';
 import { UserResponseDto } from '../../users/dto/user-response.dto';
+import { MatchCandidateDto } from 'src/domain/profile/dto/match-response.dto';
 import { SimplePostParticipationResponseDto } from '../../post-participation/dto/simple-post-participation-response.dto';
 
 export class PostResponseDto {
@@ -65,6 +66,9 @@ export class PostResponseDto {
   @IsOptional()
   @IsUUID()
   imageId?: string;
+
+  @Expose()
+  matchResult: MatchCandidateDto[] | null;
 
   @Expose()
   @Type(() => SimplePostParticipationResponseDto)
