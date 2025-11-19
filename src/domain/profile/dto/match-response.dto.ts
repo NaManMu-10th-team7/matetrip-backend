@@ -2,6 +2,7 @@ import { TravelStyleType } from '../../profile/entities/travel-style-type.enum';
 import { TendencyType } from '../../profile/entities/tendency-type.enum';
 import { KeywordType } from '../../post/entities/keywords-type.enum';
 import { MatchRequestDto } from './match-request.dto';
+import { MBTI_TYPES } from '../../profile/entities/mbti.enum';
 
 export class MatchRecruitingPostDto {
   id: string;
@@ -13,6 +14,14 @@ export class MatchRecruitingPostDto {
   keywords: KeywordType[];
 }
 
+export class ProfileSummaryDto {
+  userId: string;
+  nickname: string;
+  mbtiTypes: MBTI_TYPES | null;
+  mannerTemperature?: number | null;
+  profileImageId: string | null;
+}
+
 export class MatchCandidateDto {
   userId: string;
   score: number;
@@ -22,7 +31,7 @@ export class MatchCandidateDto {
   overlappingTravelStyles: TravelStyleType[];
   overlappingTendencies: TendencyType[];
   mbtiMatchScore: number;
-  mannerTemperature?: number;
+  profile?: ProfileSummaryDto | null;
   recruitingPosts?: MatchRecruitingPostDto[];
 }
 
