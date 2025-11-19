@@ -32,7 +32,9 @@ interface RawMatchRow {
   travelStyles: DbEnumArray<TravelStyleType>;
   travelTendencies: DbEnumArray<TendencyType>;
   vectorDistance: number | null;
+  mannerTemperature?: number | null;
   mbti: MBTI_TYPES | null;
+  profileImageId?: string; // Add profileImageId field
 }
 
 interface MatchCandidatesResult {
@@ -420,6 +422,8 @@ export class MatchingService {
       .createQueryBuilder('post')
       .innerJoinAndSelect('post.writer', 'writer')
       .innerJoinAndSelect('writer.profile', 'profile')
+      .leftJoinAndSelect('post.image', 'image') // Join with post image entity
+      .leftJoinAndSelect('profile.profileImage', 'profileImage') // Join with profile image entity
       .where('writer.id != :userId', { userId })
       .andWhere('post.status = :status', { status: PostStatus.RECRUITING })
       .andWhere('profile.profile_embedding IS NOT NULL')
@@ -501,6 +505,8 @@ export class MatchingService {
           travelTendencies: profile.tendency,
           vectorDistance,
           mbti: profile.mbtiTypes ?? null,
+          mannerTemperature: profile.mannerTemperature, // Add mannerTemperature
+          profileImageId: profile.profileImage?.id, // Assign profileImageId
         };
         const candidate = this.toMatchCandidate(
           row,
@@ -528,7 +534,7 @@ export class MatchingService {
   ): Promise<MatchCandidatesResult> {
     const requesterProfile = await this.profileRepository.findOne({
       where: { user: { id: userId } },
-      relations: { user: true },
+      relations: { user: true, profileImage: true }, // Add profileImage relation
     });
 
     if (!requesterProfile) {
@@ -564,11 +570,11 @@ export class MatchingService {
       .addSelect('profile.travel_styles', 'travelStyles')
       .addSelect('profile.tendency', 'travelTendencies')
       .addSelect('profile.mbti', 'mbti')
-      .addSelect('profile.manner_temperature', 'mannerTemperature')
       .addSelect(
         'profile.profile_embedding <=> :queryEmbedding',
         'vectorDistance',
       )
+      .leftJoinAndSelect('profile.profileImage', 'profileImage') // Join with profile image entity
       .where('profile.user_id != :userId', {
         userId,
       })
@@ -711,19 +717,6 @@ export class MatchingService {
       .map((item) => item.replace(/^"(.*)"$/, '$1') as T)
       .filter((item) => item !== undefined && item !== null && item !== '');
   }
-  //문자열 number로 변환(36.5도를 문자열로 인식)
-  private normalizeNumber(
-    value: number | string | null | undefined,
-  ): number | null {
-    if (typeof value === 'number') {
-      return Number.isFinite(value) ? value : null;
-    }
-    if (typeof value === 'string') {
-      const parsed = parseFloat(value);
-      return Number.isFinite(parsed) ? parsed : null;
-    }
-    return null;
-  }
 
   private calculateRatio(overlapCount: number, baseTotal: number): number {
     if (!baseTotal || baseTotal <= 0) {
@@ -798,6 +791,7 @@ export class MatchingService {
       endDate: post.endDate,
       maxParticipants: post.maxParticipants,
       keywords: post.keywords ?? [],
+      imageId: post.image?.id, // Add imageId from post.image.id
     };
   }
 

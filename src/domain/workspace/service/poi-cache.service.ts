@@ -194,6 +194,27 @@ export class PoiCacheService {
   }
 
   /**
+   * planDayId 기준으로 캐시된 SCHEDULED POI 전체를 순서대로 가져옵니다.
+   * Redis List에 저장된 순서를 그대로 유지합니다.
+   */
+  async getScheduledPoisByPlanDay(
+    workspaceId: string,
+    planDayId: string,
+  ): Promise<CachedPoi[]> {
+    const ids = await this.getScheduledPoiIds(planDayId);
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const pois = await Promise.all(
+      ids.map((poiId) => this.getPoi(workspaceId, poiId)),
+    );
+
+    // List 순서 유지한 채 존재하는 것만 반환
+    return pois.filter((poi): poi is CachedPoi => Boolean(poi));
+  }
+
+  /**
    * 특정 POI를 Redis Hash에서 가져옵니다.
    */
   async getPoi(

@@ -16,6 +16,9 @@ import { UserBehaviorEventRepository } from '../user_behavior/user_behavior_even
 import { GetPlaceIdWithTimeDto } from './dto/get-placeId-with-time.dto.js';
 import { GetMostReviewedPlacesReqDto } from './dto/get-most-reviewed-places-req.dto.js';
 import { GetMostReviewedPlacesResDto } from './dto/get-most-reviewed-places-res.dto.js';
+import { GetNearbyPlacesReqDto } from './dto/get-nearby-places-req.dto.js';
+import { NearbyPlaceResDto } from './dto/nearby-place-res.dto.js';
+import { GetPlaceAndNearbyPlacesResDto } from './dto/get-place-and-nearby-places-res.dto.js';
 
 @Injectable()
 export class PlaceService {
@@ -610,5 +613,38 @@ export class PlaceService {
     }
 
     return dotProduct / magnitude;
+  }
+
+  async getPlaceAndNearbyPlaces(
+    placeId: string,
+  ): Promise<GetPlaceAndNearbyPlacesResDto> {
+    // 1. 특정 장소 조회
+    const place = await this.placeRepo.findOneBy({ id: placeId });
+    if (!place) {
+      throw new NotFoundException(`Place not found ${placeId}`);
+    }
+
+    // 2. 근처 장소 조회
+    // PostgreSQL의 point 타입과 <-> 연산자를 사용하여 거리 기반 정렬
+    const longitude = place.longitude;
+    const latitude = place.latitude;
+    const nearbyPlaces = await this.placeRepo
+      .createQueryBuilder('p')
+      .where('p.id != :placeId', { placeId })
+      .orderBy(
+        `point(p.longitude, p.latitude) <-> point(:longitude, :latitude)`,
+        'ASC',
+      )
+      .setParameters({
+        longitude,
+        latitude,
+      })
+      .limit(4) // 임시
+      .getMany();
+
+    return {
+      place: GetPlacesResDto.from(place),
+      nearbyPlaces: nearbyPlaces.map((p) => NearbyPlaceResDto.from(p)),
+    };
   }
 }

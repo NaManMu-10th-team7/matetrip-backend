@@ -12,6 +12,7 @@ export class MatchRecruitingPostDto {
   endDate: string | null;
   maxParticipants: number;
   keywords: KeywordType[];
+  imageId?: string; // Add imageId field
 }
 
 export class ProfileSummaryDto {
@@ -33,6 +34,7 @@ export class MatchCandidateDto {
   mbtiMatchScore: number;
   profile?: ProfileSummaryDto | null;
   recruitingPosts?: MatchRecruitingPostDto[];
+  profileImageId?: string; // Add profileImageId field
 }
 
 export class MatchResponseDto {
