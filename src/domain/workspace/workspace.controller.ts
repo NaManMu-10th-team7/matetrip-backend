@@ -7,6 +7,7 @@ import {
   Delete,
   UseGuards,
   Req,
+  Logger,
 } from '@nestjs/common';
 import { WorkspaceService } from './service/workspace.service';
 import { CreateWorkspaceReqDto } from './dto/create-workspace-req.dto';
@@ -21,6 +22,7 @@ import { PoiService } from './service/poi.service.js';
 
 @Controller('workspace')
 export class WorkspaceController {
+  private readonly logger = new Logger(WorkspaceController.name);
   constructor(
     private readonly workspaceService: WorkspaceService,
     private readonly reviewService: ReviewService,
@@ -99,9 +101,8 @@ export class WorkspaceController {
   @Get(':workspaceId/scheduled-pois')
   getScheduledPois(
     @Param('workspaceId') workspaceId: string,
-    // todo: DateGroupedScheduledPoisResDto
   ): Promise<PlanDayScheduledPoisGroupDto[]> {
-    console.log('[getScheduledPois] 시작');
+    this.logger.log(`[getScheduledPois] 시작 - workspaceId: ${workspaceId}`);
     return this.poiService.getScheduledPois(workspaceId);
   }
 }
