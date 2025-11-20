@@ -621,13 +621,15 @@ export class MatchingService {
     );
 
     const vectorScore = this.normalizeVectorDistance(row.vectorDistance);
-    const styleScore = this.calculateRatio(
+    const styleScore = this.calculateCosineSimilarity(
       styleOverlap.length,
       baseTravelStyles.length,
+      candidateStyles.length,
     );
-    const tendencyScore = this.calculateRatio(
+    const tendencyScore = this.calculateCosineSimilarity(
       tendencyOverlap.length,
       baseTravelTendencies.length,
+      candidateTendencies.length,
     );
 
     const mbtiScore = this.calculateMbtiScore(baseMbti, row.mbti);
@@ -695,12 +697,21 @@ export class MatchingService {
     return null;
   }
 
-  private calculateRatio(overlapCount: number, baseTotal: number): number {
-    if (!baseTotal || baseTotal <= 0) {
+  private calculateCosineSimilarity(
+    overlapCount: number,
+    baseTotal: number,
+    candidateTotal: number,
+  ): number {
+    if (!baseTotal || !candidateTotal) {
       return 0;
     }
 
-    return overlapCount / baseTotal;
+    const denominator = Math.sqrt(baseTotal * candidateTotal);
+    if (!denominator || denominator <= 0) {
+      return 0;
+    }
+
+    return overlapCount / denominator;
   }
 
   private normalizeVectorDistance(distance: number | null): number {
