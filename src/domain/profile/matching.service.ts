@@ -689,6 +689,7 @@ export class MatchingService {
       overlappingTravelStyles: styleOverlap,
       overlappingTendencies: tendencyOverlap.slice(0, MAX_TENDENCY_OVERLAPS),
       mbtiMatchScore: mbtiScore,
+      profileImageId: row.profileImageId,
     } as MatchCandidateDto;
 
     return candidate;
