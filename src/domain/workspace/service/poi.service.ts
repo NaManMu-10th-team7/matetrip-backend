@@ -10,7 +10,11 @@ import { Place } from '../../place/entities/place.entity.js';
 import { PlanDayService } from './plan-day.service.js';
 import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 import { PoiResDto } from '../dto/poi/poi-res.dto.js';
-import { PlanDayScheduledPoisGroupDto } from '../dto/poi/get-date-grouped-scheduled-pois.dto.js';
+import {
+  PlanDayScheduledPoisGroupDto,
+  PlanDayScheduleSummaryDto,
+} from '../dto/poi/get-date-grouped-scheduled-pois.dto.js';
+import { plainToInstance } from 'class-transformer';
 // import { DateGroupedScheduledPoisResDto } from '../dto/poi/get-date-grouped-scheduled-pois.dto.js';
 
 @Injectable()
@@ -164,12 +168,17 @@ export class PoiService {
 
       // DTO로 변환
       const poisDto = scheduledPois.map((poi) => PoiResDto.fromCachedPoi(poi));
-
-      results.push({
-        planDay: {
-          dayNo: planDay.dayNo,
-          planDate: planDay.planDate,
+      const planDaySummary = plainToInstance(
+        PlanDayScheduleSummaryDto,
+        planDay,
+        {
+          excludeExtraneousValues: true,
         },
+      );
+
+      // todo: 딕셔너리말고 다르게
+      results.push({
+        planDay: planDaySummary,
         pois: poisDto,
       });
     }
