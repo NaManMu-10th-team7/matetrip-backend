@@ -32,9 +32,9 @@ interface RawMatchRow {
   travelStyles: DbEnumArray<TravelStyleType>;
   travelTendencies: DbEnumArray<TendencyType>;
   vectorDistance: number | null;
-  mannerTemperature?: number | null;
+  //mannerTemperature?: number | null;
   mbti: MBTI_TYPES | null;
-  profileImageId?: string; // Add profileImageId field
+  // profileImageId?: string; // Add profileImageId field
 }
 
 interface MatchCandidatesResult {
@@ -507,8 +507,8 @@ export class MatchingService {
           travelTendencies: profile.tendency,
           vectorDistance,
           mbti: profile.mbtiTypes ?? null,
-          mannerTemperature: profile.mannerTemperature, // Add mannerTemperature
-          profileImageId: profile.profileImage?.id, // Assign profileImageId
+          //mannerTemperature: profile.mannerTemperature, // Add mannerTemperature
+          //profileImageId: profile.profileImage?.id, // Assign profileImageId
         };
         const candidate = this.toMatchCandidate(
           row,
@@ -516,6 +516,13 @@ export class MatchingService {
           baseTravelTendencies,
           requesterProfile.mbtiTypes ?? null,
         );
+        candidate.profile = {
+          userId: writerId,
+          nickname: profile.nickname ?? '',
+          mbtiTypes: profile.mbtiTypes ?? null,
+          mannerTemperature: profile.mannerTemperature ?? null,
+          profileImageId: profile.profileImage?.id ?? null,
+        };
         return {
           ...candidate,
           recruitingPosts: posts,
@@ -689,7 +696,6 @@ export class MatchingService {
       overlappingTravelStyles: styleOverlap,
       overlappingTendencies: tendencyOverlap.slice(0, MAX_TENDENCY_OVERLAPS),
       mbtiMatchScore: mbtiScore,
-      profileImageId: row.profileImageId,
     } as MatchCandidateDto;
 
     return candidate;
