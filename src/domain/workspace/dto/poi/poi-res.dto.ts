@@ -13,8 +13,8 @@ type PoiResDtoProps = {
   latitude: number;
   status: PoiStatus;
   sequence: number;
-  planDayId?: string;
   placeId: string;
+  planDayId?: string;
 };
 
 export class PoiResDto {
@@ -82,8 +82,8 @@ export class PoiResDto {
       latitude: poi.latitude,
       status: poi.status,
       sequence: poi.sequence,
-      planDayId: poi.planDay?.id,
       placeId: poi.place?.id,
+      planDayId: poi.planDay?.id,
     });
   }
 }

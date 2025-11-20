@@ -10,6 +10,12 @@ import { Place } from '../../place/entities/place.entity.js';
 import { PlanDayService } from './plan-day.service.js';
 import { PlanDayResDto } from '../dto/planday/plan-day-res.dto.js';
 import { PoiResDto } from '../dto/poi/poi-res.dto.js';
+import {
+  PlanDayScheduledPoisGroupDto,
+  PlanDayScheduleSummaryDto,
+} from '../dto/poi/get-date-grouped-scheduled-pois.dto.js';
+import { plainToInstance } from 'class-transformer';
+// import { DateGroupedScheduledPoisResDto } from '../dto/poi/get-date-grouped-scheduled-pois.dto.js';
 
 @Injectable()
 export class PoiService {
@@ -134,4 +140,73 @@ export class PoiService {
       newlyPersistedCount,
     };
   }
+
+  async getScheduledPois(
+    workspaceId: string,
+  ): Promise<PlanDayScheduledPoisGroupDto[]> {
+    /**
+     * 1. workspaceId로 planDays 찾기
+     * 2. 각 planday별 scheduled pois를 찾기
+     * 3. PlanDayScheduledPoisGroupDto 형태로 반환
+     */
+    const planDays: PlanDayResDto[] =
+      await this.planDayService.getWorkspacePlanDays(workspaceId);
+
+    if (planDays.length === 0) {
+      return [];
+    }
+
+    // 각 planDay별로 scheduled POI들을 가져와서 그룹화
+    const results: PlanDayScheduledPoisGroupDto[] = [];
+
+    for (const planDay of planDays) {
+      const scheduledPois =
+        await this.poiCacheService.getScheduledPoisByPlanDay(
+          workspaceId,
+          planDay.id,
+        );
+
+      // DTO로 변환
+      const poisDto = scheduledPois.map((poi) => PoiResDto.fromCachedPoi(poi));
+      const planDaySummary = plainToInstance(
+        PlanDayScheduleSummaryDto,
+        planDay,
+        {
+          excludeExtraneousValues: true,
+        },
+      );
+
+      // todo: 딕셔너리말고 다르게
+      results.push({
+        planDay: planDaySummary,
+        pois: poisDto,
+      });
+    }
+
+    return results;
+  }
+
+  // ): Promise<DateGroupedScheduledPoisResDto> {
+
+  // async getScheduledPoisWithDate(workspaceId: string): Promise<Poi[]> {
+  //   const planDays: PlanDayResDto[] =
+  //     await this.planDayService.getWorkspacePlanDays(workspaceId);
+
+  //   if (planDays.length === 0) {
+  //     return [];
+  //   }
+
+  //   const planDayIds = planDays.map((planDay) => planDay.id);
+  //   // 캐시 찾기
+  //   // planDayIds.map(() -> {
+  //   //   poiCacheService.getsh
+  //   // })
+  //   return this.poiRepository.find({
+  //     where: {
+  //       planDay: {
+  //         workspace: { id: workspaceId },
+  //         status: PlanDayStatus.SCHEDULED,
+  //       },
+  //     },
+  //   });
 }
