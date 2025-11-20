@@ -19,11 +19,11 @@ export class PlanDayScheduledPoisGroupDto {
   pois: PoiResDto[];
 }
 
-export class DateGroupedScheduledPoisResDto {
-  @Expose()
-  @Type(() => PlanDayScheduledPoisGroupDto)
-  planDayScheduledPoisGroup: PlanDayScheduledPoisGroupDto[];
-}
+// export class DateGroupedScheduledPoisResDto {
+//   @Expose()
+//   @Type(() => PlanDayScheduledPoisGroupDto)
+//   planDayScheduledPoisGroup: PlanDayScheduledPoisGroupDto[];
+// }
 
 // TODO : 분석 관련 DTO
 // GET /workspace/:workspaceId/poi-analysis

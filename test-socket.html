@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Socket.IO Chat Test</title>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Socket.IO Chat Connection Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+
+    <script>
+        const socket = io('http://localhost:3004/chat', {
+            transports: ['websocket', 'polling']
+        });
+
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+
+        socket.on('connect', () => {
+            statusDiv.textContent = 'Connected! Socket ID: ' + socket.id;
+            statusDiv.style.color = 'green';
+            console.log('Connected to Socket.IO server');
+
+            // Test join event
+            socket.emit('join', {
+                workspaceId: 'test-workspace-id',
+                username: 'TestUser'
+            });
+        });
+
+        socket.on('disconnect', () => {
+            statusDiv.textContent = 'Disconnected';
+            statusDiv.style.color = 'red';
+            console.log('Disconnected from server');
+        });
+
+        socket.on('error', (error) => {
+            const msg = document.createElement('div');
+            msg.textContent = 'Error: ' + JSON.stringify(error);
+            msg.style.color = 'red';
+            messagesDiv.appendChild(msg);
+            console.error('Socket error:', error);
+        });
+
+        socket.on('joined', (data) => {
+            const msg = document.createElement('div');
+            msg.textContent = 'Joined: ' + JSON.stringify(data);
+            msg.style.color = 'blue';
+            messagesDiv.appendChild(msg);
+            console.log('Joined:', data);
+        });
+
+        socket.on('message', (data) => {
+            const msg = document.createElement('div');
+            msg.textContent = 'Message: ' + JSON.stringify(data);
+            messagesDiv.appendChild(msg);
+            console.log('Message received:', data);
+        });
+    </script>
+</body>
+</html>

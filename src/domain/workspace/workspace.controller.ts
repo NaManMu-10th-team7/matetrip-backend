@@ -18,6 +18,8 @@ import { PoiGateway } from './gateway/poi.gateway.js';
 import { PoiOptimizeReqDto } from './dto/poi/poi-optimize-req.dto.js';
 import { PlanReqDto } from './dto/workspace-res.dto';
 import { RegionGroup } from '../place/entities/region_group.enum.js';
+import { DateGroupedScheduledPoisResDto } from './dto/poi/get-date-grouped-scheduled-pois.dto.js';
+import { PoiService } from './service/poi.service.js';
 
 @Controller('workspace')
 export class WorkspaceController {
@@ -25,6 +27,7 @@ export class WorkspaceController {
     private readonly workspaceService: WorkspaceService,
     private readonly reviewService: ReviewService,
     private readonly poiGateway: PoiGateway,
+    private readonly poiService: PoiService,
   ) {}
 
   @Post()
@@ -93,5 +96,13 @@ export class WorkspaceController {
   @Get(':workspaceId/post')
   getPostByWorkspaceId(@Param('workspaceId') workspaceId: string) {
     return this.workspaceService.getPostByWorkspaceId(workspaceId);
+  }
+
+  @Get(':workspaceId/scheduled-pois')
+  getScheduledPois(
+    @Param('workspaceId') workspaceId: string,
+    // todo: DateGroupedScheduledPoisResDto
+  ) {
+    return this.poiService.getScheduledPois(workspaceId);
   }
 }
