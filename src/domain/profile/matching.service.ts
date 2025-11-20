@@ -564,10 +564,8 @@ export class MatchingService {
         ? matchRequestDto.travelTendencies
         : baseTravelTendencies;
 
-    let limit = matchRequestDto.limit ?? DEFAULT_LIMIT;
-    if (limit < 40) {
-      limit = 40;
-    }
+    const limit = matchRequestDto.limit ?? DEFAULT_LIMIT;
+    const limitBarrier = Math.max(limit, 30);
 
     const qb = this.profileRepository
       .createQueryBuilder('profile')
@@ -585,7 +583,7 @@ export class MatchingService {
       })
       .andWhere('profile.profile_embedding IS NOT NULL')
       .orderBy('profile.profile_embedding <=> :queryEmbedding', 'ASC')
-      .limit(limit) //백터 기준으로 잘라 버리기에 조금 더 limit 을 크게 둠
+      .limit(limitBarrier) //30보다 작으면 무조건 30개를 벡터유사도로 잘라 비교함
       .setParameter(
         'queryEmbedding',
         toVectorLiteral(requesterProfile.profileEmbedding),
