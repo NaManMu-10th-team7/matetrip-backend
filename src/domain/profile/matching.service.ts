@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { MatchRequestDto } from './dto/match-request.dto';
 import {
   MatchCandidateDto,
@@ -299,7 +299,7 @@ export class MatchingService {
   ): Promise<MatchCandidateDto[]> {
     const requesterProfile = await this.profileRepository.findOne({
       where: { user: { id: userId } },
-      relations: { user: true, profileImage: true }, // Add profileImage relation
+      relations: { user: true },
     });
 
     if (!requesterProfile) {
@@ -311,7 +311,8 @@ export class MatchingService {
         '요청한 사용자의 임베딩 정보가 아직 준비되지 않았습니다.',
       );
     }
-    //MatchRequestDto에서 보낸게 없으면 profile 데이터에서 찾아옴 =baseTravelStyles,baseTravelTendencies
+
+    // MatchRequestDto에서 보낸게 없으면 profile 데이터에서 찾아옴 = baseTravelStyles, baseTravelTendencies
     const baseTravelStyles = requesterProfile.travelStyles ?? [];
     const baseTravelTendencies = requesterProfile.tendency ?? [];
 
@@ -323,15 +324,11 @@ export class MatchingService {
       .addSelect('profile.travel_styles', 'travelStyles')
       .addSelect('profile.tendency', 'travelTendencies')
       .addSelect('profile.mbti', 'mbti')
-      .addSelect('profile.manner_temperature', 'mannerTemperature')
       .addSelect(
         'profile.profile_embedding <=> :queryEmbedding',
         'vectorDistance',
       )
-      .leftJoinAndSelect('profile.profileImage', 'profileImage') // Join with profile image entity
-      .where('profile.user_id != :userId', {
-        userId,
-      })
+      .where('profile.user_id != :userId', { userId })
       .andWhere('profile.profile_embedding IS NOT NULL')
       .orderBy('profile.profile_embedding <=> :queryEmbedding', 'ASC')
       .limit(limit)
@@ -341,6 +338,7 @@ export class MatchingService {
       );
 
     const rawCandidates = await qb.getRawMany<RawMatchRow>();
+
     // raw result -> 가중치 기반 점수 계산 -> 점수 내림차순 정렬
     const matches = rawCandidates
       .map((row) =>
@@ -352,6 +350,47 @@ export class MatchingService {
         ),
       )
       .sort((a, b) => b.score - a.score);
+
+    // ✅ 여기서부터 profile 붙이기
+
+    // 1) 매칭된 userId 리스트 뽑기
+    const targetUserIds: string[] = matches.map((m) => m.userId);
+    if (targetUserIds.length === 0) {
+      return [];
+    }
+
+    // 2) 해당 유저들의 프로필을 한 번에 조회 (필요한 relation까지)
+    const profiles = await this.profileRepository.find({
+      where: { user: { id: In(targetUserIds) } },
+      relations: {
+        user: true,
+        profileImage: true, // 프로필 이미지까지 필요하면
+      },
+    });
+
+    // 3) userId -> profile 매핑
+    const profileMap = new Map<string, Profile>();
+    for (const profile of profiles) {
+      if (profile.user?.id) {
+        profileMap.set(profile.user.id, profile);
+      }
+    }
+
+    matches.forEach((m) => {
+      const profile = profileMap.get(m.userId);
+      if (!profile) {
+        m.profile = null;
+        return;
+      }
+      //profile붙여주기
+      m.profile = {
+        userId: profile.user.id,
+        nickname: profile.nickname ?? '',
+        mbtiTypes: profile.mbtiTypes ?? null,
+        profileImageId: profile.profileImage?.id ?? null,
+        mannerTemperature: profile.mannerTemperature ?? null,
+      };
+    });
 
     return matches;
   }
@@ -531,7 +570,6 @@ export class MatchingService {
       .addSelect('profile.travel_styles', 'travelStyles')
       .addSelect('profile.tendency', 'travelTendencies')
       .addSelect('profile.mbti', 'mbti')
-      .addSelect('profile.manner_temperature', 'mannerTemperature')
       .addSelect(
         'profile.profile_embedding <=> :queryEmbedding',
         'vectorDistance',
@@ -648,9 +686,7 @@ export class MatchingService {
       overlappingTravelStyles: styleOverlap,
       overlappingTendencies: tendencyOverlap.slice(0, MAX_TENDENCY_OVERLAPS),
       mbtiMatchScore: mbtiScore,
-      mannerTemperature: this.normalizeNumber(row.mannerTemperature),
-      profileImageId: row.profileImageId, // Assign profileImageId
-    } as MatchCandidateDto & { mannerTemperature: number | null };
+    } as MatchCandidateDto;
 
     return candidate;
   }
@@ -682,19 +718,6 @@ export class MatchingService {
       .split(',')
       .map((item) => item.replace(/^"(.*)"$/, '$1') as T)
       .filter((item) => item !== undefined && item !== null && item !== '');
-  }
-  //문자열 number로 변환(36.5도를 문자열로 인식)
-  private normalizeNumber(
-    value: number | string | null | undefined,
-  ): number | null {
-    if (typeof value === 'number') {
-      return Number.isFinite(value) ? value : null;
-    }
-    if (typeof value === 'string') {
-      const parsed = parseFloat(value);
-      return Number.isFinite(parsed) ? parsed : null;
-    }
-    return null;
   }
 
   private calculateCosineSimilarity(
