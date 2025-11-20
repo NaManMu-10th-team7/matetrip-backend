@@ -18,7 +18,6 @@ import { GetBehaviorBasedRecommendationResDto } from './dto/get-behavior-based-r
 import { AuthGuard } from '@nestjs/passport';
 import { GetMostReviewedPlacesReqDto } from './dto/get-most-reviewed-places-req.dto.js';
 import { GetMostReviewedPlacesResDto } from './dto/get-most-reviewed-places-res.dto.js';
-import { GetNearbyPlacesReqDto } from './dto/get-nearby-places-req.dto.js';
 import { GetPlaceAndNearbyPlacesResDto } from './dto/get-place-and-nearby-places-res.dto.js';
 
 @Controller('places')
