@@ -331,7 +331,7 @@ export class MatchingService {
       .where('profile.user_id != :userId', { userId })
       .andWhere('profile.profile_embedding IS NOT NULL')
       .orderBy('profile.profile_embedding <=> :queryEmbedding', 'ASC')
-      .limit(limit)
+      .limit(limit + 10)
       .setParameter(
         'queryEmbedding',
         toVectorLiteral(requesterProfile.profileEmbedding),
@@ -351,10 +351,12 @@ export class MatchingService {
       )
       .sort((a, b) => b.score - a.score);
 
+    const slicedMatches = matches.slice(0, limit);
+
     // ✅ 여기서부터 profile 붙이기
 
     // 1) 매칭된 userId 리스트 뽑기
-    const targetUserIds: string[] = matches.map((m) => m.userId);
+    const targetUserIds: string[] = slicedMatches.map((m) => m.userId);
     if (targetUserIds.length === 0) {
       return [];
     }
@@ -376,7 +378,7 @@ export class MatchingService {
       }
     }
 
-    matches.forEach((m) => {
+    slicedMatches.forEach((m) => {
       const profile = profileMap.get(m.userId);
       if (!profile) {
         m.profile = null;
@@ -392,7 +394,7 @@ export class MatchingService {
       };
     });
 
-    return matches;
+    return slicedMatches;
   }
 
   //전체글에서 필터링한 글들 유저성향이 나와 가장 맞는 사람들부터 보여주기
@@ -562,7 +564,10 @@ export class MatchingService {
         ? matchRequestDto.travelTendencies
         : baseTravelTendencies;
 
-    const limit = matchRequestDto.limit ?? DEFAULT_LIMIT;
+    let limit = matchRequestDto.limit ?? DEFAULT_LIMIT;
+    if (limit < 40) {
+      limit = 40;
+    }
 
     const qb = this.profileRepository
       .createQueryBuilder('profile')
@@ -580,7 +585,7 @@ export class MatchingService {
       })
       .andWhere('profile.profile_embedding IS NOT NULL')
       .orderBy('profile.profile_embedding <=> :queryEmbedding', 'ASC')
-      .limit(limit + 10) //백터 기준으로 잘라 버리기에 조금 더 limit 을 크게 둠
+      .limit(limit) //백터 기준으로 잘라 버리기에 조금 더 limit 을 크게 둠
       .setParameter(
         'queryEmbedding',
         toVectorLiteral(requesterProfile.profileEmbedding),
