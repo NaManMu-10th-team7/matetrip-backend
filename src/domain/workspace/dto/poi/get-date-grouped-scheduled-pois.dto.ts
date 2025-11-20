@@ -1,6 +1,7 @@
 import { Expose, Type } from 'class-transformer';
 import { PoiResDto } from './poi-res.dto.js';
 
+// todo : readonly 후 캡슐화
 export class PlanDayScheduleSummaryDto {
   @Expose()
   dayNo: number;
@@ -17,12 +18,6 @@ export class PlanDayScheduledPoisGroupDto {
   @Expose()
   @Type(() => PoiResDto)
   pois: PoiResDto[];
-}
-
-export class DateGroupedScheduledPoisResDto {
-  @Expose()
-  @Type(() => PlanDayScheduledPoisGroupDto)
-  planDayScheduledPoisGroup: PlanDayScheduledPoisGroupDto[];
 }
 
 // TODO : 분석 관련 DTO
