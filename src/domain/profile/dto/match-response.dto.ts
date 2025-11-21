@@ -19,7 +19,7 @@ export class ProfileSummaryDto {
   nickname: string;
   // mbtiTypes: MBTI_TYPES | null;
   mannerTemperature?: number | null;
-  profileImageId: string | null;
+  profileImageId?: string | null;
 }
 
 export class MatchCandidateDto {
@@ -33,7 +33,7 @@ export class MatchCandidateDto {
   mbtiMatchScore: number;
   profile?: ProfileSummaryDto | null;
   recruitingPosts?: MatchRecruitingPostDto[];
-  profileImageId?: string; // Add profileImageId field
+  //profileImageId?: string; // Add profileImageId field
 }
 
 export class MatchResponseDto {
