@@ -16,6 +16,7 @@ import { UserBehaviorEventRepository } from '../user_behavior/user_behavior_even
 import { GetPlaceIdWithTimeDto } from './dto/get-placeId-with-time.dto.js';
 import { GetMostReviewedPlacesReqDto } from './dto/get-most-reviewed-places-req.dto.js';
 import { GetMostReviewedPlacesResDto } from './dto/get-most-reviewed-places-res.dto.js';
+import { SearchPlaceByNameQueryDto } from './dto/search-place-by-name-query.dto.js';
 import { GetNearbyPlacesReqDto } from './dto/get-nearby-places-req.dto.js';
 import { NearbyPlaceResDto } from './dto/nearby-place-res.dto.js';
 import { GetPlaceAndNearbyPlacesResDto } from './dto/get-place-and-nearby-places-res.dto.js';
@@ -54,6 +55,38 @@ export class PlaceService {
     });
     console.log('가져온 개수 = ', places.length);
     return places.map((place) => GetPlacesResDto.from(place));
+  }
+
+  /**
+   * @description 장소 이름으로 장소를 검색하여 ID 목록을 반환합니다. (부분 일치, 대소문자 무시)
+   * @param dto - 검색할 장소 이름이 담긴 DTO
+   * @returns { placeIds: string[] } - 검색된 장소의 ID 목록을 담은 객체
+   */
+  async findPlacesByName(
+    dto: SearchPlaceByNameQueryDto,
+  ): Promise<{ placeIds: string[] }> {
+    const { name } = dto;
+    const results = await this.placeRepo
+      .createQueryBuilder('place')
+      .select('place.id', 'id') // ID만 선택
+      .where('place.title ILIKE :name', { name: `%${name}%` }) // 부분 일치 검색
+      .orderBy(
+        `CASE
+          WHEN place.title = :exactName THEN 1
+          WHEN place.title ILIKE :startsWithName THEN 2
+          ELSE 3
+        END`,
+      )
+      .addOrderBy('place.title', 'ASC') // 2차 정렬: 이름순
+      .setParameters({
+        name: `%${name}%`,
+        exactName: name,
+        startsWithName: `${name}%`,
+      })
+      .take(5) // 너무 많은 결과를 방지하기 위해 5개로 제한
+      .getRawMany<{ id: string }>();
+
+    return { placeIds: results.map((result) => result.id) };
   }
 
   async getPersonalizedPlaces(
