@@ -439,8 +439,8 @@ export class PoiGateway {
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
 
-      // 지도 bounds 내의 장소 목록 가져오기
-      const places = await this.placeService.getPlacesInBounds({
+      // 지도 bounds 내의 장소 목록 (인기도 점수 포함)
+      const places = await this.placeService.getPlacesInBoundsWithPopularity({
         southWestLatitude: data.southWestLatitude,
         southWestLongitude: data.southWestLongitude,
         northEastLatitude: data.northEastLatitude,
@@ -453,9 +453,8 @@ export class PoiGateway {
         userName: data.userName,
         places,
       });
-      // TODO : Focus는 특정 클라이언트에만 보내주고 프론트에서 버튼이나 뭐 누르면 그 사용자의 Focus로 가는거
       this.logger.debug(
-        `[PLACE_FOCUS] User ${data.userName} focused, returned ${places.length} places in bounds`,
+        `[PLACE_FOCUS] User ${data.userName} focused, returned ${places.length} places with popularity scores`,
       );
     } catch (error) {
       this.logger.error(
