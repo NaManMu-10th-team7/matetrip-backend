@@ -386,7 +386,6 @@ export class MatchingService {
       }
       //profile붙여주기
       m.profile = {
-        userId: profile.user.id,
         nickname: profile.nickname ?? '',
         mbtiTypes: profile.mbtiTypes ?? null,
         profileImageId: profile.profileImage?.id ?? null,
@@ -517,7 +516,6 @@ export class MatchingService {
           requesterProfile.mbtiTypes ?? null,
         );
         candidate.profile = {
-          userId: writerId,
           nickname: profile.nickname ?? '',
           mbtiTypes: profile.mbtiTypes ?? null,
           mannerTemperature: profile.mannerTemperature ?? null,
