@@ -554,7 +554,7 @@ export class MatchingService {
         candidate.profile = {
           nickname: profile.nickname ?? '',
           // mbtiTypes: profile.mbtiTypes ?? null,
-          mannerTemperature: profile.mannerTemperature ?? null,
+          mannerTemperature: profile.mannerTemperature,
           profileImageId: profile.profileImage?.id ?? null,
         };
         return {
