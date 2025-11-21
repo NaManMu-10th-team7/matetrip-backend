@@ -69,6 +69,88 @@ export class PlaceService {
   }
 
   /**
+   * @description 지도 bounds 내 장소 목록을 인기도 점수와 함께 조회합니다.
+   * 인기 기준: user_behavior_events에서 POI_MARK, POI_SCHEDULE 이벤트 수
+   * 프론트에서 카테고리별 필터링 및 정렬이 가능하도록 각 장소에 popularityScore 포함
+   * @param dto - bounds 좌표
+   * @returns 인기도 점수가 포함된 장소 목록
+   */
+  async getPlacesInBoundsWithPopularity(
+    dto: GetPlacesReqDto,
+  ): Promise<GetPlacesResDto[]> {
+    const {
+      southWestLatitude,
+      southWestLongitude,
+      northEastLatitude,
+      northEastLongitude,
+    } = dto;
+
+    const t0 = performance.now();
+    const rawPlaces = await this.placeRepo
+      .createQueryBuilder('p')
+      .leftJoin(
+        'user_behavior_events',
+        'ube',
+        'ube.place_id = p.id AND ube.event_type IN (:...eventTypes)',
+        { eventTypes: ['POI_MARK', 'POI_SCHEDULE'] },
+      )
+      .where(
+        `ST_Intersects(
+          p.location,
+          ST_MakeEnvelope(:swLng, :swLat, :neLng, :neLat, 4326)::geography
+        )`,
+        {
+          swLng: southWestLongitude,
+          swLat: southWestLatitude,
+          neLng: northEastLongitude,
+          neLat: northEastLatitude,
+        },
+      )
+      .select('p.id', 'id')
+      .addSelect('p.title', 'title')
+      .addSelect('p.address', 'address')
+      .addSelect('p.category', 'category')
+      .addSelect('p.summary', 'summary')
+      .addSelect('p.image_url', 'image_url')
+      .addSelect('p.longitude', 'longitude')
+      .addSelect('p.latitude', 'latitude')
+      .addSelect('COUNT(ube.id)', 'popularity_score')
+      .groupBy('p.id')
+      .limit(20)
+      .getRawMany<{
+        id: string;
+        title: string;
+        address: string;
+        category: string;
+        summary: string | null;
+        image_url: string | null;
+        longitude: number;
+        latitude: number;
+        popularity_score: string;
+      }>();
+
+    console.log(
+      `[getPlacesInBoundsWithPopularity] 쿼리 수행 시간: ${(performance.now() - t0).toFixed(4)} ms`,
+    );
+    console.log(`장소 ${rawPlaces.length}개 조회 완료`);
+
+    return rawPlaces.map(
+      (p) =>
+        new GetPlacesResDto(
+          p.id,
+          p.category,
+          p.title,
+          p.address,
+          Number(p.longitude),
+          Number(p.latitude),
+          p.summary ?? undefined,
+          p.image_url ?? undefined,
+          Number(p.popularity_score),
+        ),
+    );
+  }
+
+  /**
    * @description 장소 이름으로 장소를 검색하여 ID 목록을 반환합니다. (부분 일치, 대소문자 무시)
    * @param dto - 검색할 장소 이름이 담긴 DTO
    * @returns { placeIds: string[] } - 검색된 장소의 ID 목록을 담은 객체
