@@ -16,7 +16,7 @@ export class MatchRecruitingPostDto {
 }
 
 export class ProfileSummaryDto {
-  nickname?: string | null;
+  nickname: string;
   // mbtiTypes: MBTI_TYPES | null;
   mannerTemperature?: number;
   profileImageId?: string | null;
