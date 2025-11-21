@@ -7,7 +7,7 @@ import {
   Delete,
   UseGuards,
   Req,
-  Query,
+  Logger,
 } from '@nestjs/common';
 import { WorkspaceService } from './service/workspace.service';
 import { CreateWorkspaceReqDto } from './dto/create-workspace-req.dto';
@@ -17,14 +17,17 @@ import { ReviewService } from '../review/review.service';
 import { PoiGateway } from './gateway/poi.gateway.js';
 import { PoiOptimizeReqDto } from './dto/poi/poi-optimize-req.dto.js';
 import { PlanReqDto } from './dto/workspace-res.dto';
-import { RegionGroup } from '../place/entities/region_group.enum.js';
+import { PlanDayScheduledPoisGroupDto } from './dto/poi/get-date-grouped-scheduled-pois.dto.js';
+import { PoiService } from './service/poi.service.js';
 
 @Controller('workspace')
 export class WorkspaceController {
+  private readonly logger = new Logger(WorkspaceController.name);
   constructor(
     private readonly workspaceService: WorkspaceService,
     private readonly reviewService: ReviewService,
     private readonly poiGateway: PoiGateway,
+    private readonly poiService: PoiService,
   ) {}
 
   @Post()
@@ -93,5 +96,13 @@ export class WorkspaceController {
   @Get(':workspaceId/post')
   getPostByWorkspaceId(@Param('workspaceId') workspaceId: string) {
     return this.workspaceService.getPostByWorkspaceId(workspaceId);
+  }
+
+  @Get(':workspaceId/scheduled-pois')
+  getScheduledPois(
+    @Param('workspaceId') workspaceId: string,
+  ): Promise<PlanDayScheduledPoisGroupDto[]> {
+    this.logger.log(`[getScheduledPois] 시작 - workspaceId: ${workspaceId}`);
+    return this.poiService.getScheduledPois(workspaceId);
   }
 }

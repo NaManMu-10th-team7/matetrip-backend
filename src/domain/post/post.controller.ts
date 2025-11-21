@@ -20,11 +20,16 @@ import { PostResponseDto } from './dto/post-response.dto.js';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { SearchPostDto } from './dto/search-post.dto';
 import { AuthGuard } from '@nestjs/passport';
+import { MatchingService } from '../profile/matching.service';
+import { MatchRequestDto } from '../profile/dto/match-request.dto';
 
 import { Request } from 'express';
 @Controller('posts')
 export class PostController {
-  constructor(private readonly postService: PostService) {}
+  constructor(
+    private readonly postService: PostService,
+    private readonly matchingService: MatchingService,
+  ) {}
 
   @Post()
   @UseGuards(AuthGuard('jwt'))
@@ -57,13 +62,49 @@ export class PostController {
     return this.postService.findPostsByUserId(userId); // 기존 findMyPosts 함수 재활용
   }
 
+  // @Get(':id')
+  // @HttpCode(HttpStatus.OK)
+  // async getOne(
+  //   @Param('id', new ParseUUIDPipe()) id: string,
+  // ): Promise<PostResponseDto> {
+  //   return this.postService.findOne(id);
+  // }
+
   @Get(':id')
-  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard('jwt'))
   async getOne(
-    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req?: Request & { user: { id: string } },
+    @Query() matchRequestDto?: MatchRequestDto,
   ): Promise<PostResponseDto> {
-    return this.postService.findOne(id);
+    const post = await this.postService.findOne(id);
+    const isWriter = req?.user.id === post.writer.id;
+
+    post.matchResult = isWriter
+      ? await this.matchingService.findMatchesWithAllUsers(
+          post.writer.id,
+          matchRequestDto ?? {},
+        )
+      : null;
+
+    return post;
   }
+
+  // @Get(':id')
+  // @HttpCode(HttpStatus.OK)
+  // async getOne(
+  //   @Param('id', new ParseUUIDPipe()) id: string,
+  //   @Req() req?: Request & { user?: { id: string } },
+  // ): Promise<PostWithMatchesResponseDto> {
+  //   const post = await this.postService.findOne(id);
+  //   const requesterId = req?.user?.id;
+  //   const isWriter = requesterId === post.writer.id;
+  //   //작성자 일때만 매칭 정보 뜨게
+  //   const matchResult = isWriter
+  //     ? await this.matchingService.findMatchesWithAllUsers(post.writer.id)
+  //     : null;
+  //   return { post, matchResult };
+  // }
 
   @Get('workspace/:workspaceId/members')
   @HttpCode(HttpStatus.OK)

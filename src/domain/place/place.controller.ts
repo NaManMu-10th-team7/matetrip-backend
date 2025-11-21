@@ -1,4 +1,13 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { PlaceService } from './place.service';
 import { GetPlacesReqDto } from './dto/get-places-req.dto.js';
 import { GetPlacesResDto } from './dto/get-places-res.dto.js';
@@ -8,6 +17,10 @@ import { GetPopularPlacesResDto } from './dto/get-popular-places-res.dto.js';
 import { GetBehaviorBasedRecommendationReqDto } from './dto/get-behavior-based-recommendation-req.dto.js';
 import { GetBehaviorBasedRecommendationResDto } from './dto/get-behavior-based-recommendation-res.dto.js';
 import { SearchPlaceByNameQueryDto } from './dto/search-place-by-name-query.dto.js';
+import { AuthGuard } from '@nestjs/passport';
+import { GetMostReviewedPlacesReqDto } from './dto/get-most-reviewed-places-req.dto.js';
+import { GetMostReviewedPlacesResDto } from './dto/get-most-reviewed-places-res.dto.js';
+import { GetPlaceAndNearbyPlacesResDto } from './dto/get-place-and-nearby-places-res.dto.js';
 
 @Controller('places')
 export class PlaceController {
@@ -73,7 +86,24 @@ export class PlaceController {
   }
 
   @Get(':id')
-  getPlaceById(@Param('id') id: string): Promise<GetPlacesResDto> {
+  getPlaceById(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<GetPlacesResDto> {
     return this.placeService.getPlaceById(id);
   }
+
+  //GetNearbyPlacesReqDto
+
+  @Get(':id/with-nearby')
+  @HttpCode(HttpStatus.OK)
+  getPlaceAndNearbyPlaces(
+    @Param('id', ParseUUIDPipe) placeId: string,
+  ): Promise<GetPlaceAndNearbyPlacesResDto> {
+    return this.placeService.getPlaceAndNearbyPlaces(placeId);
+  }
+
+  // @Get('nearby')
+  // getPlacesInBounds(@Query() dto: GetPlacesReqDto): Promise<GetPlacesResDto[]> {
+  //   return this.placeService.getPlacesInBounds(dto);
+  // }
 }
