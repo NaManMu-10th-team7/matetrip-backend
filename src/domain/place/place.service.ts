@@ -46,13 +46,24 @@ export class PlaceService {
       northEastLongitude,
     } = dto;
 
-    const places: Place[] = await this.placeRepo.find({
-      where: {
-        latitude: Between(southWestLatitude, northEastLatitude),
-        longitude: Between(southWestLongitude, northEastLongitude),
-      },
-      take: 20,
-    });
+    const t0 = performance.now();
+    const places: Place[] = await this.placeRepo
+      .createQueryBuilder('p')
+      .where(
+        `ST_Intersects(
+      p.location, ST_MakeEnvelope(:southWestLongitude, :southWestLatitude, :northEastLongitude, :northEastLatitude))`,
+        {
+          southWestLongitude,
+          southWestLatitude,
+          northEastLongitude,
+          northEastLatitude,
+        },
+      )
+      .limit(20)
+      .getMany();
+    console.log(
+      `[getPlacesInBounds] 공간인덱싱 적용시킨 연산으로 걸린 시간: ${(performance.now() - t0).toFixed(4)} ms`,
+    );
     console.log('가져온 개수 = ', places.length);
     return places.map((place) => GetPlacesResDto.from(place));
   }
@@ -190,7 +201,7 @@ export class PlaceService {
     }
     const avgEmbeddingString = `[${avgVector.join(',')}]`;
     const categoryNames = Array.from(categories.keys());
-    const totalLimit = Array.from(categories.values()).reduce(
+    const ttalLimit = Array.from(categories.values()).reduce(
       (sum, count) => sum + count,
       0,
     );
