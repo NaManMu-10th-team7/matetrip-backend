@@ -10,6 +10,7 @@ import {
   MatchCandidateDto,
   MatchRecruitingPostDto,
   MatchResponseDto,
+  ProfileSummaryDto,
 } from './dto/match-response.dto';
 import { Profile } from './entities/profile.entity';
 import { TravelStyleType } from './entities/travel-style-type.enum';
@@ -45,9 +46,9 @@ interface MatchCandidatesResult {
 const DEFAULT_LIMIT = 150;
 const POST_DEFAULT_LIMIT = 4;
 const VECTOR_WEIGHT = 0.3;
-const STYLE_WEIGHT = 0.25;
-const MBTI_WEIGHT = 0.25;
-const TENDENCY_WEIGHT = 0.2;
+const STYLE_WEIGHT = 0.3;
+const MBTI_WEIGHT = 0.15;
+const TENDENCY_WEIGHT = 0.25;
 const SCORE_OFFSET = 0.15;
 const SCORE_CAP = 0.99;
 const MAX_TENDENCY_OVERLAPS = 5;
@@ -285,18 +286,32 @@ export class MatchingService {
     userId: string,
     matchRequestDto: MatchRequestDto,
   ): Promise<MatchCandidateDto[]> {
-    // 유사도 상위 후보를 넉넉하게 불러와서 이후 게시글 필터링으로 탈락해도 원하는 수량을 유지한다.
     const matchResult = await this.buildMatchCandidatesResult(
       userId,
       matchRequestDto,
     );
-    const requestedLimit = matchResult.query.limit ?? DEFAULT_LIMIT;
 
     if (!matchResult.matches.length) {
       return [];
     }
 
+    // 매칭된 후보들의 프로필/모집글 정보를 붙여서 응답 DTO를 완성한다.
     const writerIds = matchResult.matches.map((match) => match.userId);
+    const profileMap = new Map<string, Profile>();
+    if (writerIds.length) {
+      const profiles = await this.profileRepository.find({
+        where: { user: { id: In(writerIds) } },
+        relations: {
+          user: true,
+          profileImage: true,
+        },
+      });
+      profiles.forEach((profile) => {
+        if (profile.user?.id) {
+          profileMap.set(profile.user.id, profile);
+        }
+      });
+    }
     // 사용자가 이미 참가/신청한 게시글은 제외한 뒤, 각 사용자별 대표 모집글을 찾는다.
     //“각 후보 사용자에게 아직 신청하지 않은 모집글이 있는가?”
     const recruitingPostMap = await this.fetchAvailableRecruitingPosts(
@@ -311,10 +326,22 @@ export class MatchingService {
           // 해당 사용자에게 조건을 만족하는 모집글이 없으면 제외한다.
           return null;
         }
+        const profile = profileMap.get(candidate.userId);
+        const profileSummary = profile
+          ? {
+              nickname: profile.nickname ?? '',
+              mannerTemperature: profile.mannerTemperature,
+              profileImageId: profile.profileImage?.id ?? null,
+            }
+          : null;
         // 매칭 정보 + 모집글 1건을 묶어서 반환할 DTO로 변환한다.
         return {
           ...candidate,
+          profile: profileSummary,
           recruitingPosts: [this.toRecruitingPostDto(post)],
+        } as MatchCandidateDto & {
+          profile: ProfileSummaryDto | null;
+          recruitingPosts: MatchRecruitingPostDto[];
         };
       })
       .filter(
@@ -322,10 +349,10 @@ export class MatchingService {
           candidate,
         ): candidate is MatchCandidateDto & {
           recruitingPosts: MatchRecruitingPostDto[];
+          profile: ProfileSummaryDto | null;
         } => candidate !== null,
       );
-
-    return candidatesWithPosts.slice(0, requestedLimit);
+    return candidatesWithPosts;
   }
 
   //전체 유저에서 나와 맞는 유저 찾기
@@ -425,7 +452,7 @@ export class MatchingService {
         nickname: profile.nickname ?? '',
         //  mbtiTypes: profile.mbtiTypes ?? null,
         profileImageId: profile.profileImage?.id ?? null,
-        mannerTemperature: profile.mannerTemperature ?? null,
+        mannerTemperature: profile.mannerTemperature,
       };
     });
 
@@ -606,7 +633,7 @@ export class MatchingService {
         : baseTravelTendencies;
 
     const limit = matchRequestDto.limit ?? DEFAULT_LIMIT;
-    const limitBarrier = Math.max(limit, 30);
+    const limitBarrier = Math.max(limit + 5, 30);
 
     const qb = this.profileRepository
       .createQueryBuilder('profile')
@@ -706,6 +733,7 @@ export class MatchingService {
 
     const qb = this.postRepository
       .createQueryBuilder('post')
+      .leftJoinAndSelect('post.image', 'image') //이미지 불러옴
       // 후보 사용자(writer)의 모집 중(post.status=RECRUITING) 게시글만 조회한다.
       .innerJoinAndSelect('post.writer', 'writer')
       .where('writer.id IN (:...writerIds)', { writerIds })
