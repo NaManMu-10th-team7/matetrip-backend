@@ -3,8 +3,10 @@ import {
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
+import { NovaService } from '../../ai/summaryLLM.service';
 import { MatchingService } from '../profile/matching.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -18,6 +20,7 @@ import { buildEmbeddingPayloadFromSource } from '../profile/utils/embedding-payl
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
+    private readonly novaService: NovaService,
     private readonly matchingService: MatchingService,
     private readonly jwtService: JwtService,
   ) {}
@@ -58,6 +61,25 @@ export class AuthService {
   // @returns 생성된 사용자 정보 (비밀번호 제외)
   async signUp(createUserDto: CreateUserDto): Promise<UserPayloadDto> {
     try {
+      const profile = createUserDto.profile;
+      if (profile?.description?.trim()) {
+        const rawDesc = profile.description?.trim();
+
+        if (rawDesc && !this.novaService.isValidSummary(rawDesc)) {
+          throw new BadRequestException(
+            '상세소개 요약이 충분히 구체적이지 않아 회원가입을 진행할 수 없습니다.',
+          );
+        }
+        if (rawDesc) {
+          const isMeaningful =
+            await this.novaService.isMeaningfulSummaryLLM(rawDesc);
+          if (!isMeaningful) {
+            throw new BadRequestException(
+              '상세소개 요약이 부적절하거나 의미가 없어 회원가입을 진행할 수 없습니다.',
+            );
+          }
+        }
+      }
       // UserService의 create 메서드 호출. 안에서 트랜잭션, 해싱, 중복 검사 모두 일어남
       const newUser = await this.usersService.create(createUserDto);
 

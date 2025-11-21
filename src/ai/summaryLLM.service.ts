@@ -22,6 +22,7 @@ export class NovaService {
   private readonly client: BedrockRuntimeClient;
   private readonly modelId: string;
   private readonly defaultMaxTokens: number;
+  private readonly validationMaxTokens = 8;
 
   constructor(private readonly configService: ConfigService) {
     // Bedrock 호출에 필요한 액세스 키와 리전을 전부 환경 변수에서 로드한다.
@@ -65,6 +66,99 @@ export class NovaService {
    */
   async summarizeDescription(description: string): Promise<string> {
     return this.summarize(description, { maxLength: 2, language: '한국어' });
+  }
+
+  /**
+   * 요약 결과가 의미 있는 문장인지 간단히 검증한다.
+   * - 최소 길이/문자 수를 만족해야 하고
+   * - 전부 기호/반복 단어로만 이루어진 경우를 걸러낸다.
+   */
+  isValidSummary(summary?: string): boolean {
+    const text = summary?.trim();
+    if (!text || text.length < 8) {
+      return false;
+    }
+
+    const alphaCount = (text.match(/[A-Za-z가-힣]/g) ?? []).length;
+    if (alphaCount < 4) {
+      return false;
+    }
+
+    const punctuationCount = (text.match(/[^\w가-힣\s]/g) ?? []).length;
+    const punctuationRatio = punctuationCount / text.length;
+    if (punctuationRatio > 0.4) {
+      return false;
+    }
+
+    const tokens = text.split(/\s+/).filter(Boolean);
+    const uniqueTokenCount = new Set(tokens).size;
+    if (uniqueTokenCount <= 2 && text.length < 20) {
+      return false;
+    }
+
+    // 동일 문자 반복이나 극히 적은 문자 다양성으로 채워진 경우 거른다.
+    if (/(.)\1{6,}/.test(text)) {
+      return false;
+    }
+    const uniqueChars = new Set(text.replace(/\s+/g, '').split(''));
+    if (uniqueChars.size <= 3 && text.length >= 10) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * LLM에게 요약이 의미 있는지 이진 분류를 요청한다.
+   * - INVALID가 반환되면 false
+   * - 응답 파싱 실패/오류 시에는 true를 반환해 기존 로직을 막지 않는다.
+   */
+  async isMeaningfulSummaryLLM(
+    summary: string,
+    timeout = 3000,
+  ): Promise<boolean> {
+    const trimmed = summary?.trim();
+    if (!trimmed) {
+      return false;
+    }
+
+    const prompt =
+      `Decide if the following Korean text is a meaningful, coherent summary (not gibberish, spam, or insults). ` +
+      `Reply with exactly one word: VALID or INVALID.\n\nText:\n${trimmed}`;
+
+    const command = new ConverseCommand({
+      modelId: this.modelId,
+      messages: [
+        {
+          role: 'user',
+          content: [{ text: prompt }],
+        },
+      ],
+      inferenceConfig: {
+        maxTokens: this.validationMaxTokens,
+        temperature: 0,
+        topP: 0,
+      },
+    });
+
+    try {
+      const response = await this.client.send(command, {
+        requestTimeout: timeout,
+      });
+      const verdict = this.extractText(response)?.toUpperCase().trim();
+      if (!verdict) {
+        return true;
+      }
+      return verdict.startsWith('VALID');
+    } catch (error) {
+      // 요약 생성까지는 성공했으므로 검증 실패 시에는 로깅만 하고 통과시킨다.
+      this.logger.warn(
+        `LLM summary validation skipped due to error: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return true;
+    }
   }
 
   /**
