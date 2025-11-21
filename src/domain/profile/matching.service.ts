@@ -32,9 +32,9 @@ interface RawMatchRow {
   travelStyles: DbEnumArray<TravelStyleType>;
   travelTendencies: DbEnumArray<TendencyType>;
   vectorDistance: number | null;
-  mannerTemperature?: number | null;
+  //mannerTemperature?: number | null;
   mbti: MBTI_TYPES | null;
-  profileImageId?: string; // Add profileImageId field
+  // profileImageId?: string; // Add profileImageId field
 }
 
 interface MatchCandidatesResult {
@@ -422,9 +422,8 @@ export class MatchingService {
       }
       //profile붙여주기
       m.profile = {
-        userId: profile.user.id,
         nickname: profile.nickname ?? '',
-        mbtiTypes: profile.mbtiTypes ?? null,
+        //  mbtiTypes: profile.mbtiTypes ?? null,
         profileImageId: profile.profileImage?.id ?? null,
         mannerTemperature: profile.mannerTemperature ?? null,
       };
@@ -543,8 +542,8 @@ export class MatchingService {
           travelTendencies: profile.tendency,
           vectorDistance,
           mbti: profile.mbtiTypes ?? null,
-          mannerTemperature: profile.mannerTemperature, // Add mannerTemperature
-          profileImageId: profile.profileImage?.id, // Assign profileImageId
+          //mannerTemperature: profile.mannerTemperature, // Add mannerTemperature
+          //profileImageId: profile.profileImage?.id, // Assign profileImageId
         };
         const candidate = this.toMatchCandidate(
           row,
@@ -552,6 +551,12 @@ export class MatchingService {
           baseTravelTendencies,
           requesterProfile.mbtiTypes ?? null,
         );
+        candidate.profile = {
+          nickname: profile.nickname ?? '',
+          // mbtiTypes: profile.mbtiTypes ?? null,
+          mannerTemperature: profile.mannerTemperature ?? null,
+          profileImageId: profile.profileImage?.id ?? null,
+        };
         return {
           ...candidate,
           recruitingPosts: posts,

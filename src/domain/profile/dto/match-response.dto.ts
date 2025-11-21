@@ -16,11 +16,10 @@ export class MatchRecruitingPostDto {
 }
 
 export class ProfileSummaryDto {
-  userId: string;
   nickname: string;
-  mbtiTypes: MBTI_TYPES | null;
+  // mbtiTypes: MBTI_TYPES | null;
   mannerTemperature?: number | null;
-  profileImageId: string | null;
+  profileImageId?: string | null;
 }
 
 export class MatchCandidateDto {
