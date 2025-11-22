@@ -1,6 +1,8 @@
 import {
+  Inject,
   Logger,
   UnauthorizedException,
+  forwardRef,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -85,7 +87,9 @@ export class PoiGateway {
   server: Server;
 
   constructor(
+    @Inject(forwardRef(() => WorkspaceService))
     private readonly workspaceService: WorkspaceService,
+    @Inject(forwardRef(() => PoiService))
     private readonly poiService: PoiService,
     private readonly poiCacheService: PoiCacheService,
     private readonly rabbitMQProducer: RabbitmqProducer,
@@ -243,34 +247,10 @@ export class PoiGateway {
     try {
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
-
-      // POI를 SCHEDULED로 전환하고 List에 추가
-      await this.poiCacheService.addToSchedule(
-        data.workspaceId,
-        data.planDayId,
-        data.poiId,
+      await this.poiService.addPoiToSchedule(data);
+      this.logger.debug(
+        `Socket ${socket.id} added POI to schedule in planDay ${data.planDayId}`,
       );
-
-      const poi: CachedPoi | undefined = await this.poiCacheService.getPoi(
-        data.workspaceId,
-        data.poiId,
-      );
-
-      if (!poi) {
-        this.logger.warn(`Failed to add POI to schedule`);
-        return;
-      }
-
-      // ScheduleEvent 전달
-      this.sendBehaviorEvent(poi, BehaviorEventType.POI_SCHEDULE);
-
-      // 모든 클라이언트에 알림
-      this.server.to(roomName).emit(PoiSocketEvent.ADD_SCHEDULE, {
-        poiId: data.poiId,
-        planDayId: data.planDayId,
-      });
-
-      this.logger.debug(`Added POI to schedule in planDay ${data.planDayId}`);
     } catch (error) {
       this.logger.error(
         `Socket ${socket.id} failed to add POI to schedule`,
@@ -439,8 +419,8 @@ export class PoiGateway {
       const roomName = this.getPoiRoomName(data.workspaceId);
       this.validateRoomAuth(roomName, socket);
 
-      // 지도 bounds 내의 장소 목록 (인기도 점수 포함)
-      const places = await this.placeService.getPlacesInBoundsWithPopularity({
+      // 지도 bounds 내의 장소 목록 가져오기
+      const places = await this.placeService.getPlacesInBounds({
         southWestLatitude: data.southWestLatitude,
         southWestLongitude: data.southWestLongitude,
         northEastLatitude: data.northEastLatitude,
@@ -453,8 +433,9 @@ export class PoiGateway {
         userName: data.userName,
         places,
       });
+      // TODO : Focus는 특정 클라이언트에만 보내주고 프론트에서 버튼이나 뭐 누르면 그 사용자의 Focus로 가는거
       this.logger.debug(
-        `[PLACE_FOCUS] User ${data.userName} focused, returned ${places.length} places with popularity scores`,
+        `[PLACE_FOCUS] User ${data.userName} focused, returned ${places.length} places in bounds`,
       );
     } catch (error) {
       this.logger.error(
@@ -537,6 +518,23 @@ export class PoiGateway {
     }
   }
 
+  /**
+   * POI가 일정에 추가되었음을 브로드캐스트합니다.
+   * @param workspaceId
+   * @param poiId
+   * @param planDayId
+   */
+  public broadcastPoiAddSchedule(
+    workspaceId: string,
+    poiId: string,
+    planDayId: string,
+  ) {
+    const roomName = this.getPoiRoomName(workspaceId);
+    this.server
+      .to(roomName)
+      .emit(PoiSocketEvent.ADD_SCHEDULE, { poiId, planDayId });
+  }
+
   private getPoiRoomName(workspaceId: string) {
     return `poi:${workspaceId}`;
   }
@@ -554,7 +552,7 @@ export class PoiGateway {
    * @param eventType - 행동 이벤트 타입
    * @param placeId - focus에서 추천받은 place의 ID (옵셔널)
    */
-  private sendBehaviorEvent(
+  public sendBehaviorEvent(
     cachedPoi: CachedPoi,
     eventType: BehaviorEventType,
   ): void {

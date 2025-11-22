@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Poi } from '../entities/poi.entity.js';
 import { In, Repository } from 'typeorm';
@@ -15,6 +20,9 @@ import {
   PlanDayScheduleSummaryDto,
 } from '../dto/poi/get-date-grouped-scheduled-pois.dto.js';
 import { plainToInstance } from 'class-transformer';
+import { PoiGateway } from '../gateway/poi.gateway.js';
+import { BehaviorEventType } from '../../../infra/rabbitmq/dto/enqueue-behavior-event.dto.js';
+import { PoiAddScheduleReqDto } from '../dto/poi/poi-add-schedule-req.dto.js';
 // import { DateGroupedScheduledPoisResDto } from '../dto/poi/get-date-grouped-scheduled-pois.dto.js';
 
 @Injectable()
@@ -24,6 +32,8 @@ export class PoiService {
     private readonly poiRepository: Repository<Poi>,
     private readonly planDayService: PlanDayService,
     private readonly poiCacheService: PoiCacheService,
+    @Inject(forwardRef(() => PoiGateway))
+    private readonly poiGateway: PoiGateway,
   ) {}
 
   async persistPoi(cachedPoi: CachedPoi): Promise<Poi> {
@@ -184,6 +194,60 @@ export class PoiService {
     }
 
     return results;
+  }
+
+  /**
+   * POI를 특정 날짜의 일정에 추가하고, 변경사항을 브로드캐스트합니다.
+   * @param data - PoiAddScheduleReqDto
+   */
+  async addPoiToSchedule(data: PoiAddScheduleReqDto): Promise<void> {
+    const { workspaceId, planDayId, poiId } = data;
+
+    // 1. POI를 SCHEDULED로 전환하고 List에 추가
+    await this.poiCacheService.addToSchedule(workspaceId, planDayId, poiId);
+
+    const poi: CachedPoi | undefined = await this.poiCacheService.getPoi(
+      workspaceId,
+      poiId,
+    );
+
+    if (!poi) {
+      throw new BadRequestException(
+        `POI with id ${poiId} not found in workspace ${workspaceId}`,
+      );
+    }
+
+    // 2. 행동 이벤트 전송
+    this.poiGateway.sendBehaviorEvent(poi, BehaviorEventType.POI_SCHEDULE);
+
+    // 3. 같은 워크스페이스의 모든 클라이언트에게 브로드캐스트
+    this.poiGateway.broadcastPoiAddSchedule(workspaceId, poiId, planDayId);
+  }
+
+  /**
+   * 특정 워크스페이스 내에서 placeId를 기준으로 POI를 조회합니다.
+   * @param workspaceId - 워크스페이스 ID
+   * @param placeId - 장소 ID
+   * @returns PoiResDto | null
+   */
+  async getPoiByPlaceId(
+    workspaceId: string,
+    placeId: string,
+  ): Promise<PoiResDto | null> {
+    // 1. 캐시에서 먼저 조회
+    const cachedPois = await this.poiCacheService.getWorkspacePois(workspaceId);
+    const cachedPoi = cachedPois.find((p) => p.placeId === placeId);
+    if (cachedPoi) {
+      return PoiResDto.fromCachedPoi(cachedPoi);
+    }
+
+    // 2. 캐시에 없으면 DB에서 조회
+    const poi = await this.poiRepository.findOne({
+      where: { place: { id: placeId } },
+      relations: ['createdBy', 'planDay', 'place'],
+    });
+
+    return poi ? PoiResDto.fromEntity(poi, workspaceId) : null;
   }
 
   // ): Promise<DateGroupedScheduledPoisResDto> {
