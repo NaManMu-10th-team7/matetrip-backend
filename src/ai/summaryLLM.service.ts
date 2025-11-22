@@ -47,9 +47,15 @@ export class NovaService {
     });
 
     // 모델/토큰 수는 환경변수로 오버라이드할 수 있도록 열어 둔다.
-    this.modelId =
-      this.configService.get<string>('NOVA_SUMMARY_MODEL') ??
-      'arn:aws:bedrock:ap-northeast-2:620257467167:inference-profile/apac.amazon.nova-lite-v1:0'; //arn url 갖고 와야함
+    const modelId = this.configService.get<string>('NOVA_SUMMARY_MODEL'); //arn url 갖고 와야함
+    if (!modelId) {
+      // .env에 NOVA_SUMMARY_MODEL이 없으면 바로 애플리케이션이 뜨지 않게 막는다.
+      throw new Error(
+        'NOVA_SUMMARY_MODEL env is not set (Bedrock Nova ARN 필요).',
+      );
+    }
+    this.modelId = modelId;
+
     this.defaultMaxTokens =
       Number(this.configService.get<string>('NOVA_SUMMARY_MAX_TOKENS')) || 512;
   }

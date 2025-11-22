@@ -22,6 +22,7 @@ import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import { PlaceModule } from '../place/place.module';
 import { RabbitmqModule } from '../../infra/rabbitmq/rabbitmq.module.js';
+import { ChimeMeetingService } from './service/chime-meeting.service.js';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { RabbitmqModule } from '../../infra/rabbitmq/rabbitmq.module.js';
     PoiService,
     ChatMessageService,
     PlanDayService,
+    ChimeMeetingService,
   ],
 })
 export class WorkspaceModule {}

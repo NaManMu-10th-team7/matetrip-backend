@@ -9,6 +9,7 @@ export class GetPlacesResDto {
   image_url?: string;
   longitude: number;
   latitude: number;
+  popularityScore?: number; // 인기도 점수 (POI_MARK + POI_SCHEDULE 이벤트 수)
 
   constructor(
     id: string,
@@ -19,6 +20,7 @@ export class GetPlacesResDto {
     latitude: number,
     summary?: string,
     image_url?: string,
+    popularityScore?: number,
   ) {
     this.id = id;
     this.category = category;
@@ -28,9 +30,10 @@ export class GetPlacesResDto {
     this.image_url = image_url;
     this.longitude = longitude;
     this.latitude = latitude;
+    this.popularityScore = popularityScore;
   }
 
-  static from(place: Place) {
+  static from(place: Place, popularityScore?: number) {
     return new GetPlacesResDto(
       place.id,
       place.category, // DB변경 전 임시
@@ -40,6 +43,7 @@ export class GetPlacesResDto {
       place.latitude,
       place.summary,
       place.image_url,
+      popularityScore,
     );
   }
 }

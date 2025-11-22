@@ -4,19 +4,20 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { MatchRequestDto } from './dto/match-request.dto';
 import {
   MatchCandidateDto,
   MatchRecruitingPostDto,
   MatchResponseDto,
+  ProfileSummaryDto,
 } from './dto/match-response.dto';
 import { Profile } from './entities/profile.entity';
 import { TravelStyleType } from './entities/travel-style-type.enum';
 import { TendencyType } from './entities/tendency-type.enum';
 import { Post } from '../post/entities/post.entity';
 import { PostStatus } from '../post/entities/post-status.enum';
-//import { PostParticipation } from '../post-participation/entities/post-participation.entity';
+import { PostParticipation } from '../post-participation/entities/post-participation.entity.js';
 import { MBTI_TYPES } from './entities/mbti.enum';
 import { EmbeddingMatchingProfileDto } from './dto/embedding-matching-profile.dto';
 import { NovaService } from '../../ai/summaryLLM.service';
@@ -32,9 +33,9 @@ interface RawMatchRow {
   travelStyles: DbEnumArray<TravelStyleType>;
   travelTendencies: DbEnumArray<TendencyType>;
   vectorDistance: number | null;
-  mannerTemperature?: number | null;
+  //mannerTemperature?: number | null;
   mbti: MBTI_TYPES | null;
-  profileImageId?: string; // Add profileImageId field
+  // profileImageId?: string; // Add profileImageId field
 }
 
 interface MatchCandidatesResult {
@@ -45,10 +46,10 @@ interface MatchCandidatesResult {
 const DEFAULT_LIMIT = 150;
 const POST_DEFAULT_LIMIT = 4;
 const VECTOR_WEIGHT = 0.3;
-const STYLE_WEIGHT = 0.25;
-const MBTI_WEIGHT = 0.25;
-const TENDENCY_WEIGHT = 0.2;
-const SCORE_OFFSET = 0.3;
+const STYLE_WEIGHT = 0.3;
+const MBTI_WEIGHT = 0.15;
+const TENDENCY_WEIGHT = 0.25;
+const SCORE_OFFSET = 0.15;
 const SCORE_CAP = 0.99;
 const MAX_TENDENCY_OVERLAPS = 5;
 const SUMMARY_CHAR_LIMIT = 500;
@@ -280,16 +281,78 @@ export class MatchingService {
     private readonly titanEmbeddingService: TitanEmbeddingService,
   ) {}
 
-  //전체 유저에서 나와 맞는 게시글이 모집중인 유저 찾기
+  // 유저별 매칭 정보 + 신청 가능한 모집글 한 건씩 묶어서 반환한다.
   async findMatches(
     userId: string,
     matchRequestDto: MatchRequestDto,
   ): Promise<MatchCandidateDto[]> {
-    const { matches } = await this.buildMatchCandidatesResult(
+    const matchResult = await this.buildMatchCandidatesResult(
       userId,
       matchRequestDto,
     );
-    return matches;
+
+    if (!matchResult.matches.length) {
+      return [];
+    }
+
+    // 매칭된 후보들의 프로필/모집글 정보를 붙여서 응답 DTO를 완성한다.
+    const writerIds = matchResult.matches.map((match) => match.userId);
+    const profileMap = new Map<string, Profile>();
+    if (writerIds.length) {
+      const profiles = await this.profileRepository.find({
+        where: { user: { id: In(writerIds) } },
+        relations: {
+          user: true,
+          profileImage: true,
+        },
+      });
+      profiles.forEach((profile) => {
+        if (profile.user?.id) {
+          profileMap.set(profile.user.id, profile);
+        }
+      });
+    }
+    // 사용자가 이미 참가/신청한 게시글은 제외한 뒤, 각 사용자별 대표 모집글을 찾는다.
+    //“각 후보 사용자에게 아직 신청하지 않은 모집글이 있는가?”
+    const recruitingPostMap = await this.fetchAvailableRecruitingPosts(
+      writerIds,
+      userId,
+    );
+    //응답 형식은 MatchCandidateDto에 recruitingPosts 배열을 붙이는 작업
+    const candidatesWithPosts = matchResult.matches
+      .map((candidate) => {
+        const post = recruitingPostMap.get(candidate.userId);
+        if (!post) {
+          // 해당 사용자에게 조건을 만족하는 모집글이 없으면 제외한다.
+          return null;
+        }
+        const profile = profileMap.get(candidate.userId);
+        const profileSummary = profile
+          ? {
+              nickname: profile.nickname ?? '',
+              mannerTemperature: profile.mannerTemperature,
+              profileImageId: profile.profileImage?.id ?? null,
+            }
+          : null;
+        // 매칭 정보 + 모집글 1건을 묶어서 반환할 DTO로 변환한다.
+        return {
+          ...candidate,
+          profile: profileSummary,
+          recruitingPosts: [this.toRecruitingPostDto(post)],
+        } as MatchCandidateDto & {
+          profile: ProfileSummaryDto | null;
+          recruitingPosts: MatchRecruitingPostDto[];
+        };
+      })
+      .filter(
+        (
+          candidate,
+        ): candidate is MatchCandidateDto & {
+          recruitingPosts: MatchRecruitingPostDto[];
+          profile: ProfileSummaryDto | null;
+        } => candidate !== null,
+      );
+    return candidatesWithPosts;
   }
 
   //전체 유저에서 나와 맞는 유저 찾기
@@ -299,7 +362,7 @@ export class MatchingService {
   ): Promise<MatchCandidateDto[]> {
     const requesterProfile = await this.profileRepository.findOne({
       where: { user: { id: userId } },
-      relations: { user: true, profileImage: true }, // Add profileImage relation
+      relations: { user: true },
     });
 
     if (!requesterProfile) {
@@ -311,7 +374,8 @@ export class MatchingService {
         '요청한 사용자의 임베딩 정보가 아직 준비되지 않았습니다.',
       );
     }
-    //MatchRequestDto에서 보낸게 없으면 profile 데이터에서 찾아옴 =baseTravelStyles,baseTravelTendencies
+
+    // MatchRequestDto에서 보낸게 없으면 profile 데이터에서 찾아옴 = baseTravelStyles, baseTravelTendencies
     const baseTravelStyles = requesterProfile.travelStyles ?? [];
     const baseTravelTendencies = requesterProfile.tendency ?? [];
 
@@ -323,24 +387,21 @@ export class MatchingService {
       .addSelect('profile.travel_styles', 'travelStyles')
       .addSelect('profile.tendency', 'travelTendencies')
       .addSelect('profile.mbti', 'mbti')
-      .addSelect('profile.manner_temperature', 'mannerTemperature')
       .addSelect(
         'profile.profile_embedding <=> :queryEmbedding',
         'vectorDistance',
       )
-      .leftJoinAndSelect('profile.profileImage', 'profileImage') // Join with profile image entity
-      .where('profile.user_id != :userId', {
-        userId,
-      })
+      .where('profile.user_id != :userId', { userId })
       .andWhere('profile.profile_embedding IS NOT NULL')
       .orderBy('profile.profile_embedding <=> :queryEmbedding', 'ASC')
-      .limit(limit)
+      .limit(limit + 10)
       .setParameter(
         'queryEmbedding',
         toVectorLiteral(requesterProfile.profileEmbedding),
       );
 
     const rawCandidates = await qb.getRawMany<RawMatchRow>();
+
     // raw result -> 가중치 기반 점수 계산 -> 점수 내림차순 정렬
     const matches = rawCandidates
       .map((row) =>
@@ -353,7 +414,49 @@ export class MatchingService {
       )
       .sort((a, b) => b.score - a.score);
 
-    return matches;
+    const slicedMatches = matches.slice(0, limit);
+
+    // ✅ 여기서부터 profile 붙이기
+
+    // 1) 매칭된 userId 리스트 뽑기
+    const targetUserIds: string[] = slicedMatches.map((m) => m.userId);
+    if (targetUserIds.length === 0) {
+      return [];
+    }
+
+    // 2) 해당 유저들의 프로필을 한 번에 조회 (필요한 relation까지)
+    const profiles = await this.profileRepository.find({
+      where: { user: { id: In(targetUserIds) } },
+      relations: {
+        user: true,
+        profileImage: true, // 프로필 이미지까지 필요하면
+      },
+    });
+
+    // 3) userId -> profile 매핑
+    const profileMap = new Map<string, Profile>();
+    for (const profile of profiles) {
+      if (profile.user?.id) {
+        profileMap.set(profile.user.id, profile);
+      }
+    }
+
+    slicedMatches.forEach((m) => {
+      const profile = profileMap.get(m.userId);
+      if (!profile) {
+        m.profile = null;
+        return;
+      }
+      //profile붙여주기
+      m.profile = {
+        nickname: profile.nickname ?? '',
+        //  mbtiTypes: profile.mbtiTypes ?? null,
+        profileImageId: profile.profileImage?.id ?? null,
+        mannerTemperature: profile.mannerTemperature,
+      };
+    });
+
+    return slicedMatches;
   }
 
   //전체글에서 필터링한 글들 유저성향이 나와 가장 맞는 사람들부터 보여주기
@@ -466,8 +569,8 @@ export class MatchingService {
           travelTendencies: profile.tendency,
           vectorDistance,
           mbti: profile.mbtiTypes ?? null,
-          mannerTemperature: profile.mannerTemperature, // Add mannerTemperature
-          profileImageId: profile.profileImage?.id, // Assign profileImageId
+          //mannerTemperature: profile.mannerTemperature, // Add mannerTemperature
+          //profileImageId: profile.profileImage?.id, // Assign profileImageId
         };
         const candidate = this.toMatchCandidate(
           row,
@@ -475,6 +578,12 @@ export class MatchingService {
           baseTravelTendencies,
           requesterProfile.mbtiTypes ?? null,
         );
+        candidate.profile = {
+          nickname: profile.nickname ?? '',
+          // mbtiTypes: profile.mbtiTypes ?? null,
+          mannerTemperature: profile.mannerTemperature,
+          profileImageId: profile.profileImage?.id ?? null,
+        };
         return {
           ...candidate,
           recruitingPosts: posts,
@@ -524,6 +633,7 @@ export class MatchingService {
         : baseTravelTendencies;
 
     const limit = matchRequestDto.limit ?? DEFAULT_LIMIT;
+    const limitBarrier = Math.max(limit + 5, 30);
 
     const qb = this.profileRepository
       .createQueryBuilder('profile')
@@ -531,7 +641,6 @@ export class MatchingService {
       .addSelect('profile.travel_styles', 'travelStyles')
       .addSelect('profile.tendency', 'travelTendencies')
       .addSelect('profile.mbti', 'mbti')
-      .addSelect('profile.manner_temperature', 'mannerTemperature')
       .addSelect(
         'profile.profile_embedding <=> :queryEmbedding',
         'vectorDistance',
@@ -542,7 +651,7 @@ export class MatchingService {
       })
       .andWhere('profile.profile_embedding IS NOT NULL')
       .orderBy('profile.profile_embedding <=> :queryEmbedding', 'ASC')
-      .limit(limit + 10) //백터 기준으로 잘라 버리기에 조금 더 limit 을 크게 둠
+      .limit(limitBarrier) //30보다 작으면 무조건 30개를 벡터유사도로 잘라 비교함
       .setParameter(
         'queryEmbedding',
         toVectorLiteral(requesterProfile.profileEmbedding),
@@ -558,6 +667,17 @@ export class MatchingService {
         // 현재 모집 중인 글이 하나라도 있는지를 체크한다.
         .andWhere('post.status = :recruitingStatus')
         // 이미 내가 신청/참여한 게시글은 제외해야 하므로 NOT EXISTS로 필터링
+        .andWhere((qb3) => {
+          const participationSubQuery = qb3
+            .subQuery()
+            .select('1')
+            .from(PostParticipation, 'pp')
+            // post_participation에 현재 글 + 내가 신청한 기록이 있으면 제외한다.
+            .where('pp.post_id = post.id')
+            .andWhere('pp.requester_id = :userId')
+            .getQuery();
+          return `NOT EXISTS ${participationSubQuery}`;
+        })
         .getQuery();
       return `EXISTS ${subQuery}`;
     });
@@ -602,6 +722,50 @@ export class MatchingService {
     };
   }
 
+  private async fetchAvailableRecruitingPosts(
+    writerIds: string[],
+    userId: string,
+  ): Promise<Map<string, Post>> {
+    // 후보 사용자별로 아직 신청하지 않은 모집글을 한 건씩 매핑하기 위한 헬퍼
+    if (!writerIds.length) {
+      return new Map();
+    }
+
+    const qb = this.postRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.image', 'image') //이미지 불러옴
+      // 후보 사용자(writer)의 모집 중(post.status=RECRUITING) 게시글만 조회한다.
+      .innerJoinAndSelect('post.writer', 'writer')
+      .where('writer.id IN (:...writerIds)', { writerIds })
+      .andWhere('post.status = :status', { status: PostStatus.RECRUITING })
+      // 내가 작성한 글은 제외한다.
+      .andWhere('post.writer_id != :userId', { userId })
+      // post_participation에서 내가 신청한 기록이 있는 글은 제외한다.
+      .andWhere((qb2) => {
+        const participationSubQuery = qb2
+          .subQuery()
+          .select('1')
+          .from(PostParticipation, 'pp')
+          .where('pp.post_id = post.id')
+          .andWhere('pp.requester_id = :userId')
+          .getQuery();
+        return `NOT EXISTS ${participationSubQuery}`;
+      });
+
+    const posts = await qb.getMany();
+    const map = new Map<string, Post>();
+
+    posts.forEach((post) => {
+      const writerId = post.writer?.id;
+      if (!writerId || map.has(writerId)) {
+        return;
+      }
+      map.set(writerId, post);
+    });
+
+    return map;
+  }
+
   private toMatchCandidate(
     row: RawMatchRow,
     baseTravelStyles: TravelStyleType[],
@@ -621,13 +785,15 @@ export class MatchingService {
     );
 
     const vectorScore = this.normalizeVectorDistance(row.vectorDistance);
-    const styleScore = this.calculateRatio(
+    const styleScore = this.calculateCosineSimilarity(
       styleOverlap.length,
       baseTravelStyles.length,
+      candidateStyles.length,
     );
-    const tendencyScore = this.calculateRatio(
+    const tendencyScore = this.calculateCosineSimilarity(
       tendencyOverlap.length,
       baseTravelTendencies.length,
+      candidateTendencies.length,
     );
 
     const mbtiScore = this.calculateMbtiScore(baseMbti, row.mbti);
@@ -646,9 +812,7 @@ export class MatchingService {
       overlappingTravelStyles: styleOverlap,
       overlappingTendencies: tendencyOverlap.slice(0, MAX_TENDENCY_OVERLAPS),
       mbtiMatchScore: mbtiScore,
-      mannerTemperature: this.normalizeNumber(row.mannerTemperature),
-      profileImageId: row.profileImageId, // Assign profileImageId
-    } as MatchCandidateDto & { mannerTemperature: number | null };
+    } as MatchCandidateDto;
 
     return candidate;
   }
@@ -681,26 +845,22 @@ export class MatchingService {
       .map((item) => item.replace(/^"(.*)"$/, '$1') as T)
       .filter((item) => item !== undefined && item !== null && item !== '');
   }
-  //문자열 number로 변환(36.5도를 문자열로 인식)
-  private normalizeNumber(
-    value: number | string | null | undefined,
-  ): number | null {
-    if (typeof value === 'number') {
-      return Number.isFinite(value) ? value : null;
-    }
-    if (typeof value === 'string') {
-      const parsed = parseFloat(value);
-      return Number.isFinite(parsed) ? parsed : null;
-    }
-    return null;
-  }
 
-  private calculateRatio(overlapCount: number, baseTotal: number): number {
-    if (!baseTotal || baseTotal <= 0) {
+  private calculateCosineSimilarity(
+    overlapCount: number,
+    baseTotal: number,
+    candidateTotal: number,
+  ): number {
+    if (!baseTotal || !candidateTotal) {
       return 0;
     }
 
-    return overlapCount / baseTotal;
+    const denominator = Math.sqrt(baseTotal * candidateTotal);
+    if (!denominator || denominator <= 0) {
+      return 0;
+    }
+
+    return overlapCount / denominator;
   }
 
   private normalizeVectorDistance(distance: number | null): number {
