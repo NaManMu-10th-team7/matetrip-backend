@@ -8,6 +8,7 @@ import {
   UseGuards,
   Req,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { WorkspaceService } from './service/workspace.service';
 import { CreateWorkspaceReqDto } from './dto/create-workspace-req.dto';
@@ -19,6 +20,8 @@ import { PoiOptimizeReqDto } from './dto/poi/poi-optimize-req.dto.js';
 import { PlanReqDto } from './dto/workspace-res.dto';
 import { PlanDayScheduledPoisGroupDto } from './dto/poi/get-date-grouped-scheduled-pois.dto.js';
 import { PoiService } from './service/poi.service.js';
+import { ChimeMeetingService } from './service/chime-meeting.service.js';
+import { JoinChimeMeetingDto } from './dto/chime/join-chime-meeting.dto.js';
 
 @Controller('workspace')
 export class WorkspaceController {
@@ -28,6 +31,7 @@ export class WorkspaceController {
     private readonly reviewService: ReviewService,
     private readonly poiGateway: PoiGateway,
     private readonly poiService: PoiService,
+    private readonly chimeMeetingService: ChimeMeetingService,
   ) {}
 
   @Post()
@@ -40,6 +44,30 @@ export class WorkspaceController {
     return this.workspaceService.getConsensusRecommendedAccommodations(
       createPlanDto,
     );
+  }
+
+  @Post(':workspaceId/chime/join')
+  async joinChimeMeeting(
+    @Param('workspaceId') workspaceId: string,
+    @Body() joinDto: JoinChimeMeetingDto,
+  ) {
+    const exists = await this.workspaceService.isExist(workspaceId);
+    if (!exists) {
+      throw new NotFoundException("Workspace doesn't exist");
+    }
+
+    const { meeting, attendee } =
+      await this.chimeMeetingService.joinWorkspace(
+        workspaceId,
+        joinDto.userId,
+        joinDto.username ?? joinDto.userId,
+      );
+
+    return {
+      meeting,
+      attendee,
+      joinInfo: { meeting, attendee }, // 프론트에서 바로 Amazon Chime SDK에 넘길 수 있는 구조
+    };
   }
 
   @UseGuards(AuthGuard('jwt'))
