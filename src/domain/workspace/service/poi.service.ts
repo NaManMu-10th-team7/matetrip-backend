@@ -15,6 +15,7 @@ import {
   PlanDayScheduleSummaryDto,
 } from '../dto/poi/get-date-grouped-scheduled-pois.dto.js';
 import { plainToInstance } from 'class-transformer';
+import { PoiStatus } from '../entities/poi-status.enum.js';
 // import { DateGroupedScheduledPoisResDto } from '../dto/poi/get-date-grouped-scheduled-pois.dto.js';
 
 @Injectable()
@@ -94,11 +95,15 @@ export class PoiService {
       return { persistedPois: [], newlyPersistedCount: 0 };
     }
 
-    const missingPlanDay = cachedPois.filter((poi) => !poi.planDayId);
-    if (missingPlanDay.length > 0) {
-      throw new BadRequestException(
-        'planDayId is required to persist POIs for a workspace',
-      );
+    // 'MARKED' 상태이거나 planDayId가 없는 POI는 DB에 저장하지 않음
+    const poisToPersist = cachedPois.filter(
+      (poi) => poi.status !== PoiStatus.MARKED && poi.planDayId,
+    );
+
+    // 저장할 POI가 없는 경우
+    if (poisToPersist.length === 0) {
+      // 이 경우 캐시를 비우지 않고 그대로 return하여, MARKED 상태의 POI들이 캐시에 남아있도록 함
+      return { persistedPois: [], newlyPersistedCount: 0 };
     }
 
     /**
@@ -107,11 +112,11 @@ export class PoiService {
      * - 상태가 변경된 POI (SCHEDULED↔MARKED)
      * - sequence가 변경된 POI
      */
-    const newlyPersistedCount = cachedPois.filter(
+    const newlyPersistedCount = poisToPersist.filter(
       (poi) => !poi.isPersisted,
     ).length;
 
-    const entities = cachedPois.map((poi) =>
+    const entities = poisToPersist.map((poi) =>
       this.poiRepository.create({
         id: poi.id,
         longitude: poi.longitude,
@@ -136,7 +141,10 @@ export class PoiService {
     await this.poiCacheService.clearWorkspacePois(workspaceId, planDayIds);
 
     return {
-      persistedPois: cachedPois.map((poi) => ({ ...poi, isPersisted: true })),
+      persistedPois: poisToPersist.map((poi) => ({
+        ...poi,
+        isPersisted: true,
+      })),
       newlyPersistedCount,
     };
   }
