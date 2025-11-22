@@ -22,6 +22,7 @@ import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import { PlaceModule } from '../place/place.module';
 import { RabbitmqModule } from '../../infra/rabbitmq/rabbitmq.module.js';
+import { ChimeMeetingService } from './service/chime-meeting.service';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { RabbitmqModule } from '../../infra/rabbitmq/rabbitmq.module.js';
     ConfigModule,
     RabbitmqModule,
     PlaceModule,
+    ChimeMeetingService,
   ],
   controllers: [WorkspaceController],
   providers: [
