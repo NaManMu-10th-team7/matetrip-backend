@@ -4,20 +4,114 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository, LessThan } from 'typeorm';
 import { PlaceUserReview } from './entities/place_user_review.entity';
 import { CreatePlaceUserReviewDto } from './dto/create-place_user_review.dto';
 import { PlaceUserReviewResponseDto } from './dto/place-user-review-response.dto';
 import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
 import { PaginatedReviewsResponseDto } from './dto/paginated-reviews-response.dto';
 import { Transactional } from 'typeorm-transactional';
+import { Post } from '../post/entities/post.entity';
+import { PostParticipation } from '../post-participation/entities/post-participation.entity';
+import { Workspace } from '../workspace/entities/workspace.entity';
+import { PlanDay } from '../workspace/entities/plan-day.entity';
+import { Poi } from '../workspace/entities/poi.entity';
+import { Place } from '../place/entities/place.entity';
+import { ReviewablePlaceResponseDto } from './dto/reviewable-place-response.dto';
 
 @Injectable()
 export class PlaceUserReviewService {
   constructor(
     @InjectRepository(PlaceUserReview)
     private readonly placeUserReviewRepo: Repository<PlaceUserReview>,
+    @InjectRepository(Post)
+    private readonly postRepo: Repository<Post>,
+    @InjectRepository(PostParticipation)
+    private readonly postParticipationRepo: Repository<PostParticipation>,
+    @InjectRepository(Workspace)
+    private readonly workspaceRepo: Repository<Workspace>,
+    @InjectRepository(PlanDay)
+    private readonly planDayRepo: Repository<PlanDay>,
+    @InjectRepository(Poi)
+    private readonly poiRepo: Repository<Poi>,
   ) {}
+
+  async findReviewablePlaces(
+    userId: string,
+  ): Promise<ReviewablePlaceResponseDto[]> {
+    // 1. 사용자가 참여한 Post 조회
+    const participations = await this.postParticipationRepo.find({
+      where: { requester: { id: userId } },
+      relations: ['post'],
+    });
+    const participatingPostIds = participations.map((p) => p.post.id);
+
+    // 2. 사용자가 작성한 Post 조회
+    const writtenPosts = await this.postRepo.find({
+      where: { writer: { id: userId } },
+    });
+    const writtenPostIds = writtenPosts.map((p) => p.id);
+
+    const allPostIds = [
+      ...new Set([...participatingPostIds, ...writtenPostIds]),
+    ];
+
+    if (allPostIds.length === 0) {
+      return [];
+    }
+
+    // 3. Post에 연결된 Workspace 조회
+    const workspaces = await this.workspaceRepo.find({
+      where: { post: { id: In(allPostIds) } },
+    });
+    const workspaceIds = workspaces.map((w) => w.id);
+
+    if (workspaceIds.length === 0) {
+      return [];
+    }
+
+    // 4. Workspace에 연결된 지난 PlanDay 조회
+    const today = new Date().toISOString().split('T')[0];
+    const pastPlanDays = await this.planDayRepo.find({
+      where: {
+        workspace: { id: In(workspaceIds) },
+        planDate: LessThan(today),
+      },
+    });
+    const pastPlanDayIds = pastPlanDays.map((pd) => pd.id);
+
+    if (pastPlanDayIds.length === 0) {
+      return [];
+    }
+
+    // 5. PlanDay에 연결된 Poi(Place) 조회
+    const pois = await this.poiRepo.find({
+      where: { planDay: { id: In(pastPlanDayIds) } },
+      relations: ['place'],
+    });
+    const places = pois.map((poi) => poi.place).filter((p) => p); // null인 경우 제외
+
+    if (places.length === 0) {
+      return [];
+    }
+    const placeIds = places.map((p) => p.id);
+
+    // 6. 이미 리뷰를 작성한 Place 제외
+    const reviewedPlaces = await this.placeUserReviewRepo.find({
+      where: {
+        user: { id: userId },
+        place: { id: In(placeIds) },
+      },
+      relations: ['place'],
+    });
+    const reviewedPlaceIds = reviewedPlaces.map((r) => r.place.id);
+
+    const reviewablePlaces = places.filter(
+      (p) => !reviewedPlaceIds.includes(p.id),
+    );
+
+    return reviewablePlaces.map((p) => ReviewablePlaceResponseDto.fromEntity(p));
+  }
 
   @Transactional()
   async create(

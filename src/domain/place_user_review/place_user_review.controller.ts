@@ -18,12 +18,22 @@ import { CreatePlaceUserReviewDto } from './dto/create-place_user_review.dto';
 import { PlaceUserReviewResponseDto } from './dto/place-user-review-response.dto';
 import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
 import { PaginatedReviewsResponseDto } from './dto/paginated-reviews-response.dto';
+import { ReviewablePlaceResponseDto } from './dto/reviewable-place-response.dto';
 
 @Controller('place-user-reviews')
 export class PlaceUserReviewController {
   constructor(
     private readonly placeUserReviewService: PlaceUserReviewService,
   ) {}
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('reviewable')
+  @HttpCode(HttpStatus.OK)
+  async findReviewablePlaces(
+    @Req() req: Request & { user: { id: string } },
+  ): Promise<ReviewablePlaceResponseDto[]> {
+    return this.placeUserReviewService.findReviewablePlaces(req.user.id);
+  }
 
   @UseGuards(AuthGuard('jwt'))
   @Post()
