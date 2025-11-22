@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { WorkspaceService } from './service/workspace.service';
 import { WorkspaceController } from './workspace.controller';
 import { Workspace } from './entities/workspace.entity.js';
@@ -22,7 +22,6 @@ import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import { PlaceModule } from '../place/place.module';
 import { RabbitmqModule } from '../../infra/rabbitmq/rabbitmq.module.js';
-import { ChimeMeetingService } from './service/chime-meeting.service.js';
 
 @Module({
   imports: [
@@ -34,7 +33,7 @@ import { ChimeMeetingService } from './service/chime-meeting.service.js';
       PostParticipation,
       ChatMessage,
     ]),
-    PostModule,
+    forwardRef(() => PostModule),
     RedisModule,
     ReviewModule, // ReviewService를 사용하기 위해 ReviewModule을 import
     AiModule,
@@ -52,7 +51,7 @@ import { ChimeMeetingService } from './service/chime-meeting.service.js';
     PoiService,
     ChatMessageService,
     PlanDayService,
-    ChimeMeetingService,
   ],
+  exports: [PoiGateway, PoiService],
 })
 export class WorkspaceModule {}
