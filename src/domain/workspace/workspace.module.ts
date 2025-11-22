@@ -42,7 +42,6 @@ import { ChimeMeetingService } from './service/chime-meeting.service';
     ConfigModule,
     RabbitmqModule,
     PlaceModule,
-    ChimeMeetingService,
   ],
   controllers: [WorkspaceController],
   providers: [
@@ -53,6 +52,7 @@ import { ChimeMeetingService } from './service/chime-meeting.service';
     PoiService,
     ChatMessageService,
     PlanDayService,
+    ChimeMeetingService,
   ],
   exports: [PoiGateway, PoiService],
 })
