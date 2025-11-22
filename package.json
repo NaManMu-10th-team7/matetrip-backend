@@ -49,7 +49,6 @@
     "dotenv": "^17.2.3",
     "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.2",
-    "openvidu-node-client": "^2.31.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
