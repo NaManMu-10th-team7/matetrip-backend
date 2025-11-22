@@ -65,11 +65,6 @@ export class AuthService {
       if (profile?.description?.trim()) {
         const rawDesc = profile.description?.trim();
 
-        if (rawDesc && !this.novaService.isValidSummary(rawDesc)) {
-          throw new BadRequestException(
-            '상세소개 요약이 충분히 구체적이지 않아 회원가입을 진행할 수 없습니다.',
-          );
-        }
         if (rawDesc) {
           const isMeaningful =
             await this.novaService.isMeaningfulSummaryLLM(rawDesc);
