@@ -213,9 +213,10 @@ export class PoiGateway {
       this.logger.debug(
         `Socket ${socket.id} unmarked POI ${data.poiId} in workspace ${data.workspaceId}`,
       );
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Socket ${socket.id} failed to unmark POI ${data.poiId} in workspace ${data.workspaceId}`,
+        `Socket ${socket.id} failed to unmark POI ${data.poiId} in workspace ${data.workspaceId}: ${message}`,
       );
     }
   }
@@ -226,14 +227,22 @@ export class PoiGateway {
     @MessageBody() data: PoiSocketDto,
   ) {
     try {
-      this.validateRoomAuth(this.getPoiRoomName(data.workspaceId), socket);
+      const roomName = this.getPoiRoomName(data.workspaceId);
+      this.validateRoomAuth(roomName, socket);
 
       await this.poiService.flushWorkspacePois(data.workspaceId);
 
+      const pois: PoiResDto[] = await this.poiService.getWorkspacePois(
+        data.workspaceId,
+      );
+
+      this.server.to(roomName).emit(PoiSocketEvent.FLUSHED, { pois });
+
       this.logger.log(`Workspace ${data.workspaceId} flushed POIs`);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Socket ${socket.id} failed to flush workspace ${data.workspaceId}`,
+        `Socket ${socket.id} failed to flush workspace ${data.workspaceId}: ${message}`,
         error,
       );
     }
@@ -252,8 +261,9 @@ export class PoiGateway {
         `Socket ${socket.id} added POI to schedule in planDay ${data.planDayId}`,
       );
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Socket ${socket.id} failed to add POI to schedule`,
+        `Socket ${socket.id} failed to add POI to schedule: ${message}`,
         error,
       );
     }
@@ -297,8 +307,9 @@ export class PoiGateway {
         `Socket ${socket.id} removed POI ${data.poiId} from schedule in planDay ${data.planDayId}`,
       );
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Socket ${socket.id} failed to remove POI from schedule`,
+        `Socket ${socket.id} failed to remove POI from schedule: ${message}`,
         error,
       );
     }
@@ -330,8 +341,9 @@ export class PoiGateway {
         `Socket ${socket.id} reordered POIs in planDay ${data.planDayId}: ${data.poiIds.join(', ')}`,
       );
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Socket ${socket.id} failed to reorder POIs in planDay ${data.planDayId}`,
+        `Socket ${socket.id} failed to reorder POIs in planDay ${data.planDayId}: ${message}`,
         error,
       );
     }
@@ -348,8 +360,9 @@ export class PoiGateway {
 
       socket.to(roomName).emit(PoiSocketEvent.CURSOR_MOVED, data);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Socket ${socket.id} failed to move cursor in workspace ${data.workspaceId}`,
+        `Socket ${socket.id} failed to move cursor in workspace ${data.workspaceId}: ${message}`,
         error,
       );
     }
@@ -371,8 +384,9 @@ export class PoiGateway {
       };
       socket.to(roomName).emit(PoiSocketEvent.POI_HOVERED, payload);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Socket ${socket.id} failed to handle POI hover in workspace ${data.workspaceId}`,
+        `Socket ${socket.id} failed to handle POI hover in workspace ${data.workspaceId}: ${message}`,
         error,
       );
     }
@@ -403,8 +417,9 @@ export class PoiGateway {
         `[MAP_CLICKED] Emitted to room ${roomName}. Payload: ${JSON.stringify(payload)}`,
       );
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Socket ${socket.id} failed to handle map click in workspace ${data.workspaceId}`,
+        `Socket ${socket.id} failed to handle map click in workspace ${data.workspaceId}: ${message}`,
         error,
       );
     }
@@ -438,8 +453,9 @@ export class PoiGateway {
         `[PLACE_FOCUS] User ${data.userName} focused, returned ${places.length} places in bounds`,
       );
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Socket ${socket.id} failed to handle place focus in workspace ${data.workspaceId}`,
+        `Socket ${socket.id} failed to handle place focus in workspace ${data.workspaceId}: ${message}`,
         error,
       );
     }
@@ -487,8 +503,9 @@ export class PoiGateway {
         `[AI Optimize] Broadcasted POI reorder in planDay ${planDayId}: ${poiIds.join(', ')}`,
       );
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Failed to broadcast POI reorder in planDay ${planDayId}`,
+        `Failed to broadcast POI reorder in planDay ${planDayId}: ${message}`,
         error,
       );
       throw error;
@@ -511,8 +528,9 @@ export class PoiGateway {
         `[BROADCAST_SYNC] Synced ${pois.length} POIs to room: ${roomName}`,
       );
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Failed to broadcast sync for workspace ${workspaceId}`,
+        `Failed to broadcast sync for workspace ${workspaceId}: ${message}`,
         error,
       );
     }
@@ -521,18 +539,17 @@ export class PoiGateway {
   /**
    * POI가 일정에 추가되었음을 브로드캐스트합니다.
    * @param workspaceId
-   * @param poiId
-   * @param planDayId
+   * @param poi
    */
-  public broadcastPoiAddSchedule(
-    workspaceId: string,
-    poiId: string,
-    planDayId: string,
-  ) {
+  public broadcastPoiAddSchedule(workspaceId: string, poi: CachedPoi) {
     const roomName = this.getPoiRoomName(workspaceId);
-    this.server
-      .to(roomName)
-      .emit(PoiSocketEvent.ADD_SCHEDULE, { poiId, planDayId });
+    const poiResDto = PoiResDto.fromCachedPoi(poi);
+    // 프론트엔드가 기대하는 형식으로 페이로드 변경
+    this.server.to(roomName).emit(PoiSocketEvent.ADD_SCHEDULE, {
+      poiId: poiResDto.id,
+      planDayId: poiResDto.planDayId,
+    });
+    this.logger.debug(`[ADD_SCHEDULE] Emitted to room: ${roomName}, Payload: ${JSON.stringify({ poiId: poiResDto.id, planDayId: poiResDto.planDayId })}`);
   }
 
   private getPoiRoomName(workspaceId: string) {
@@ -571,7 +588,8 @@ export class PoiGateway {
       this.rabbitMQProducer.enqueueBehaviorEvent(behaviorEvent);
       this.logger.debug(`행동 Event 전송 : ${eventType} for place ${placeId}`);
     } catch (error) {
-      this.logger.error(`행동 Event 전송 실패 : ${eventType}`, error);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`행동 Event 전송 실패 : ${eventType}: ${message}`, error);
     }
   }
 }
