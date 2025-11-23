@@ -1,15 +1,15 @@
-import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { IsInt, IsNotEmpty, IsString, IsUUID } from 'class-validator';
 
-export class PoiAddScheduleByPlaceReqDto {
-  @IsString()
+export class AddScheduleByPlaceReqDto {
+  @IsUUID()
   @IsNotEmpty()
   workspaceId: string;
 
-  @IsNumber()
-  @IsNotEmpty()
-  dayNo: number;
-
-  @IsString()
+  @IsUUID()
   @IsNotEmpty()
   placeId: string;
+
+  @IsInt()
+  @IsNotEmpty()
+  dayNo: number; // 1-based day number
 }
