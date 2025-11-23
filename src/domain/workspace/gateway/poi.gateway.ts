@@ -231,9 +231,8 @@ export class PoiGateway {
 
       await this.poiService.flushWorkspacePois(data.workspaceId);
 
-      const pois: PoiResDto[] = await this.poiService.getWorkspacePois(
-        data.workspaceId,
-      );
+      const pois: PoiResDto[] =
+        await this.poiService.getWorkspacePoisByWorkspace(data.workspaceId);
 
       this.server.to(roomName).emit(PoiSocketEvent.FLUSHED, { pois });
 
@@ -548,7 +547,9 @@ export class PoiGateway {
       poiId: poiResDto.id,
       planDayId: poiResDto.planDayId,
     });
-    this.logger.debug(`[ADD_SCHEDULE] Emitted to room: ${roomName}, Payload: ${JSON.stringify({ poiId: poiResDto.id, planDayId: poiResDto.planDayId })}`);
+    this.logger.debug(
+      `[ADD_SCHEDULE] Emitted to room: ${roomName}, Payload: ${JSON.stringify({ poiId: poiResDto.id, planDayId: poiResDto.planDayId })}`,
+    );
   }
 
   private getPoiRoomName(workspaceId: string) {
@@ -588,7 +589,10 @@ export class PoiGateway {
       this.logger.debug(`행동 Event 전송 : ${eventType} for place ${placeId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`행동 Event 전송 실패 : ${eventType}: ${message}`, error);
+      this.logger.error(
+        `행동 Event 전송 실패 : ${eventType}: ${message}`,
+        error,
+      );
     }
   }
 }
