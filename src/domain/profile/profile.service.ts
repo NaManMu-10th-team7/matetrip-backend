@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
@@ -20,6 +21,7 @@ import { Transactional } from 'typeorm-transactional';
 import { MatchingService } from './matching.service';
 //상세소개 , 여행 성향, 여행 스타일 얻는 dto 가 아래
 import { buildEmbeddingPayloadFromSource } from './utils/embedding-payload.util';
+import { NovaService } from 'src/ai/summaryLLM.service';
 
 /**
  * 클라이언트에 반환되는 프로필 정보 형태
@@ -53,6 +55,7 @@ export class ProfileService {
     private readonly binaryContentRepository: Repository<BinaryContent>,
     private readonly rabbitMQProducer: RabbitmqProducer,
     private readonly matchingService: MatchingService,
+    private readonly novaService: NovaService,
   ) {}
 
   /**
@@ -210,11 +213,27 @@ export class ProfileService {
       throw new NotFoundException(`프로필을 찾을 수 없습니다.`);
     }
 
-    const { profileImageId, ...textData } = updateProfileDto;
-
+    const prevDescription = profile.description ?? '';
     const prevTravelStyles = [...(profile.travelStyles ?? [])];
     const prevTendencies = [...(profile.tendency ?? [])];
-    const prevDescription = profile.description ?? '';
+
+    const { profileImageId, ...textData } = updateProfileDto;
+
+    const incomingDescription = updateProfileDto.description;
+    const trimmedPrev = prevDescription.trim();
+    const trimmedNew = incomingDescription?.trim();
+    const descriptionChanged =
+      incomingDescription !== undefined && trimmedPrev !== (trimmedNew ?? '');
+
+    if (descriptionChanged && trimmedNew) {
+      const isMeaningful =
+        await this.novaService.isMeaningfulSummaryLLM(trimmedNew);
+      if (!isMeaningful) {
+        throw new BadRequestException(
+          '상세소개 요약이 부적절하거나 의미가 없어 수정을 진행할 수 없습니다.',
+        );
+      }
+    }
 
     // 전달된 필드만 덮어쓰기 🌟(사진 파일 제외)
     Object.assign(profile, textData);

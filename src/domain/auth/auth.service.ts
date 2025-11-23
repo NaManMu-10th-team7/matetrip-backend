@@ -87,18 +87,14 @@ export class AuthService {
 
       return newUser;
     } catch (error) {
-      // UserService에서 던진 에러를 여기서 처리
       if (
         error instanceof ConflictException ||
-        error instanceof InternalServerErrorException
+        error instanceof InternalServerErrorException ||
+        error instanceof BadRequestException // 400 그대로 전달
       ) {
         throw error;
       }
-
-      // 그 외 모든 에러
-      // 서버 로그에 에러 기록
       console.error(error);
-
       throw new InternalServerErrorException(
         '회원가입 처리 중 오류가 발생했습니다.',
       );
