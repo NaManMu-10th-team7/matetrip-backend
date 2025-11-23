@@ -26,6 +26,8 @@ import { PlanDayResDto } from './dto/planday/plan-day-res.dto.js';
 import { ChimeMeetingService } from './service/chime-meeting.service.js';
 import { JoinChimeMeetingDto } from './dto/chime/join-chime-meeting.dto.js';
 
+import { AddScheduleByPlaceReqDto } from './dto/poi/poi-add-schedule-by-place-req.dto.js';
+
 @Controller('workspace')
 export class WorkspaceController {
   private readonly logger = new Logger(WorkspaceController.name);
@@ -114,6 +116,18 @@ export class WorkspaceController {
     return {
       success: true,
       message: 'POI added to schedule and broadcasted successfully',
+    };
+  }
+
+  /**
+   * AI 에이전트가 placeId를 이용해 POI를 생성하고 바로 일정에 추가할 때 호출하는 엔드포인트
+   */
+  @Post('schedule/add-by-place')
+  async addScheduleByPlace(@Body() reqDto: AddScheduleByPlaceReqDto) {
+    await this.workspaceService.addScheduleByPlace(reqDto);
+    return {
+      success: true,
+      message: 'POI created and added to schedule successfully',
     };
   }
 

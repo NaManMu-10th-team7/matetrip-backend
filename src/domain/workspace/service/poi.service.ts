@@ -221,7 +221,7 @@ export class PoiService {
     this.poiGateway.sendBehaviorEvent(poi, BehaviorEventType.POI_SCHEDULE);
 
     // 3. 같은 워크스페이스의 모든 클라이언트에게 브로드캐스트
-    this.poiGateway.broadcastPoiAddSchedule(workspaceId, poiId, planDayId);
+    this.poiGateway.broadcastPoiAddSchedule(workspaceId, poi);
   }
 
   /**
