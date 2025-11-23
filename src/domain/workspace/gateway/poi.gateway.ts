@@ -108,9 +108,8 @@ export class PoiGateway {
         workspaceId: data.workspaceId,
       });
 
-      const pois: PoiResDto[] = await this.poiService.getWorkspacePois(
-        data.workspaceId,
-      );
+      const pois: PoiResDto[] =
+        await this.poiService.getWorkspacePoisByWorkspace(data.workspaceId);
 
       // todo: 나중에 DTO로
       socket.emit(PoiSocketEvent.SYNC, { pois });
@@ -520,7 +519,7 @@ export class PoiGateway {
     try {
       const roomName = this.getPoiRoomName(workspaceId);
       const pois: PoiResDto[] =
-        await this.poiService.getWorkspacePois(workspaceId);
+        await this.poiService.getWorkspacePoisByWorkspace(workspaceId);
 
       this.server.to(roomName).emit(PoiSocketEvent.SYNC, { pois });
 

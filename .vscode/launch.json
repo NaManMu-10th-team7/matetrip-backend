@@ -4,11 +4,12 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Nest start:debug",
+      "name": "Debug NestJS",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "start:debug"],
       "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
+      "restart": true,
+      "cwd": "${workspaceFolder}",
       "skipFiles": ["<node_internals>/**"]
     }
   ]

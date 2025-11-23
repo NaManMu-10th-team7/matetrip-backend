@@ -52,12 +52,11 @@ export class PoiService {
   // workspace의 저장된 poi들 전부 반환
   // 캐시에 있다면 그대로 반환
   // 캐시에 없다면 DB에서 반환 후 캐시
-  async getWorkspacePois(workspaceId: string): Promise<PoiResDto[]> {
+  async getWorkspacePoisByWorkspace(workspaceId: string): Promise<PoiResDto[]> {
     const cached = await this.poiCacheService.getWorkspacePois(workspaceId);
     if (cached.length > 0) {
       return cached.map((poi) => PoiResDto.fromCachedPoi(poi));
     }
-
     // DB에서 찾고 캐시에 저장
     const planDays: PlanDayResDto[] =
       await this.planDayService.getWorkspacePlanDays(workspaceId);
@@ -77,7 +76,6 @@ export class PoiService {
       // TODO: 너무 무거운 JOIN인가 의심되니까 나중에 Refac생각해보기(일단 나중에) ex. userId만 필요한데 전체를 가져오니까
       relations: ['createdBy', 'planDay', 'place'],
     });
-
     await this.poiCacheService.setWorkspacePois(workspaceId, pois);
 
     return pois.map((poi) => PoiResDto.fromEntity(poi, workspaceId));
@@ -171,6 +169,7 @@ export class PoiService {
   async getScheduledPois(
     workspaceId: string,
   ): Promise<PlanDayScheduledPoisGroupDto[]> {
+    // getWorkspacePoisByWorkspace
     /**
      * 1. workspaceId로 planDays 찾기
      * 2. 각 planday별 scheduled pois를 찾기
@@ -182,6 +181,9 @@ export class PoiService {
     if (planDays.length === 0) {
       return [];
     }
+    /**
+     * TODO: 캐시에서 가져오는걸 Main으로 바꾸기 (일단 씻고)
+     */
 
     // 각 planDay별로 scheduled POI들을 가져와서 그룹화
     const results: PlanDayScheduledPoisGroupDto[] = [];
@@ -192,6 +194,10 @@ export class PoiService {
           workspaceId,
           planDay.id,
         );
+
+      // if (scheduledPois.length === 0) {
+      //   this.poiRepository.find;
+      // }
 
       // DTO로 변환
       const poisDto = scheduledPois.map((poi) => PoiResDto.fromCachedPoi(poi));

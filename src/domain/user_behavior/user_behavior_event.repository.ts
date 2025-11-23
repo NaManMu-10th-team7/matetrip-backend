@@ -30,12 +30,13 @@ export class UserBehaviorEventRepository extends Repository<UserBehaviorEvent> {
       .innerJoin('event.place', 'place')
       .innerJoin('event.user', 'user')
       .select('place.id', 'placeId')
-      .addSelect('MAX(event.createdAt)', 'latestEventAt')
+      .addSelect('event.createdAt', 'latestEventAt')
       .where('user.id = :userId', { userId })
       .andWhere('event.eventType IN (:...eventTypes)', { eventTypes })
       .andWhere('event.createdAt >= :sinceDate', { sinceDate })
-      .groupBy('place.id')
-      .orderBy('MAX(event.createdAt)', 'DESC') // 집계 표현식으로 정렬
+      .distinctOn(['place.id'])
+      .orderBy('place.id')
+      .addOrderBy('event.createdAt', 'DESC')
       .limit(limit)
       .getRawMany<GetPlaceIdWithTimeDto>();
   }
