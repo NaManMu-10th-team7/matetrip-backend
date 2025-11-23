@@ -143,7 +143,16 @@ export class PoiService {
 
     // 모든 POI upsert: id 중복이면 update, 아니면 insert
     // 변경 없는 POI는 실제로 write 안 일어남 (DB 최적화)
-    await this.poiRepository.upsert(entities, ['id']);
+    await this.poiRepository
+      .createQueryBuilder()
+      .insert()
+      .into(Poi)
+      .values(entities)
+      .onConflict(
+        `("id") DO UPDATE SET "place_name" = EXCLUDED."place_name", "longitude" = EXCLUDED."longitude", "latitude" = EXCLUDED."latitude", "address" = EXCLUDED."address", "status" = EXCLUDED."status", "sequence" = EXCLUDED."sequence", "created_by" = EXCLUDED."created_by", "plan_day_id" = EXCLUDED."plan_day_id", "place_id" = EXCLUDED."place_id"`,
+      )
+      .orIgnore()
+      .execute();
 
     const planDayIds =
       await this.planDayService.getWorkspacePlanDayIds(workspaceId);
