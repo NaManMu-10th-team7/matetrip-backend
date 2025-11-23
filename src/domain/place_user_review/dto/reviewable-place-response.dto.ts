@@ -14,8 +14,12 @@ export class ReviewablePlaceResponseDto {
   summary: string;
   sido: string;
   createdAt: Date;
+  planDate?: string;
 
-  static fromEntity(place: Place): ReviewablePlaceResponseDto {
+  static fromEntity(
+    place: Place,
+    planDate?: string,
+  ): ReviewablePlaceResponseDto {
     const dto = new ReviewablePlaceResponseDto();
     dto.id = place.id;
     dto.title = place.title;
@@ -29,6 +33,7 @@ export class ReviewablePlaceResponseDto {
     dto.summary = place.summary;
     dto.sido = place.sido;
     dto.createdAt = place.createdAt;
+    dto.planDate = planDate;
     return dto;
   }
 }

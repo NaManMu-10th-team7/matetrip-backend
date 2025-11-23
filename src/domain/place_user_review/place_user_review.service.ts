@@ -16,7 +16,6 @@ import { PostParticipation } from '../post-participation/entities/post-participa
 import { Workspace } from '../workspace/entities/workspace.entity';
 import { PlanDay } from '../workspace/entities/plan-day.entity';
 import { Poi } from '../workspace/entities/poi.entity';
-import { Place } from '../place/entities/place.entity';
 import { ReviewablePlaceResponseDto } from './dto/reviewable-place-response.dto';
 
 @Injectable()
@@ -39,14 +38,13 @@ export class PlaceUserReviewService {
   async findReviewablePlaces(
     userId: string,
   ): Promise<ReviewablePlaceResponseDto[]> {
-    // 1. 사용자가 참여한 Post 조회
+    // 1. 사용자가 참여하거나 작성한 모든 Post 조회
     const participations = await this.postParticipationRepo.find({
       where: { requester: { id: userId } },
       relations: ['post'],
     });
     const participatingPostIds = participations.map((p) => p.post.id);
 
-    // 2. 사용자가 작성한 Post 조회
     const writtenPosts = await this.postRepo.find({
       where: { writer: { id: userId } },
     });
@@ -55,22 +53,16 @@ export class PlaceUserReviewService {
     const allPostIds = [
       ...new Set([...participatingPostIds, ...writtenPostIds]),
     ];
+    if (allPostIds.length === 0) return [];
 
-    if (allPostIds.length === 0) {
-      return [];
-    }
-
-    // 3. Post에 연결된 Workspace 조회
+    // 2. Post에 연결된 Workspace 조회
     const workspaces = await this.workspaceRepo.find({
       where: { post: { id: In(allPostIds) } },
     });
     const workspaceIds = workspaces.map((w) => w.id);
+    if (workspaceIds.length === 0) return [];
 
-    if (workspaceIds.length === 0) {
-      return [];
-    }
-
-    // 4. Workspace에 연결된 지난 PlanDay 조회
+    // 3. Workspace에 연결된 지난 PlanDay 조회
     const today = new Date().toISOString().split('T')[0];
     const pastPlanDays = await this.planDayRepo.find({
       where: {
@@ -79,24 +71,34 @@ export class PlaceUserReviewService {
       },
     });
     const pastPlanDayIds = pastPlanDays.map((pd) => pd.id);
+    if (pastPlanDayIds.length === 0) return [];
 
-    if (pastPlanDayIds.length === 0) {
-      return [];
-    }
+    // 4. PlanDay에 연결된 Poi 조회 (QueryBuilder 사용)
+    const pois = await this.poiRepo
+      .createQueryBuilder('poi')
+      .leftJoinAndSelect('poi.place', 'place')
+      .leftJoinAndSelect('poi.planDay', 'planDay')
+      .where('poi.planDay IN (:...pastPlanDayIds)', { pastPlanDayIds })
+      .andWhere('poi.place IS NOT NULL')
+      .andWhere('planDay.planDate IS NOT NULL')
+      .getMany();
 
-    // 5. PlanDay에 연결된 Poi(Place) 조회
-    const pois = await this.poiRepo.find({
-      where: { planDay: { id: In(pastPlanDayIds) } },
-      relations: ['place'],
+    // 5. Place ID를 기준으로 가장 최근의 planDate를 매핑
+    const placeToDateMap = new Map<string, string>();
+    pois.forEach((poi) => {
+      if (poi.place && poi.planDay && poi.planDay.planDate) {
+        const existingDate = placeToDateMap.get(poi.place.id);
+        if (!existingDate || poi.planDay.planDate > existingDate) {
+          placeToDateMap.set(poi.place.id, poi.planDay.planDate);
+        }
+      }
     });
-    const places = pois.map((poi) => poi.place).filter((p) => p); // null인 경우 제외
 
-    if (places.length === 0) {
-      return [];
-    }
-    const placeIds = places.map((p) => p.id);
+    const places = [...new Set(pois.map((poi) => poi.place).filter((p) => p))];
+    if (places.length === 0) return [];
 
     // 6. 이미 리뷰를 작성한 Place 제외
+    const placeIds = places.map((p) => p.id);
     const reviewedPlaces = await this.placeUserReviewRepo.find({
       where: {
         user: { id: userId },
@@ -104,13 +106,15 @@ export class PlaceUserReviewService {
       },
       relations: ['place'],
     });
-    const reviewedPlaceIds = reviewedPlaces.map((r) => r.place.id);
+    const reviewedPlaceIds = new Set(reviewedPlaces.map((r) => r.place.id));
 
-    const reviewablePlaces = places.filter(
-      (p) => !reviewedPlaceIds.includes(p.id),
-    );
+    const reviewablePlaces = places.filter((p) => !reviewedPlaceIds.has(p.id));
 
-    return reviewablePlaces.map((p) => ReviewablePlaceResponseDto.fromEntity(p));
+    // 7. DTO로 변환
+    return reviewablePlaces.map((p) => {
+      const planDate = placeToDateMap.get(p.id);
+      return ReviewablePlaceResponseDto.fromEntity(p, planDate);
+    });
   }
 
   @Transactional()
