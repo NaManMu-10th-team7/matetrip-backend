@@ -12,8 +12,6 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UserPayloadDto } from '../users/dto/user.payload.dto';
-import { CreateProfileDto } from '../profile/dto/create-profile.dto';
-import { EmbeddingMatchingProfileDto } from '../profile/dto/embedding-matching-profile.dto';
 import { buildEmbeddingPayloadFromSource } from '../profile/utils/embedding-payload.util';
 
 @Injectable()
@@ -105,29 +103,5 @@ export class AuthService {
         '회원가입 처리 중 오류가 발생했습니다.',
       );
     }
-  }
-
-  private buildEmbeddingPayload(
-    profile?: CreateProfileDto,
-  ): EmbeddingMatchingProfileDto {
-    const payload: EmbeddingMatchingProfileDto = {};
-    if (!profile) {
-      return payload;
-    }
-
-    if (profile.description?.trim() || profile.intro?.trim()) {
-      payload.description =
-        profile.description?.trim() || profile.intro?.trim();
-    }
-
-    if (profile.travelStyles?.length) {
-      payload.travelStyleTypes = profile.travelStyles;
-    }
-
-    if (profile.tendency?.length) {
-      payload.travelTendencies = profile.tendency;
-    }
-
-    return payload;
   }
 }
