@@ -8,6 +8,7 @@ import {
   UseGuards,
   Req,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { WorkspaceService } from './service/workspace.service';
 import { CreateWorkspaceReqDto } from './dto/create-workspace-req.dto';
@@ -18,7 +19,14 @@ import { PoiGateway } from './gateway/poi.gateway.js';
 import { PoiOptimizeReqDto } from './dto/poi/poi-optimize-req.dto.js';
 import { PlanReqDto } from './dto/workspace-res.dto';
 import { PlanDayScheduledPoisGroupDto } from './dto/poi/get-date-grouped-scheduled-pois.dto.js';
+import { PoiAddScheduleReqDto } from './dto/poi/poi-add-schedule-req.dto.js';
 import { PoiService } from './service/poi.service.js';
+import { PlanDayService } from './service/plan-day.service.js';
+import { PlanDayResDto } from './dto/planday/plan-day-res.dto.js';
+import { ChimeMeetingService } from './service/chime-meeting.service.js';
+import { JoinChimeMeetingDto } from './dto/chime/join-chime-meeting.dto.js';
+
+import { AddScheduleByPlaceReqDto } from './dto/poi/poi-add-schedule-by-place-req.dto.js';
 
 @Controller('workspace')
 export class WorkspaceController {
@@ -28,6 +36,8 @@ export class WorkspaceController {
     private readonly reviewService: ReviewService,
     private readonly poiGateway: PoiGateway,
     private readonly poiService: PoiService,
+    private readonly planDayService: PlanDayService,
+    private readonly chimeMeetingService: ChimeMeetingService,
   ) {}
 
   @Post()
@@ -40,6 +50,29 @@ export class WorkspaceController {
     return this.workspaceService.getConsensusRecommendedAccommodations(
       createPlanDto,
     );
+  }
+
+  @Post(':workspaceId/chime/join')
+  async joinChimeMeeting(
+    @Param('workspaceId') workspaceId: string,
+    @Body() joinDto: JoinChimeMeetingDto,
+  ) {
+    const exists = await this.workspaceService.isExist(workspaceId);
+    if (!exists) {
+      throw new NotFoundException("Workspace doesn't exist");
+    }
+
+    const { meeting, attendee } = await this.chimeMeetingService.joinWorkspace(
+      workspaceId,
+      joinDto.userId,
+      joinDto.username ?? joinDto.userId,
+    );
+
+    return {
+      meeting,
+      attendee,
+      joinInfo: { meeting, attendee }, // 프론트에서 바로 Amazon Chime SDK에 넘길 수 있는 구조
+    };
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -70,6 +103,64 @@ export class WorkspaceController {
       success: true,
       message: 'POI order optimized and broadcasted successfully',
     };
+  }
+
+  /**
+   * AI 에이전트가 POI를 특정 날짜의 일정에 추가할 때 호출하는 엔드포인트
+   */
+  @Post('poi/add-schedule')
+  async addPoiToScheduleByAi(@Body() data: PoiAddScheduleReqDto) {
+    // AI 에이전트의 요청임을 검증하는 로직 추가 가능 (e.g. API Key)
+    await this.poiService.addPoiToSchedule(data);
+
+    return {
+      success: true,
+      message: 'POI added to schedule and broadcasted successfully',
+    };
+  }
+
+  /**
+   * AI 에이전트가 placeId를 이용해 POI를 생성하고 바로 일정에 추가할 때 호출하는 엔드포인트
+   */
+  @Post('schedule/add-by-place')
+  async addScheduleByPlace(@Body() reqDto: AddScheduleByPlaceReqDto) {
+    await this.workspaceService.addScheduleByPlace(reqDto);
+    return {
+      success: true,
+      message: 'POI created and added to schedule successfully',
+    };
+  }
+
+  /**
+   * 특정 워크스페이스 내에서 placeId를 기준으로 POI를 조회합니다.
+   * @param workspaceId - 워크스페이스 ID
+   * @param placeId - 장소 ID
+   * @returns PoiResDto
+   */
+  @Get(':workspaceId/poi/by-place/:placeId')
+  async getPoiByPlaceId(
+    @Param('workspaceId') workspaceId: string,
+    @Param('placeId') placeId: string,
+  ) {
+    const poi = await this.poiService.getPoiByPlaceId(workspaceId, placeId);
+    if (!poi) {
+      throw new NotFoundException(
+        `POI with placeId ${placeId} not found in workspace ${workspaceId}`,
+      );
+    }
+    return poi;
+  }
+
+  /**
+   * @description 워크스페이스의 모든 PlanDay 목록을 조회합니다.
+   * @param workspaceId - 워크스페이스 ID
+   * @returns PlanDayResDto[]
+   */
+  @Get(':workspaceId/plan-days')
+  async getWorkspacePlanDays(
+    @Param('workspaceId') workspaceId: string,
+  ): Promise<PlanDayResDto[]> {
+    return this.planDayService.getWorkspacePlanDays(workspaceId);
   }
 
   @Get(':id')

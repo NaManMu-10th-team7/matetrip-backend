@@ -14,7 +14,6 @@ import { WorkspaceModule } from './domain/workspace/workspace.module';
 import { AuthModule } from './domain/auth/auth.module';
 import { RedisModule } from './infra/redis/redis.module';
 import { NotificationsModule } from './domain/notifications/notifications.module';
-// import { OpenviduModule } from './openvidu/openvidu.module';
 import { AiModule } from './ai/ai.module';
 import { HttpModule } from '@nestjs/axios';
 import { PlaceModule } from './domain/place/place.module';
@@ -45,7 +44,6 @@ import { PlaceUserReviewModule } from './domain/place_user_review/place_user_rev
     AuthModule,
     RedisModule,
     NotificationsModule,
-    // OpenviduModule,
     AiModule,
     PlaceModule,
     RabbitmqModule,

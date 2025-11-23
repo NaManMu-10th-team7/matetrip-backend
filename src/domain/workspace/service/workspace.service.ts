@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -36,6 +37,7 @@ import { RegionGroup } from 'src/domain/place/entities/region_group.enum';
 import { differenceInCalendarDays } from 'date-fns';
 import { DailyPlanResDto } from '../dto/daily-plan-recommendation-res.dto';
 import { GetPlacesResDto } from 'src/domain/place/dto/get-places-res.dto';
+import { AddScheduleByPlaceReqDto } from '../dto/poi/poi-add-schedule-by-place-req.dto';
 
 @Injectable()
 export class WorkspaceService {
@@ -114,6 +116,72 @@ export class WorkspaceService {
     const cachedPoi: CachedPoi = buildToCachedPoiFromCreateDto(dto);
     await this.poiCacheService.upsertPoi(dto.workspaceId, cachedPoi);
     return cachedPoi;
+  }
+
+  async addScheduleByPlace(reqDto: AddScheduleByPlaceReqDto): Promise<void> {
+    const { workspaceId, placeId, dayNo } = reqDto;
+
+    // 1. placeId로 DB에서 장소 정보 가져오기
+    const place = await this.placesService.getPlaceById(placeId);
+    if (!place) {
+      throw new NotFoundException(`Place with ID ${placeId} not found.`);
+    }
+
+    // 2. 가져온 정보로 "Marked" 상태의 POI를 캐시에 생성
+    // 2-1. 기존에 같은 placeId로 생성된 POI가 있는지 확인 (중복 생성 방지)
+    let poi = await this.poiService.getPoiByPlaceId(workspaceId, placeId);
+    let poiId: string;
+
+    if (poi) {
+      poiId = poi.id;
+      this.logger.debug(
+        `Existing POI found for place ${placeId}. POI ID: ${poiId}`,
+      );
+    } else {
+      // 2-2. 없으면 새로 생성
+      const newPoiId = uuidv4();
+      const cachedPoi: CachedPoi = {
+        id: newPoiId,
+        workspaceId,
+        createdBy: '00000000-0000-0000-0000-000000000000',
+        placeId: place.id,
+        placeName: place.title,
+        address: place.address,
+        longitude: place.longitude,
+        latitude: place.latitude,
+        status: PoiStatus.MARKED,
+        sequence: 0,
+        isPersisted: false, // 아직 DB에 저장되지 않음
+      };
+      await this.poiCacheService.upsertPoi(workspaceId, cachedPoi);
+      poiId = newPoiId;
+      this.logger.debug(
+        `New POI created for place ${placeId}. POI ID: ${poiId}`,
+      );
+    }
+
+    // 3. dayNo에 맞는 planDayId 찾기
+    const planDays =
+      await this.planDayService.getWorkspacePlanDays(workspaceId);
+    const targetPlanDay = planDays.find((pd) => pd.dayNo === dayNo);
+
+    if (!targetPlanDay) {
+      throw new NotFoundException(
+        `Plan day number ${dayNo} not found in workspace ${workspaceId}.`,
+      );
+    }
+    const planDayId = targetPlanDay.id;
+
+    // 4. POI를 일정에 추가 (상태 변경 및 브로드캐스트)
+    await this.poiService.addPoiToSchedule({
+      workspaceId,
+      planDayId,
+      poiId,
+    });
+
+    this.logger.log(
+      `Successfully added POI ${poiId} (Place: ${placeId}) to schedule for day ${dayNo} in workspace ${workspaceId}.`,
+    );
   }
 
   /**

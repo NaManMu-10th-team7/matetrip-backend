@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Poi } from '../entities/poi.entity.js';
 import { In, Repository } from 'typeorm';
@@ -15,6 +20,10 @@ import {
   PlanDayScheduleSummaryDto,
 } from '../dto/poi/get-date-grouped-scheduled-pois.dto.js';
 import { plainToInstance } from 'class-transformer';
+import { PoiStatus } from '../entities/poi-status.enum.js';
+import { PoiGateway } from '../gateway/poi.gateway.js';
+import { BehaviorEventType } from '../../../infra/rabbitmq/dto/enqueue-behavior-event.dto.js';
+import { PoiAddScheduleReqDto } from '../dto/poi/poi-add-schedule-req.dto.js';
 // import { DateGroupedScheduledPoisResDto } from '../dto/poi/get-date-grouped-scheduled-pois.dto.js';
 
 @Injectable()
@@ -24,6 +33,8 @@ export class PoiService {
     private readonly poiRepository: Repository<Poi>,
     private readonly planDayService: PlanDayService,
     private readonly poiCacheService: PoiCacheService,
+    @Inject(forwardRef(() => PoiGateway))
+    private readonly poiGateway: PoiGateway,
   ) {}
 
   async persistPoi(cachedPoi: CachedPoi): Promise<Poi> {
@@ -94,11 +105,15 @@ export class PoiService {
       return { persistedPois: [], newlyPersistedCount: 0 };
     }
 
-    const missingPlanDay = cachedPois.filter((poi) => !poi.planDayId);
-    if (missingPlanDay.length > 0) {
-      throw new BadRequestException(
-        'planDayId is required to persist POIs for a workspace',
-      );
+    // 'MARKED' 상태이거나 planDayId가 없는 POI는 DB에 저장하지 않음
+    const poisToPersist = cachedPois.filter(
+      (poi) => poi.status !== PoiStatus.MARKED && poi.planDayId,
+    );
+
+    // 저장할 POI가 없는 경우
+    if (poisToPersist.length === 0) {
+      // 이 경우 캐시를 비우지 않고 그대로 return하여, MARKED 상태의 POI들이 캐시에 남아있도록 함
+      return { persistedPois: [], newlyPersistedCount: 0 };
     }
 
     /**
@@ -107,11 +122,11 @@ export class PoiService {
      * - 상태가 변경된 POI (SCHEDULED↔MARKED)
      * - sequence가 변경된 POI
      */
-    const newlyPersistedCount = cachedPois.filter(
+    const newlyPersistedCount = poisToPersist.filter(
       (poi) => !poi.isPersisted,
     ).length;
 
-    const entities = cachedPois.map((poi) =>
+    const entities = poisToPersist.map((poi) =>
       this.poiRepository.create({
         id: poi.id,
         longitude: poi.longitude,
@@ -128,7 +143,16 @@ export class PoiService {
 
     // 모든 POI upsert: id 중복이면 update, 아니면 insert
     // 변경 없는 POI는 실제로 write 안 일어남 (DB 최적화)
-    await this.poiRepository.upsert(entities, ['id']);
+    await this.poiRepository
+      .createQueryBuilder()
+      .insert()
+      .into(Poi)
+      .values(entities)
+      .onConflict(
+        `("id") DO UPDATE SET "place_name" = EXCLUDED."place_name", "longitude" = EXCLUDED."longitude", "latitude" = EXCLUDED."latitude", "address" = EXCLUDED."address", "status" = EXCLUDED."status", "sequence" = EXCLUDED."sequence", "created_by" = EXCLUDED."created_by", "plan_day_id" = EXCLUDED."plan_day_id", "place_id" = EXCLUDED."place_id"`,
+      )
+      .orIgnore()
+      .execute();
 
     const planDayIds =
       await this.planDayService.getWorkspacePlanDayIds(workspaceId);
@@ -136,7 +160,10 @@ export class PoiService {
     await this.poiCacheService.clearWorkspacePois(workspaceId, planDayIds);
 
     return {
-      persistedPois: cachedPois.map((poi) => ({ ...poi, isPersisted: true })),
+      persistedPois: poisToPersist.map((poi) => ({
+        ...poi,
+        isPersisted: true,
+      })),
       newlyPersistedCount,
     };
   }
@@ -184,6 +211,60 @@ export class PoiService {
     }
 
     return results;
+  }
+
+  /**
+   * POI를 특정 날짜의 일정에 추가하고, 변경사항을 브로드캐스트합니다.
+   * @param data - PoiAddScheduleReqDto
+   */
+  async addPoiToSchedule(data: PoiAddScheduleReqDto): Promise<void> {
+    const { workspaceId, planDayId, poiId } = data;
+
+    // 1. POI를 SCHEDULED로 전환하고 List에 추가
+    await this.poiCacheService.addToSchedule(workspaceId, planDayId, poiId);
+
+    const poi: CachedPoi | undefined = await this.poiCacheService.getPoi(
+      workspaceId,
+      poiId,
+    );
+
+    if (!poi) {
+      throw new BadRequestException(
+        `POI with id ${poiId} not found in workspace ${workspaceId}`,
+      );
+    }
+
+    // 2. 행동 이벤트 전송
+    this.poiGateway.sendBehaviorEvent(poi, BehaviorEventType.POI_SCHEDULE);
+
+    // 3. 같은 워크스페이스의 모든 클라이언트에게 브로드캐스트
+    this.poiGateway.broadcastPoiAddSchedule(workspaceId, poi);
+  }
+
+  /**
+   * 특정 워크스페이스 내에서 placeId를 기준으로 POI를 조회합니다.
+   * @param workspaceId - 워크스페이스 ID
+   * @param placeId - 장소 ID
+   * @returns PoiResDto | null
+   */
+  async getPoiByPlaceId(
+    workspaceId: string,
+    placeId: string,
+  ): Promise<PoiResDto | null> {
+    // 1. 캐시에서 먼저 조회
+    const cachedPois = await this.poiCacheService.getWorkspacePois(workspaceId);
+    const cachedPoi = cachedPois.find((p) => p.placeId === placeId);
+    if (cachedPoi) {
+      return PoiResDto.fromCachedPoi(cachedPoi);
+    }
+
+    // 2. 캐시에 없으면 DB에서 조회
+    const poi = await this.poiRepository.findOne({
+      where: { place: { id: placeId } },
+      relations: ['createdBy', 'planDay', 'place'],
+    });
+
+    return poi ? PoiResDto.fromEntity(poi, workspaceId) : null;
   }
 
   // ): Promise<DateGroupedScheduledPoisResDto> {
