@@ -1,9 +1,7 @@
 import { Place } from '../../place/entities/place.entity';
 import { RegionGroup } from '../../place/entities/region_group.enum';
-import { PostInfoInReviewablePlaceDto } from './post-info-in-reviewable-place.dto';
-import { Post } from '../../post/entities/post.entity';
 
-export class ReviewablePlaceResponseDto {
+export class ReviewablePlaceItemDto {
   id: string;
   title: string;
   address: string;
@@ -16,15 +14,10 @@ export class ReviewablePlaceResponseDto {
   summary: string;
   sido: string;
   createdAt: Date;
-  planDate?: string;
-  post: PostInfoInReviewablePlaceDto;
+  planDate: string;
 
-  static fromEntity(
-    place: Place,
-    planDate: string,
-    post: Post,
-  ): ReviewablePlaceResponseDto {
-    const dto = new ReviewablePlaceResponseDto();
+  static from(place: Place, planDate: string): ReviewablePlaceItemDto {
+    const dto = new ReviewablePlaceItemDto();
     dto.id = place.id;
     dto.title = place.title;
     dto.address = place.address;
@@ -37,8 +30,11 @@ export class ReviewablePlaceResponseDto {
     dto.summary = place.summary;
     dto.sido = place.sido;
     dto.createdAt = place.createdAt;
-    dto.planDate = planDate;
-    dto.post = PostInfoInReviewablePlaceDto.fromEntity(post);
+
+    const date = new Date(planDate);
+    const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][date.getUTCDay()];
+    dto.planDate = `${planDate} (${dayOfWeek})`;
+
     return dto;
   }
 }

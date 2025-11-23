@@ -16,7 +16,9 @@ import { PostParticipation } from '../post-participation/entities/post-participa
 import { Workspace } from '../workspace/entities/workspace.entity';
 import { PlanDay } from '../workspace/entities/plan-day.entity';
 import { Poi } from '../workspace/entities/poi.entity';
-import { ReviewablePlaceResponseDto } from './dto/reviewable-place-response.dto';
+import { ReviewablePostGroupDto } from './dto/reviewable-post-group.dto';
+import { PostInfoInReviewablePlaceDto } from './dto/post-info-in-reviewable-place.dto';
+import { ReviewablePlaceItemDto } from './dto/reviewable-place-item.dto';
 
 @Injectable()
 export class PlaceUserReviewService {
@@ -37,7 +39,7 @@ export class PlaceUserReviewService {
 
   async findReviewablePlaces(
     userId: string,
-  ): Promise<ReviewablePlaceResponseDto[]> {
+  ): Promise<ReviewablePostGroupDto[]> {
     // 1. 사용자가 참여하거나 작성한 모든 Post 조회
     const participations = await this.postParticipationRepo.find({
       where: { requester: { id: userId } },
@@ -73,48 +75,68 @@ export class PlaceUserReviewService {
     const pastPlanDayIds = pastPlanDays.map((pd) => pd.id);
     if (pastPlanDayIds.length === 0) return [];
 
-    // 4. PlanDay에 연결된 Poi 조회 (QueryBuilder 사용)
+    // 4. 관련 데이터 한번에 조회
     const pois = await this.poiRepo
       .createQueryBuilder('poi')
       .leftJoinAndSelect('poi.place', 'place')
       .leftJoinAndSelect('poi.planDay', 'planDay')
+      .leftJoinAndSelect('planDay.workspace', 'workspace')
+      .leftJoinAndSelect('workspace.post', 'post')
       .where('poi.planDay IN (:...pastPlanDayIds)', { pastPlanDayIds })
       .andWhere('poi.place IS NOT NULL')
       .andWhere('planDay.planDate IS NOT NULL')
       .getMany();
 
-    // 5. Place ID를 기준으로 가장 최근의 planDate를 매핑
-    const placeToDateMap = new Map<string, string>();
-    pois.forEach((poi) => {
-      if (poi.place && poi.planDay && poi.planDay.planDate) {
-        const existingDate = placeToDateMap.get(poi.place.id);
-        if (!existingDate || poi.planDay.planDate > existingDate) {
-          placeToDateMap.set(poi.place.id, poi.planDay.planDate);
-        }
-      }
-    });
-
-    const places = [...new Set(pois.map((poi) => poi.place).filter((p) => p))];
-    if (places.length === 0) return [];
-
-    // 6. 이미 리뷰를 작성한 Place 제외
-    const placeIds = places.map((p) => p.id);
+    // 5. 이미 리뷰를 작성한 Place ID 목록 조회
+    const allPlaceIds = pois.map((poi) => poi.place.id);
     const reviewedPlaces = await this.placeUserReviewRepo.find({
       where: {
         user: { id: userId },
-        place: { id: In(placeIds) },
+        place: { id: In(allPlaceIds) },
       },
-      relations: ['place'],
     });
     const reviewedPlaceIds = new Set(reviewedPlaces.map((r) => r.place.id));
 
-    const reviewablePlaces = places.filter((p) => !reviewedPlaceIds.has(p.id));
+    // 6. Post를 기준으로 데이터 그룹핑
+    const postGroups = new Map<string, ReviewablePostGroupDto>();
 
-    // 7. DTO로 변환
-    return reviewablePlaces.map((p) => {
-      const planDate = placeToDateMap.get(p.id);
-      return ReviewablePlaceResponseDto.fromEntity(p, planDate);
-    });
+    for (const poi of pois) {
+      if (
+        !poi.place ||
+        !poi.planDay?.planDate ||
+        !poi.planDay.workspace?.post ||
+        reviewedPlaceIds.has(poi.place.id)
+      ) {
+        continue;
+      }
+
+      const post = poi.planDay.workspace.post;
+      let group = postGroups.get(post.id);
+
+      if (!group) {
+        group = {
+          post: PostInfoInReviewablePlaceDto.fromEntity(post),
+          places: [],
+        };
+        postGroups.set(post.id, group);
+      }
+
+      // 동일 장소가 다른 날짜에 여러번 포함된 경우, 가장 최근 날짜만 사용
+      const existingPlaceIndex = group.places.findIndex(
+        (p) => p.id === poi.place.id,
+      );
+      if (existingPlaceIndex > -1) {
+        if (group.places[existingPlaceIndex].planDate < poi.planDay.planDate) {
+          group.places[existingPlaceIndex].planDate = poi.planDay.planDate;
+        }
+      } else {
+        group.places.push(
+          ReviewablePlaceItemDto.from(poi.place, poi.planDay.planDate),
+        );
+      }
+    }
+
+    return Array.from(postGroups.values());
   }
 
   @Transactional()

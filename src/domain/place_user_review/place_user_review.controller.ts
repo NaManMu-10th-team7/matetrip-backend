@@ -18,7 +18,7 @@ import { CreatePlaceUserReviewDto } from './dto/create-place_user_review.dto';
 import { PlaceUserReviewResponseDto } from './dto/place-user-review-response.dto';
 import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
 import { PaginatedReviewsResponseDto } from './dto/paginated-reviews-response.dto';
-import { ReviewablePlaceResponseDto } from './dto/reviewable-place-response.dto';
+import { ReviewablePostGroupDto } from './dto/reviewable-post-group.dto';
 
 @Controller('place-user-reviews')
 export class PlaceUserReviewController {
@@ -31,7 +31,7 @@ export class PlaceUserReviewController {
   @HttpCode(HttpStatus.OK)
   async findReviewablePlaces(
     @Req() req: Request & { user: { id: string } },
-  ): Promise<ReviewablePlaceResponseDto[]> {
+  ): Promise<ReviewablePostGroupDto[]> {
     return this.placeUserReviewService.findReviewablePlaces(req.user.id);
   }
 
