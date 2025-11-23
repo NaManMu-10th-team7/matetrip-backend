@@ -94,6 +94,7 @@ export class PlaceUserReviewService {
         user: { id: userId },
         place: { id: In(allPlaceIds) },
       },
+      relations: ['place'],
     });
     const reviewedPlaceIds = new Set(reviewedPlaces.map((r) => r.place.id));
 
