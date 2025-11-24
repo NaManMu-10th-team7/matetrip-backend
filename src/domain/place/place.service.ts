@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { GetPlacesReqDto } from './dto/get-places-req.dto.js';
 import { Place } from './entities/place.entity.js';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -23,6 +23,7 @@ import { GetPlaceAndNearbyPlacesResDto } from './dto/get-place-and-nearby-places
 
 @Injectable()
 export class PlaceService {
+  private readonly logger = new Logger(PlaceService.name);
   constructor(
     @InjectRepository(Place)
     private readonly placeRepo: Repository<Place>,
@@ -158,14 +159,9 @@ export class PlaceService {
   async findPlacesByName(
     dto: SearchPlaceByNameQueryDto,
   ): Promise<{ placeIds: string[] }> {
-    console.log(
-      '==================================================================================',
-    );
-    console.log('들어왔니?');
-    console.log(
-      '==================================================================================',
-    );
+    this.logger.log(`Finding places with name: ${dto.name}`);
     const { name } = dto;
+
     const results = await this.placeRepo
       .createQueryBuilder('place')
       .select('place.id', 'id') // ID만 선택
@@ -186,6 +182,7 @@ export class PlaceService {
       .take(5) // 너무 많은 결과를 방지하기 위해 5개로 제한
       .getRawMany<{ id: string }>();
 
+    this.logger.log(`Found ${results.length} places.`);
     return { placeIds: results.map((result) => result.id) };
   }
 
