@@ -156,10 +156,10 @@ export class PlaceService {
    * @param dto - 검색할 장소 이름이 담긴 DTO
    * @returns { placeIds: string[] } - 검색된 장소의 ID 목록을 담은 객체
    */
-  async findPlacesByName(
+  async findPlaceIdsByName(
     dto: SearchPlaceByNameQueryDto,
   ): Promise<{ placeIds: string[] }> {
-    this.logger.log(`Finding places with name: ${dto.name}`);
+    this.logger.debug(`Finding places with name: ${dto.name}`);
     const { name } = dto;
 
     const results = await this.placeRepo
@@ -184,6 +184,16 @@ export class PlaceService {
 
     this.logger.log(`Found ${results.length} places.`);
     return { placeIds: results.map((result) => result.id) };
+  }
+
+  async getPlacesByWord(word: string): Promise<GetPlacesResDto[]> {
+    const places: Place[] = await this.placeRepo
+      .createQueryBuilder('p')
+      .where('p.title ILIKE :word', { word: `%${word}%` })
+      .orWhere('p.description ILIKE :word', { word: `%${word}%` })
+      .getMany();
+
+    return places.map((place) => GetPlacesResDto.from(place));
   }
 
   async getPersonalizedPlaces(

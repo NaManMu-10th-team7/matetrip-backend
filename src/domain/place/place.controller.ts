@@ -9,7 +9,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { PlaceService } from './place.service';
-import { GetPlacesReqDto } from './dto/get-places-req.dto.js';
 import { GetPlacesResDto } from './dto/get-places-res.dto.js';
 import { GetPersonalizedPlacesByRegionReqDto } from './dto/get-personalized-places-by-region-req-dto.js';
 import { GetPopularPlacesReqDto } from './dto/get-popular-places-req.dto.js';
@@ -18,29 +17,28 @@ import { GetBehaviorBasedRecommendationReqDto } from './dto/get-behavior-based-r
 import { GetBehaviorBasedRecommendationResDto } from './dto/get-behavior-based-recommendation-res.dto.js';
 import { SearchPlaceByNameQueryDto } from './dto/search-place-by-name-query.dto.js';
 import { AuthGuard } from '@nestjs/passport';
-import { GetMostReviewedPlacesReqDto } from './dto/get-most-reviewed-places-req.dto.js';
-import { GetMostReviewedPlacesResDto } from './dto/get-most-reviewed-places-res.dto.js';
 import { GetPlaceAndNearbyPlacesResDto } from './dto/get-place-and-nearby-places-res.dto.js';
 
 @Controller('places')
 export class PlaceController {
   constructor(private readonly placeService: PlaceService) {}
-
-  // TODO : Event Driven으로 바꾸기
-  @Get()
-  getPlacesInBounds(@Query() dto: GetPlacesReqDto): Promise<GetPlacesResDto[]> {
-    console.log('dto', dto);
-    return this.placeService.getPlacesInBounds(dto);
-  }
-
   /**
    * @description 장소 이름으로 장소를 검색합니다.
    * @param dto - name: 검색어
    * @returns GetPlacesResDto[] - 검색된 장소 목록
    */
   @Get('search')
-  findPlacesByName(@Query() dto: SearchPlaceByNameQueryDto) {
-    return this.placeService.findPlacesByName(dto);
+  @HttpCode(HttpStatus.OK)
+  findPlaceIdsByName(
+    @Query() dto: SearchPlaceByNameQueryDto,
+  ): Promise<{ placeIds: string[] }> {
+    return this.placeService.findPlaceIdsByName(dto);
+  }
+
+  @Get('search/detail')
+  @HttpCode(HttpStatus.OK)
+  getPlaces(@Query('word') word: string): Promise<GetPlacesResDto[]> {
+    return this.placeService.getPlacesByWord(word);
   }
 
   /**
@@ -49,6 +47,7 @@ export class PlaceController {
    * 목표 = 무한 스크롤 방식
    */
   @Get('popular')
+  @HttpCode(HttpStatus.OK)
   getPopularPlaces(
     @Query() dto: GetPopularPlacesReqDto,
   ): Promise<GetPopularPlacesResDto[]> {
@@ -56,10 +55,11 @@ export class PlaceController {
   }
 
   @Get('/recommendation')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
   async getPersonalizedPlaces(
     @Query() dto: GetPersonalizedPlacesByRegionReqDto,
   ): Promise<GetPlacesResDto[]> {
-    console.log('테스트');
     return this.placeService.getPersonalizedPlaces(dto);
   }
 
@@ -69,6 +69,7 @@ export class PlaceController {
    * @returns { { key: string; value: string }[] } 지역 그룹 목록
    */
   @Get('regions')
+  @HttpCode(HttpStatus.OK)
   getRegionGroups(): { key: string; value: string }[] {
     return this.placeService.getRegionGroups();
   }
@@ -79,6 +80,8 @@ export class PlaceController {
    * @returns GetBehaviorBasedRecommendationResDto[] - 추천 장소 목록 (추천 이유 포함)
    */
   @Get('/recommendation/behavior')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
   async getBehaviorBasedRecommendation(
     @Query() dto: GetBehaviorBasedRecommendationReqDto,
   ): Promise<GetBehaviorBasedRecommendationResDto[]> {
@@ -86,6 +89,7 @@ export class PlaceController {
   }
 
   @Get(':id')
+  @HttpCode(HttpStatus.OK)
   getPlaceById(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<GetPlacesResDto> {
