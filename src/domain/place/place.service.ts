@@ -158,6 +158,13 @@ export class PlaceService {
   async findPlacesByName(
     dto: SearchPlaceByNameQueryDto,
   ): Promise<{ placeIds: string[] }> {
+    console.log(
+      '==================================================================================',
+    );
+    console.log('들어왔니?');
+    console.log(
+      '==================================================================================',
+    );
     const { name } = dto;
     const results = await this.placeRepo
       .createQueryBuilder('place')
