@@ -190,7 +190,7 @@ export class PlaceService {
     const places: Place[] = await this.placeRepo
       .createQueryBuilder('p')
       .where('p.title ILIKE :word', { word: `%${word}%` })
-      .orWhere('p.content ILIKE :word', { word: `%${word}%` })
+      .orWhere('p.summary ILIKE :word', { word: `%${word}%` })
       .getMany();
 
     return places.map((place) => GetPlacesResDto.from(place));
