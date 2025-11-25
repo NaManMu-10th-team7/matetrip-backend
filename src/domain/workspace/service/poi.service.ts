@@ -4,9 +4,9 @@ import {
   Injectable,
   forwardRef,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { Poi } from '../entities/poi.entity.js';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { PoiCacheService } from './poi-cache.service.js';
 import { CachedPoi } from '../types/cached-poi.js';
 import { Users } from '../../users/entities/users.entity.js';
@@ -31,6 +31,8 @@ export class PoiService {
   constructor(
     @InjectRepository(Poi)
     private readonly poiRepository: Repository<Poi>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     private readonly planDayService: PlanDayService,
     private readonly poiCacheService: PoiCacheService,
     @Inject(forwardRef(() => PoiGateway))
@@ -114,47 +116,76 @@ export class PoiService {
       return { persistedPois: [], newlyPersistedCount: 0 };
     }
 
-    /**
-     * 1. 모든 POI를 DB에 upsert
-     * - 새로 생성된 POI (isPersisted=false)
-     * - 상태가 변경된 POI (SCHEDULED↔MARKED)
-     * - sequence가 변경된 POI
-     */
-    const newlyPersistedCount = poisToPersist.filter(
-      (poi) => !poi.isPersisted,
-    ).length;
+    // 1. 기존 POI와 신규 POI 분리
+    const existingPois = poisToPersist.filter((poi) => poi.isPersisted);
+    const newPois = poisToPersist.filter((poi) => !poi.isPersisted);
+    const newlyPersistedCount = newPois.length;
 
-    const entities = poisToPersist.map((poi) =>
-      this.poiRepository.create({
-        id: poi.id,
-        longitude: poi.longitude,
-        latitude: poi.latitude,
-        address: poi.address,
-        place: poi.placeId ? ({ id: poi.placeId } as Place) : undefined,
-        placeName: poi.placeName ?? '',
-        status: poi.status,
-        sequence: poi.sequence,
-        createdBy: { id: poi.createdBy } as Users,
-        planDay: { id: poi.planDayId as string } as PlanDay,
-      }),
-    );
+    // 2. 트랜잭션을 사용하여 DB 작업 수행
+    await this.dataSource.transaction(async (transactionalEntityManager) => {
+      // 2-1. 기존 POI 업데이트 (순서, 상태 등)
+      if (existingPois.length > 0) {
+        // 2-1-1. (1단계) 모든 POI의 sequence를 충돌하지 않는 임시 값으로 변경
+        // 각 POI의 index를 기반으로 고유한 음수 값을 생성하여 충돌을 방지합니다.
+        const temporaryUpdatePromises = existingPois.map((poi, index) =>
+          transactionalEntityManager.update(
+            Poi,
+            { id: poi.id },
+            // index를 사용하여 각 POI에 대해 고유한 음수 시퀀스 값을 보장합니다.
+            // -1부터 시작하여 기존의 양수 시퀀스와 절대 겹치지 않도록 합니다.
+            { sequence: -(index + 1) },
+          ),
+        );
+        await Promise.all(temporaryUpdatePromises);
 
-    // 모든 POI upsert: id 중복이면 update, 아니면 insert
-    // 변경 없는 POI는 실제로 write 안 일어남 (DB 최적화)
-    await this.poiRepository
-      .createQueryBuilder()
-      .insert()
-      .into(Poi)
-      .values(entities)
-      .onConflict(
-        `("id") DO UPDATE SET "place_name" = EXCLUDED."place_name", "longitude" = EXCLUDED."longitude", "latitude" = EXCLUDED."latitude", "address" = EXCLUDED."address", "status" = EXCLUDED."status", "sequence" = EXCLUDED."sequence", "created_by" = EXCLUDED."created_by", "plan_day_id" = EXCLUDED."plan_day_id", "place_id" = EXCLUDED."place_id"`,
-      )
-      .orIgnore()
-      .execute();
+        // 2-1-2. (2단계) 모든 POI의 sequence를 최종 값으로 변경
+        // Promise.all 대신 for...of 루프를 사용하여 순차적으로 업데이트
+        for (const poi of existingPois) {
+          await transactionalEntityManager.update(
+            Poi,
+            { id: poi.id },
+            {
+              placeName: poi.placeName,
+              longitude: poi.longitude,
+              latitude: poi.latitude,
+              address: poi.address,
+              status: poi.status,
+              sequence: poi.sequence,
+            },
+          );
+        }
+      }
+
+      // 2-2. 신규 POI 추가
+      if (newPois.length > 0) {
+        const newEntities = newPois.map((poi) =>
+          this.poiRepository.create({
+            id: poi.id,
+            longitude: poi.longitude,
+            latitude: poi.latitude,
+            address: poi.address,
+            place: poi.placeId ? ({ id: poi.placeId } as Place) : undefined,
+            placeName: poi.placeName ?? '',
+            status: poi.status,
+            sequence: poi.sequence,
+            createdBy: { id: poi.createdBy } as Users,
+            planDay: { id: poi.planDayId as string } as PlanDay,
+          }),
+        );
+        await transactionalEntityManager
+          .createQueryBuilder()
+          .insert()
+          .into(Poi)
+          .values(newEntities)
+          .orIgnore() // id가 혹시라도 중복되면 무시 (안전장치)
+          .execute();
+      }
+    });
 
     const planDayIds =
       await this.planDayService.getWorkspacePlanDayIds(workspaceId);
 
+    // 3. DB 작업 성공 후 캐시 비우기
     await this.poiCacheService.clearWorkspacePois(workspaceId, planDayIds);
 
     return {
