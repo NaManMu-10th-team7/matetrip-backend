@@ -26,6 +26,7 @@ export class ProxyController {
     'map2.daum.net',
     'dapi.kakao.com',
     'mts.daumcdn.net',
+    'tong.visitkorea.or.kr',
   ];
 
   constructor(private readonly httpService: HttpService) {}
