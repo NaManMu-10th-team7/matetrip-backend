@@ -45,10 +45,10 @@ interface MatchCandidatesResult {
 
 const DEFAULT_LIMIT = 150;
 const POST_DEFAULT_LIMIT = 4;
-const VECTOR_WEIGHT = 0.3;
-const STYLE_WEIGHT = 0.3;
-const MBTI_WEIGHT = 0.15;
-const TENDENCY_WEIGHT = 0.25;
+const VECTOR_WEIGHT = 0.7;
+const STYLE_WEIGHT = 0.15;
+const MBTI_WEIGHT = 0.05;
+const TENDENCY_WEIGHT = 0.1;
 const SCORE_OFFSET = 0.15;
 const SCORE_CAP = 0.99;
 const MAX_TENDENCY_OVERLAPS = 5;
