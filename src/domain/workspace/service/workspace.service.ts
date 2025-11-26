@@ -38,6 +38,7 @@ import { differenceInCalendarDays } from 'date-fns';
 import { DailyPlanResDto } from '../dto/daily-plan-recommendation-res.dto';
 import { GetPlacesResDto } from 'src/domain/place/dto/get-places-res.dto';
 import { AddScheduleByPlaceReqDto } from '../dto/poi/poi-add-schedule-by-place-req.dto';
+import { AiScheduleBatchCreateReqDto } from '../dto/poi/ai-schedule-batch-create-req.dto';
 
 @Injectable()
 export class WorkspaceService {
@@ -602,5 +603,106 @@ export class WorkspaceService {
     return vector.map(
       (value) => value + (Math.random() - 0.5) * 2 * noiseLevel,
     );
+  }
+
+  /**
+   * @description 워크스페이스의 모든 POI와 일정을 삭제합니다 (Redis + DB).
+   * AI가 새로운 여행 코스를 생성하기 전에 호출됩니다.
+   * @param workspaceId - 워크스페이스 ID
+   */
+  async clearAllPois(workspaceId: string): Promise<void> {
+    this.logger.log(`Clearing all POIs for workspace ${workspaceId}`);
+
+    // 1. planDayIds 조회
+    const planDayIds =
+      await this.planDayService.getWorkspacePlanDayIds(workspaceId);
+
+    if (planDayIds.length === 0) {
+      this.logger.warn(`No plan days found for workspace ${workspaceId}`);
+      return;
+    }
+
+    // 2. Redis 캐시 삭제
+    await this.poiCacheService.clearWorkspacePois(workspaceId, planDayIds);
+
+    // 3. DB에서 POI 삭제
+    await this.poiService.deleteAllPoisByPlanDays(planDayIds);
+
+    this.logger.log(
+      `Successfully cleared all POIs for workspace ${workspaceId}`,
+    );
+  }
+
+  /**
+   * @description AI 에이전트가 생성한 여행 코스를 일괄로 POI 일정에 추가합니다.
+   * @param workspaceId - 워크스페이스 ID
+   * @param data - AI가 생성한 장소 목록 및 경유지 목록
+   * @returns 생성된 CachedPoi 배열
+   */
+  async createAiScheduleBatch(
+    workspaceId: string,
+    data: AiScheduleBatchCreateReqDto,
+  ): Promise<CachedPoi[]> {
+    this.logger.log(
+      `Creating AI schedule batch for workspace ${workspaceId}: ${data.places.length} places`,
+    );
+
+    const createdPois: CachedPoi[] = [];
+    const AI_USER_ID = '00000000-0000-0000-0000-000000000000';
+
+    // 워크스페이스의 PlanDay 목록 조회 (dayNo로 정렬)
+    const planDays =
+      await this.planDayService.getWorkspacePlanDays(workspaceId);
+    const dayNoToPlanDayId = new Map<number, string>();
+    for (const planDay of planDays) {
+      dayNoToPlanDayId.set(planDay.dayNo, planDay.id);
+    }
+
+    // 장소(Place) 처리 - waypoints는 무시하고 places만 사용
+    for (const place of data.places) {
+      const planDayId = dayNoToPlanDayId.get(place.day);
+      if (!planDayId) {
+        this.logger.warn(
+          `PlanDay not found for place '${place.placeName}' on day ${place.day}. Creating as MARKED.`,
+        );
+      }
+
+      const newCachedPoi: CachedPoi = {
+        id: uuidv4(),
+        workspaceId,
+        createdBy: AI_USER_ID,
+        placeId: place.placeId,
+        placeName: place.placeName,
+        address: place.address,
+        longitude: place.longitude,
+        latitude: place.latitude,
+        status: planDayId ? PoiStatus.SCHEDULED : PoiStatus.MARKED,
+        planDayId: planDayId || undefined,
+        sequence: place.sequence ?? 0,
+        isPersisted: false,
+      };
+
+      await this.poiCacheService.upsertPoi(workspaceId, newCachedPoi);
+
+      // SCHEDULED 상태인 경우 스케줄 리스트에도 추가
+      if (
+        newCachedPoi.planDayId &&
+        newCachedPoi.status === PoiStatus.SCHEDULED
+      ) {
+        await this.poiCacheService.addToSchedule(
+          workspaceId,
+          newCachedPoi.planDayId,
+          newCachedPoi.id,
+        );
+      }
+
+      createdPois.push(newCachedPoi);
+    }
+
+    this.logger.log(
+      `Successfully created ${createdPois.length} items for workspace ${workspaceId}`,
+    );
+
+    return createdPois;
   }
 }
