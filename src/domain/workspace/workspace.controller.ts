@@ -145,16 +145,8 @@ export class WorkspaceController {
   async createAiScheduleBatch(
     @Param('workspaceId') workspaceId: string,
     @Body() data: AiScheduleBatchCreateReqDto,
-    @Headers('x-ai-api-key') apiKey: string, // 보안상 추가
   ) {
-    // API Key 검증
-    const expectedApiKey = process.env.AI_SERVER_API_KEY;
-    if (expectedApiKey && apiKey !== expectedApiKey) {
-      this.logger.warn(
-        `Invalid API key attempt for workspace ${workspaceId} from AI batch schedule creation`,
-      );
-      throw new UnauthorizedException('Invalid API key');
-    }
+    // TODO : API Key 검증
 
     // 1. 기존 POI 및 일정 전체 삭제
     await this.workspaceService.clearAllPois(workspaceId);
