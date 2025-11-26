@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { GetPlacesReqDto } from './dto/get-places-req.dto.js';
 import { Place } from './entities/place.entity.js';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { GetPlacesResDto as GetPlacesResDto } from './dto/get-places-res.dto.js';
 import { GetPersonalizedPlacesByRegionReqDto } from './dto/get-personalized-places-by-region-req-dto.js';
 import { ProfileService } from '../profile/profile.service.js';
@@ -17,7 +17,6 @@ import { GetPlaceIdWithTimeDto } from './dto/get-placeId-with-time.dto.js';
 import { GetMostReviewedPlacesReqDto } from './dto/get-most-reviewed-places-req.dto.js';
 import { GetMostReviewedPlacesResDto } from './dto/get-most-reviewed-places-res.dto.js';
 import { SearchPlaceByNameQueryDto } from './dto/search-place-by-name-query.dto.js';
-import { GetNearbyPlacesReqDto } from './dto/get-nearby-places-req.dto.js';
 import { NearbyPlaceResDto } from './dto/nearby-place-res.dto.js';
 import { GetPlaceAndNearbyPlacesResDto } from './dto/get-place-and-nearby-places-res.dto.js';
 
@@ -47,7 +46,6 @@ export class PlaceService {
       northEastLongitude,
     } = dto;
 
-    const t0 = performance.now();
     const places: Place[] = await this.placeRepo
       .createQueryBuilder('p')
       .where(
@@ -62,10 +60,6 @@ export class PlaceService {
       )
       .limit(20)
       .getMany();
-    console.log(
-      `[getPlacesInBounds] 공간인덱싱 적용시킨 연산으로 걸린 시간: ${(performance.now() - t0).toFixed(4)} ms`,
-    );
-    console.log('가져온 개수 = ', places.length);
     return places.map((place) => GetPlacesResDto.from(place));
   }
 
@@ -297,10 +291,6 @@ export class PlaceService {
     }
     const avgEmbeddingString = `[${avgVector.join(',')}]`;
     const categoryNames = Array.from(categories.keys());
-    const ttalLimit = Array.from(categories.values()).reduce(
-      (sum, count) => sum + count,
-      0,
-    );
 
     const queryBuilder = this.placeRepo
       .createQueryBuilder('p')
