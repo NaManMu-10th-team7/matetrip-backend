@@ -9,6 +9,8 @@ import {
   Req,
   Logger,
   NotFoundException,
+  Headers,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { WorkspaceService } from './service/workspace.service';
 import { CreateWorkspaceReqDto } from './dto/create-workspace-req.dto';
@@ -27,6 +29,7 @@ import { ChimeMeetingService } from './service/chime-meeting.service.js';
 import { JoinChimeMeetingDto } from './dto/chime/join-chime-meeting.dto.js';
 
 import { AddScheduleByPlaceReqDto } from './dto/poi/poi-add-schedule-by-place-req.dto.js';
+import { AiScheduleBatchCreateReqDto } from './dto/poi/ai-schedule-batch-create-req.dto.js';
 
 @Controller('workspace')
 export class WorkspaceController {
@@ -128,6 +131,47 @@ export class WorkspaceController {
     return {
       success: true,
       message: 'POI created and added to schedule successfully',
+    };
+  }
+
+  /**
+   * AI 에이전트가 여행 코스를 생성할 때 일괄적으로 POI를 일정에 추가하는 엔드포인트
+   * 기존 POI/일정을 모두 삭제하고 새로운 POI들을 생성합니다.
+   * @param workspaceId - 워크스페이스 ID
+   * @param data - AI가 생성한 장소 목록
+   * @param apiKey - AI 서버 인증용 API Key
+   */
+  @Post(':workspaceId/ai/schedule-batch')
+  async createAiScheduleBatch(
+    @Param('workspaceId') workspaceId: string,
+    @Body() data: AiScheduleBatchCreateReqDto,
+    @Headers('x-ai-api-key') apiKey: string, // 보안상 추가
+  ) {
+    // API Key 검증
+    const expectedApiKey = process.env.AI_SERVER_API_KEY;
+    if (expectedApiKey && apiKey !== expectedApiKey) {
+      this.logger.warn(
+        `Invalid API key attempt for workspace ${workspaceId} from AI batch schedule creation`,
+      );
+      throw new UnauthorizedException('Invalid API key');
+    }
+
+    // 1. 기존 POI 및 일정 전체 삭제
+    await this.workspaceService.clearAllPois(workspaceId);
+
+    // 2. 새로운 POI들 생성 및 일정 추가
+    const createdPois = await this.workspaceService.createAiScheduleBatch(
+      workspaceId,
+      data,
+    );
+
+    // 3. 모든 클라이언트에게 브로드캐스트
+    await this.poiGateway.broadcastSync(workspaceId);
+
+    return {
+      success: true,
+      count: createdPois.length,
+      message: `Successfully created ${createdPois.length} POIs and broadcasted to all clients`,
     };
   }
 

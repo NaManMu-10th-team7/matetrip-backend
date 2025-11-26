@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   forwardRef,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -28,6 +29,8 @@ import { PoiAddScheduleReqDto } from '../dto/poi/poi-add-schedule-req.dto.js';
 
 @Injectable()
 export class PoiService {
+  private readonly logger = new Logger(PoiService.name);
+
   constructor(
     @InjectRepository(Poi)
     private readonly poiRepository: Repository<Poi>,
@@ -302,6 +305,25 @@ export class PoiService {
     });
 
     return poi ? PoiResDto.fromEntity(poi, workspaceId) : null;
+  }
+
+  /**
+   * @description 특정 planDay들에 속한 모든 POI를 DB에서 삭제합니다.
+   * AI가 새로운 여행 코스를 생성할 때 기존 POI를 삭제하기 위해 사용됩니다.
+   * @param planDayIds - PlanDay ID 배열
+   */
+  async deleteAllPoisByPlanDays(planDayIds: string[]): Promise<void> {
+    if (planDayIds.length === 0) {
+      return;
+    }
+
+    await this.poiRepository.delete({
+      planDay: {
+        id: In(planDayIds),
+      },
+    });
+
+    this.logger.log(`Deleted all POIs for planDays: ${planDayIds.join(', ')}`);
   }
 
   // ): Promise<DateGroupedScheduledPoisResDto> {
