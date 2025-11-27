@@ -8,6 +8,9 @@ import { PoiStatus } from '../entities/poi-status.enum.js';
 @Injectable()
 export class PoiCacheService {
   private readonly logger = new Logger(PoiCacheService.name);
+  private readonly workspacePoiTTL = 60 * 60 * 24; // 24시간 (1일)
+  //private readonly scheduledPoiTTL = 60 * 60 ; // 1시간
+  private readonly scheduledPoiTTL = 60 * 60 * 24; // 24시간
 
   constructor(private readonly redisService: RedisService) {}
 
@@ -31,9 +34,7 @@ export class PoiCacheService {
     const client = this.redisService.getClient();
     const key = this.buildPoisKey(workspaceId);
     await client.hSet(key, poi.id, JSON.stringify(poi));
-
-    // todo : 삭제할 것
-    // await client.expire(key, this.ttlSeconds);
+    await client.expire(key, this.workspacePoiTTL);
     this.logger.debug(
       `POI cached for workspace ${workspaceId}: ${JSON.stringify(poi)}`,
     );
@@ -49,11 +50,10 @@ export class PoiCacheService {
 
     const client = this.redisService.getClient();
     const key = this.buildScheduledPoiIdsKey(planDayId);
-    // await client.hSet(key, poi.id, JSON.stringify(poi));
     const pipeline = client.multi();
     pipeline.del(key);
     pipeline.rPush(key, poiIds);
-    // await client.expire(key, this.ttlSeconds);
+    pipeline.expire(key, this.scheduledPoiTTL);
     await pipeline.exec();
   }
 
@@ -94,11 +94,10 @@ export class PoiCacheService {
       poisToCache.map((poi) => [poi.id, JSON.stringify(poi)] as const),
     );
     pipeline.hSet(key, hashObject);
+    pipeline.expire(key, this.workspacePoiTTL);
 
     await this.syncScheduledPoisToRedis(pois);
     await pipeline.exec();
-
-    // todo : 이거 삭제하고 나중에 어케할지 고르기
   }
 
   async syncScheduledPoisToRedis(pois: Poi[]): Promise<void> {
@@ -168,6 +167,7 @@ export class PoiCacheService {
     const pipeline = client.multi();
     pipeline.del(listKey);
     pipeline.rPush(listKey, poiIds);
+    pipeline.expire(listKey, this.scheduledPoiTTL);
     await pipeline.exec();
 
     // 2. 각 POI Hash의 sequence 업데이트 (SCHEDULED는 1부터 시작)

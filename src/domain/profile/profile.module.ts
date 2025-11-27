@@ -25,6 +25,6 @@ import { TitanEmbeddingService } from '../../ai/titan-embedding.service';
     NovaService,
     TitanEmbeddingService,
   ],
-  exports: [ProfileService, MatchingService],
+  exports: [ProfileService, MatchingService, NovaService],
 })
 export class ProfileModule {}

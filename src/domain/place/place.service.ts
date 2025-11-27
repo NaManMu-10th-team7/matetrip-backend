@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { GetPlacesReqDto } from './dto/get-places-req.dto.js';
 import { Place } from './entities/place.entity.js';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { GetPlacesResDto as GetPlacesResDto } from './dto/get-places-res.dto.js';
 import { GetPersonalizedPlacesByRegionReqDto } from './dto/get-personalized-places-by-region-req-dto.js';
 import { ProfileService } from '../profile/profile.service.js';
@@ -17,12 +17,12 @@ import { GetPlaceIdWithTimeDto } from './dto/get-placeId-with-time.dto.js';
 import { GetMostReviewedPlacesReqDto } from './dto/get-most-reviewed-places-req.dto.js';
 import { GetMostReviewedPlacesResDto } from './dto/get-most-reviewed-places-res.dto.js';
 import { SearchPlaceByNameQueryDto } from './dto/search-place-by-name-query.dto.js';
-import { GetNearbyPlacesReqDto } from './dto/get-nearby-places-req.dto.js';
 import { NearbyPlaceResDto } from './dto/nearby-place-res.dto.js';
 import { GetPlaceAndNearbyPlacesResDto } from './dto/get-place-and-nearby-places-res.dto.js';
 
 @Injectable()
 export class PlaceService {
+  private readonly logger = new Logger(PlaceService.name);
   constructor(
     @InjectRepository(Place)
     private readonly placeRepo: Repository<Place>,
@@ -46,7 +46,6 @@ export class PlaceService {
       northEastLongitude,
     } = dto;
 
-    const t0 = performance.now();
     const places: Place[] = await this.placeRepo
       .createQueryBuilder('p')
       .where(
@@ -61,10 +60,6 @@ export class PlaceService {
       )
       .limit(20)
       .getMany();
-    console.log(
-      `[getPlacesInBounds] 공간인덱싱 적용시킨 연산으로 걸린 시간: ${(performance.now() - t0).toFixed(4)} ms`,
-    );
-    console.log('가져온 개수 = ', places.length);
     return places.map((place) => GetPlacesResDto.from(place));
   }
 
@@ -155,10 +150,12 @@ export class PlaceService {
    * @param dto - 검색할 장소 이름이 담긴 DTO
    * @returns { placeIds: string[] } - 검색된 장소의 ID 목록을 담은 객체
    */
-  async findPlacesByName(
+  async findPlaceIdsByName(
     dto: SearchPlaceByNameQueryDto,
   ): Promise<{ placeIds: string[] }> {
+    this.logger.debug(`Finding places with name: ${dto.name}`);
     const { name } = dto;
+
     const results = await this.placeRepo
       .createQueryBuilder('place')
       .select('place.id', 'id') // ID만 선택
@@ -179,7 +176,18 @@ export class PlaceService {
       .take(5) // 너무 많은 결과를 방지하기 위해 5개로 제한
       .getRawMany<{ id: string }>();
 
+    this.logger.log(`Found ${results.length} places.`);
     return { placeIds: results.map((result) => result.id) };
+  }
+
+  async getPlacesByWord(word: string): Promise<GetPlacesResDto[]> {
+    const places: Place[] = await this.placeRepo
+      .createQueryBuilder('p')
+      .where('p.title ILIKE :word', { word: `%${word}%` })
+      .orWhere('p.summary ILIKE :word', { word: `%${word}%` })
+      .getMany();
+
+    return places.map((place) => GetPlacesResDto.from(place));
   }
 
   async getPersonalizedPlaces(
@@ -283,10 +291,6 @@ export class PlaceService {
     }
     const avgEmbeddingString = `[${avgVector.join(',')}]`;
     const categoryNames = Array.from(categories.keys());
-    const ttalLimit = Array.from(categories.values()).reduce(
-      (sum, count) => sum + count,
-      0,
-    );
 
     const queryBuilder = this.placeRepo
       .createQueryBuilder('p')

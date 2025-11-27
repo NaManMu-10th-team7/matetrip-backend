@@ -3,21 +3,22 @@ import {
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
+import { NovaService } from '../../ai/summaryLLM.service';
 import { MatchingService } from '../profile/matching.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UserPayloadDto } from '../users/dto/user.payload.dto';
-import { CreateProfileDto } from '../profile/dto/create-profile.dto';
-import { EmbeddingMatchingProfileDto } from '../profile/dto/embedding-matching-profile.dto';
 import { buildEmbeddingPayloadFromSource } from '../profile/utils/embedding-payload.util';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
+    private readonly novaService: NovaService,
     private readonly matchingService: MatchingService,
     private readonly jwtService: JwtService,
   ) {}
@@ -58,6 +59,20 @@ export class AuthService {
   // @returns 생성된 사용자 정보 (비밀번호 제외)
   async signUp(createUserDto: CreateUserDto): Promise<UserPayloadDto> {
     try {
+      const profile = createUserDto.profile;
+      if (profile?.description?.trim()) {
+        const rawDesc = profile.description?.trim();
+
+        if (rawDesc) {
+          const isMeaningful =
+            await this.novaService.isMeaningfulSummaryLLM(rawDesc);
+          if (!isMeaningful) {
+            throw new BadRequestException(
+              '상세소개 요약이 부적절하거나 의미가 없어 회원가입을 진행할 수 없습니다.',
+            );
+          }
+        }
+      }
       // UserService의 create 메서드 호출. 안에서 트랜잭션, 해싱, 중복 검사 모두 일어남
       const newUser = await this.usersService.create(createUserDto);
 
@@ -72,45 +87,17 @@ export class AuthService {
 
       return newUser;
     } catch (error) {
-      // UserService에서 던진 에러를 여기서 처리
       if (
         error instanceof ConflictException ||
-        error instanceof InternalServerErrorException
+        error instanceof InternalServerErrorException ||
+        error instanceof BadRequestException // 400 그대로 전달
       ) {
         throw error;
       }
-
-      // 그 외 모든 에러
-      // 서버 로그에 에러 기록
       console.error(error);
-
       throw new InternalServerErrorException(
         '회원가입 처리 중 오류가 발생했습니다.',
       );
     }
-  }
-
-  private buildEmbeddingPayload(
-    profile?: CreateProfileDto,
-  ): EmbeddingMatchingProfileDto {
-    const payload: EmbeddingMatchingProfileDto = {};
-    if (!profile) {
-      return payload;
-    }
-
-    if (profile.description?.trim() || profile.intro?.trim()) {
-      payload.description =
-        profile.description?.trim() || profile.intro?.trim();
-    }
-
-    if (profile.travelStyles?.length) {
-      payload.travelStyleTypes = profile.travelStyles;
-    }
-
-    if (profile.tendency?.length) {
-      payload.travelTendencies = profile.tendency;
-    }
-
-    return payload;
   }
 }

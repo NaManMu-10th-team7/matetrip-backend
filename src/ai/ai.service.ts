@@ -16,7 +16,7 @@ export class AiService {
     query: string,
     sessionId: string,
   ): Promise<AiAgentResponseDto> {
-    const url = `${this.configService.get<string>('AI_API_SERVER_URL')}/chat`;
+    const url = `${this.configService.get<string>('AI_API_SERVER_URL')}/chat/v2`;
 
     try {
       const response = await firstValueFrom(
