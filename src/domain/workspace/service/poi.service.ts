@@ -25,7 +25,6 @@ import { PoiStatus } from '../entities/poi-status.enum.js';
 import { PoiGateway } from '../gateway/poi.gateway.js';
 import { BehaviorEventType } from '../../../infra/rabbitmq/dto/enqueue-behavior-event.dto.js';
 import { PoiAddScheduleReqDto } from '../dto/poi/poi-add-schedule-req.dto.js';
-// import { DateGroupedScheduledPoisResDto } from '../dto/poi/get-date-grouped-scheduled-pois.dto.js';
 
 @Injectable()
 export class PoiService {
@@ -293,6 +292,7 @@ export class PoiService {
   ): Promise<PoiResDto | null> {
     // 1. 캐시에서 먼저 조회
     const cachedPois = await this.poiCacheService.getWorkspacePois(workspaceId);
+
     const cachedPoi = cachedPois.find((p) => p.placeId === placeId);
     if (cachedPoi) {
       return PoiResDto.fromCachedPoi(cachedPoi);
