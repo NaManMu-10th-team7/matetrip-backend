@@ -281,13 +281,15 @@ export class PoiService {
   }
 
   /**
-   * 특정 워크스페이스 내에서 placeId를 기준으로 POI를 조회합니다.
+   * 특정 워크스페이스 내에서 placeId와 planDayId를 기준으로 POI를 조회합니다.
    * @param workspaceId - 워크스페이스 ID
+   * @param planDayId - 플랜 데이 ID
    * @param placeId - 장소 ID
    * @returns PoiResDto | null
    */
   async getPoiByPlaceId(
     workspaceId: string,
+    planDayId: string,
     placeId: string,
   ): Promise<PoiResDto | null> {
     // 1. 캐시에서 먼저 조회
@@ -300,7 +302,10 @@ export class PoiService {
 
     // 2. 캐시에 없으면 DB에서 조회
     const poi = await this.poiRepository.findOne({
-      where: { place: { id: placeId } },
+      where: {
+        planDay: { id: planDayId },
+        place: { id: placeId },
+      },
       relations: ['createdBy', 'planDay', 'place'],
     });
 
