@@ -168,20 +168,26 @@ export class WorkspaceController {
   }
 
   /**
-   * 특정 워크스페이스 내에서 placeId를 기준으로 POI를 조회합니다.
+   * 특정 플랜 데이 내에서 placeId를 기준으로 POI를 조회합니다.
    * @param workspaceId - 워크스페이스 ID
+   * @param planDayId - 플랜 데이 ID
    * @param placeId - 장소 ID
    * @returns PoiResDto
    */
-  @Get(':workspaceId/poi/by-place/:placeId')
+  @Get(':workspaceId/plan-day/:planDayId/poi/by-place/:placeId')
   async getPoiByPlaceId(
     @Param('workspaceId') workspaceId: string,
+    @Param('planDayId') planDayId: string,
     @Param('placeId') placeId: string,
   ) {
-    const poi = await this.poiService.getPoiByPlaceId(workspaceId, placeId);
+    const poi = await this.poiService.getPoiByPlaceId(
+      workspaceId,
+      planDayId,
+      placeId,
+    );
     if (!poi) {
       throw new NotFoundException(
-        `POI with placeId ${placeId} not found in workspace ${workspaceId}`,
+        `POI with placeId ${placeId} not found in plan day ${planDayId}`,
       );
     }
     return poi;
