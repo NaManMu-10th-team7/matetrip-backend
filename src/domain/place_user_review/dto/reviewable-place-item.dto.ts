@@ -32,7 +32,9 @@ export class ReviewablePlaceItemDto {
     dto.createdAt = place.createdAt;
 
     const date = new Date(planDate);
-    const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][date.getUTCDay()];
+    const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][
+      date.getUTCDay()
+    ];
     dto.planDate = `${planDate} (${dayOfWeek})`;
 
     return dto;

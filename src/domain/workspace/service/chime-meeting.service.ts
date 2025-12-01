@@ -23,8 +23,9 @@ export class ChimeMeetingService {
 
   constructor(private readonly configService: ConfigService) {
     const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey =
-      this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+    const secretAccessKey = this.configService.get<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    );
     const sessionToken = this.configService.get<string>('AWS_SESSION_TOKEN');
     const region =
       this.configService.get<string>('AWS_CHIME_REGION') ||
