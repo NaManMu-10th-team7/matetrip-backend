@@ -127,15 +127,31 @@ export class WorkspaceService {
   async addScheduleByPlace(reqDto: AddScheduleByPlaceReqDto): Promise<void> {
     const { workspaceId, placeId, dayNo } = reqDto;
 
-    // 1. placeId로 DB에서 장소 정보 가져오기
+    // 1. dayNo에 맞는 planDayId 찾기
+    const planDays =
+      await this.planDayService.getWorkspacePlanDays(workspaceId);
+    const targetPlanDay = planDays.find((pd) => pd.dayNo === dayNo);
+
+    if (!targetPlanDay) {
+      throw new NotFoundException(
+        `Plan day number ${dayNo} not found in workspace ${workspaceId}.`,
+      );
+    }
+    const planDayId = targetPlanDay.id;
+
+    // 2. placeId로 DB에서 장소 정보 가져오기
     const place = await this.placesService.getPlaceById(placeId);
     if (!place) {
       throw new NotFoundException(`Place with ID ${placeId} not found.`);
     }
 
-    // 2. 가져온 정보로 "Marked" 상태의 POI를 캐시에 생성
-    // 2-1. 기존에 같은 placeId로 생성된 POI가 있는지 확인 (중복 생성 방지)
-    let poi = await this.poiService.getPoiByPlaceId(workspaceId, placeId);
+    // 3. 가져온 정보로 "Marked" 상태의 POI를 캐시에 생성
+    // 3-1. 기존에 같은 placeId로 생성된 POI가 있는지 확인 (중복 생성 방지)
+    let poi = await this.poiService.getPoiByPlaceId(
+      workspaceId,
+      planDayId,
+      placeId,
+    );
     let poiId: string;
 
     if (poi) {
@@ -143,6 +159,10 @@ export class WorkspaceService {
       this.logger.debug(
         `Existing POI found for place ${placeId}. POI ID: ${poiId}`,
       );
+            await this.poiCacheService.upsertPoi(workspaceId, {
+        ...poi,
+        isPersisted: true,
+      });
     } else {
       // 2-2. 없으면 새로 생성
       const newPoiId = uuidv4();
@@ -165,18 +185,6 @@ export class WorkspaceService {
         `New POI created for place ${placeId}. POI ID: ${poiId}`,
       );
     }
-
-    // 3. dayNo에 맞는 planDayId 찾기
-    const planDays =
-      await this.planDayService.getWorkspacePlanDays(workspaceId);
-    const targetPlanDay = planDays.find((pd) => pd.dayNo === dayNo);
-
-    if (!targetPlanDay) {
-      throw new NotFoundException(
-        `Plan day number ${dayNo} not found in workspace ${workspaceId}.`,
-      );
-    }
-    const planDayId = targetPlanDay.id;
 
     // 4. POI를 일정에 추가 (상태 변경 및 브로드캐스트)
     await this.poiService.addPoiToSchedule({
