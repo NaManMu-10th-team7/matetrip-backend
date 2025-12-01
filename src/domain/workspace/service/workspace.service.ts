@@ -43,7 +43,6 @@ import {
   AiScheduleReplaceReqDto,
   PlaceReplacementItemDto,
 } from '../dto/poi/ai-schedule-replace-req.dto';
-import { PoiResDto } from '../dto/poi/poi-res.dto.js';
 
 @Injectable()
 export class WorkspaceService {
@@ -147,7 +146,7 @@ export class WorkspaceService {
 
     // 3. 가져온 정보로 "Marked" 상태의 POI를 캐시에 생성
     // 3-1. 기존에 같은 placeId로 생성된 POI가 있는지 확인 (중복 생성 방지)
-    let poi = await this.poiService.getPoiByPlaceId(
+    const poi = await this.poiService.getPoiByPlaceId(
       workspaceId,
       planDayId,
       placeId,
@@ -159,7 +158,7 @@ export class WorkspaceService {
       this.logger.debug(
         `Existing POI found for place ${placeId}. POI ID: ${poiId}`,
       );
-            await this.poiCacheService.upsertPoi(workspaceId, {
+      await this.poiCacheService.upsertPoi(workspaceId, {
         ...poi,
         isPersisted: true,
       });
@@ -703,16 +702,25 @@ export class WorkspaceService {
       address,
     } = replacement;
 
-    // 1. 기존 POI 정보 조회 (placeId로 검색)
+    // 1. 기존 POI 정보 조회 (workspaceId와 placeId로 검색)
+    // 먼저 캐시에서 placeId로 POI를 찾아 planDayId를 얻습니다
+    const cachedPois = await this.poiCacheService.getWorkspacePois(workspaceId);
+    const cachedPoi = cachedPois.find((p) => p.placeId === old_place_id);
+
+    if (!cachedPoi || !cachedPoi.planDayId) {
+      this.logger.warn(`[AI Replace] Old POI not found in cache`);
+      return;
+    }
+
+    // 2. planDayId를 사용하여 정확한 POI 정보 조회
     const oldPoiDto = await this.poiService.getPoiByPlaceId(
       workspaceId,
+      cachedPoi.planDayId,
       old_place_id,
     );
 
     if (!oldPoiDto) {
-      this.logger.warn(
-        `[AI Replace] Old POI with placeId ${old_place_id} not found`,
-      );
+      this.logger.warn(`[AI Replace] Old POI not found`);
       return;
     }
 
