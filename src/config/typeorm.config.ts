@@ -27,5 +27,5 @@ export const getTypeOrmConfig = (
   },
 
   //터미널 에 console 찍히는거
-  logging: false,
+  logging: true,
 });
