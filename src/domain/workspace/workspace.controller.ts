@@ -10,7 +10,6 @@ import {
   Logger,
   NotFoundException,
   Headers,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { WorkspaceService } from './service/workspace.service';
 import { CreateWorkspaceReqDto } from './dto/create-workspace-req.dto';
@@ -30,6 +29,7 @@ import { JoinChimeMeetingDto } from './dto/chime/join-chime-meeting.dto.js';
 
 import { AddScheduleByPlaceReqDto } from './dto/poi/poi-add-schedule-by-place-req.dto.js';
 import { AiScheduleBatchCreateReqDto } from './dto/poi/ai-schedule-batch-create-req.dto.js';
+import { AiScheduleReplaceReqDto } from './dto/poi/ai-schedule-replace-req.dto.js';
 
 @Controller('workspace')
 export class WorkspaceController {
@@ -165,6 +165,23 @@ export class WorkspaceController {
       count: createdPois.length,
       message: `Successfully created ${createdPois.length} POIs and broadcasted to all clients`,
     };
+  }
+
+  /**
+   * AI 에이전트가 일정 내 장소를 교체할 때 사용하는 엔드포인트
+   * @param workspaceId - 워크스페이스 ID
+   * @param data - AI가 생성한 교체 장소 목록
+   */
+  @Post(':workspaceId/ai/replace-schedule')
+  async replaceAiSchedulePlaces(
+    @Param('workspaceId') workspaceId: string,
+    @Body() data: AiScheduleReplaceReqDto,
+  ) {
+    // TODO : API Key 검증
+    // Service 레이어에서 교체 로직 수행
+    await this.workspaceService.replaceSchedulePlaces(workspaceId, data);
+    // 모든 클라이언트에게 브로드캐스트 (Redis 캐시 동기화 + Socket)
+    await this.poiGateway.broadcastSync(workspaceId);
   }
 
   /**
