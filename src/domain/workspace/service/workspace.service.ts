@@ -43,6 +43,7 @@ import {
   AiScheduleReplaceReqDto,
   PlaceReplacementItemDto,
 } from '../dto/poi/ai-schedule-replace-req.dto';
+import { PoiResDto } from '../dto/poi/poi-res.dto.js';
 
 @Injectable()
 export class WorkspaceService {
@@ -684,6 +685,7 @@ export class WorkspaceService {
     workspaceId: string,
     replacement: PlaceReplacementItemDto,
   ): Promise<void> {
+    this.logger.log(`[AI Replace] Replacing place ${replacement.old_place_id}`);
     const {
       old_place_id,
       new_place_id,
@@ -693,16 +695,21 @@ export class WorkspaceService {
       address,
     } = replacement;
 
-    // 1. 기존 POI 정보 조회 (삭제 전에 planDayId, sequence 저장)
-    const oldPoi = await this.poiCacheService.getPoi(workspaceId, old_place_id);
+    // 1. 기존 POI 정보 조회 (placeId로 검색)
+    const oldPoiDto = await this.poiService.getPoiByPlaceId(
+      workspaceId,
+      old_place_id,
+    );
 
-    if (!oldPoi) {
-      this.logger.warn(`[AI Replace] Old POI ${old_place_id} not found`);
+    if (!oldPoiDto) {
+      this.logger.warn(
+        `[AI Replace] Old POI with placeId ${old_place_id} not found`,
+      );
       return;
     }
 
     // 2. 기존 POI 삭제
-    await this.poiService.removeWorkspacePoi(workspaceId, old_place_id);
+    await this.poiService.removeWorkspacePoi(workspaceId, oldPoiDto.id);
 
     // 3. 새 POI 생성 (status, sequence는 나중에)
     const createDto: PoiCreateReqDto = {
@@ -712,8 +719,8 @@ export class WorkspaceService {
       address,
       longitude,
       latitude,
-      planDayId: oldPoi.planDayId,
-      createdBy: oldPoi.createdBy,
+      planDayId: oldPoiDto.planDayId,
+      createdBy: oldPoiDto.createdBy,
     };
 
     const newPoi = await this.cachePoi(createDto);
@@ -721,8 +728,8 @@ export class WorkspaceService {
     // 4. 새 POI의 status와 sequence를 기존 POI 값으로 업데이트
     await this.poiCacheService.upsertPoi(workspaceId, {
       ...newPoi,
-      status: oldPoi.status,
-      sequence: oldPoi.sequence,
+      status: oldPoiDto.status,
+      sequence: oldPoiDto.sequence,
     });
   }
 }
