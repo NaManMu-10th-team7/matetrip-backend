@@ -39,6 +39,11 @@ import { DailyPlanResDto } from '../dto/daily-plan-recommendation-res.dto';
 import { GetPlacesResDto } from 'src/domain/place/dto/get-places-res.dto';
 import { AddScheduleByPlaceReqDto } from '../dto/poi/poi-add-schedule-by-place-req.dto';
 import { AiScheduleBatchCreateReqDto } from '../dto/poi/ai-schedule-batch-create-req.dto';
+import {
+  AiScheduleReplaceReqDto,
+  PlaceReplacementItemDto,
+} from '../dto/poi/ai-schedule-replace-req.dto';
+import { PoiResDto } from '../dto/poi/poi-res.dto.js';
 
 @Injectable()
 export class WorkspaceService {
@@ -266,56 +271,6 @@ export class WorkspaceService {
       excludeExtraneousValues: true,
     });
   }
-
-  // async cachePoiConnection(
-  //   dto: CreatePoiConnectionReqDto,
-  // ): Promise<CachePoiConnection> {
-  //   const planDay = await this.planDayService.getPlanDayWithWorkspace(
-  //     dto.planDayId,
-  //   );
-
-  //   // TODO : 바꿀 것
-  //   if (dto.workspaceId !== planDay.workspace.id) {
-  //     throw new BadRequestException(
-  //       'Plan day does not belong to the provided workspace',
-  //     );
-  //   }
-
-  //   const cachedPoiConnection: CachePoiConnection =
-  //     buildCachedPoiConnection(dto);
-
-  //   // // 일단 update도 한번에 처리
-  //   // await this.poiConnectionCacheService.upsertPoiConnection(
-  //   //   cachedPoiConnection,
-  //   // );
-  //   return cachedPoiConnection;
-  // }
-
-  // async flushConnections(workspaceId: string) {
-  //   const connections: CachePoiConnection[] =
-  //     await this.poiConnectionCacheService.getPoiConnections(workspaceId);
-
-  //   if (connections.length === 0) return;
-
-  //   const connectionToPersist = connections.filter((c) => !c.isPersisted);
-
-  //   // todo : 이거 배치 처리하는 거 알아보기
-  //   if (connectionToPersist.length > 0) {
-  //     try {
-  //       await Promise.all(
-  //         connectionToPersist.map((connection) =>
-  //           this.poiConnectionService.persistPoiConnection(connection),
-  //         ),
-  //       );
-  //     } catch (e) {
-  //       console.log('connection persist error', e);
-  //       throw e;
-  //     }
-  //   }
-  //   await this.poiConnectionCacheService.clearWorkspacePoiConnections(
-  //     workspaceId,
-  //   );
-  // }
 
   async searchPlaces(query: string) {
     this.logger.log(`Searching places with query: "${query}" by AI agent.`);
@@ -712,5 +667,77 @@ export class WorkspaceService {
     );
 
     return createdPois;
+  }
+
+  /**
+   * @description AI 에이전트가 일정 내 장소를 교체합니다.
+   * 기존 removeWorkspacePoi와 cachePoi 로직을 재활용합니다.
+   * @param workspaceId - 워크스페이스 ID
+   * @param dto - AI가 생성한 교체 장소 목록
+   * @returns 교체된 POI 개수
+   */
+  async replaceSchedulePlaces(
+    workspaceId: string,
+    dto: AiScheduleReplaceReqDto,
+  ) {
+    this.logger.log(`[Replace] Start replacement of places`);
+
+    for (const replacement of dto.replacements) {
+      await this.replaceSinglePlace(workspaceId, replacement);
+    }
+
+    this.logger.log(`[AI Replace] Successfully replaced in ${workspaceId}`);
+  }
+
+  private async replaceSinglePlace(
+    workspaceId: string,
+    replacement: PlaceReplacementItemDto,
+  ): Promise<void> {
+    this.logger.log(`[AI Replace] Replacing place ${replacement.old_place_id}`);
+    const {
+      old_place_id,
+      new_place_id,
+      new_place_name,
+      latitude,
+      longitude,
+      address,
+    } = replacement;
+
+    // 1. 기존 POI 정보 조회 (placeId로 검색)
+    const oldPoiDto = await this.poiService.getPoiByPlaceId(
+      workspaceId,
+      old_place_id,
+    );
+
+    if (!oldPoiDto) {
+      this.logger.warn(
+        `[AI Replace] Old POI with placeId ${old_place_id} not found`,
+      );
+      return;
+    }
+
+    // 2. 기존 POI 삭제
+    await this.poiService.removeWorkspacePoi(workspaceId, oldPoiDto.id);
+
+    // 3. 새 POI 생성 (status, sequence는 나중에)
+    const createDto: PoiCreateReqDto = {
+      workspaceId,
+      placeId: new_place_id,
+      placeName: new_place_name,
+      address,
+      longitude,
+      latitude,
+      planDayId: oldPoiDto.planDayId,
+      createdBy: oldPoiDto.createdBy,
+    };
+
+    const newPoi = await this.cachePoi(createDto);
+
+    // 4. 새 POI의 status와 sequence를 기존 POI 값으로 업데이트
+    await this.poiCacheService.upsertPoi(workspaceId, {
+      ...newPoi,
+      status: oldPoiDto.status,
+      sequence: oldPoiDto.sequence,
+    });
   }
 }
