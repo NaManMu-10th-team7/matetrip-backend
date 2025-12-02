@@ -178,10 +178,7 @@ export class WorkspaceController {
     @Body() data: AiScheduleReplaceReqDto,
   ) {
     // TODO : API Key 검증
-    // Service 레이어에서 교체 로직 수행
     await this.workspaceService.replaceSchedulePlaces(workspaceId, data);
-    // 모든 클라이언트에게 브로드캐스트 (Redis 캐시 동기화 + Socket)
-    console.log('replaceAiSchedulePlaces : broadcastSync');
     await this.poiGateway.broadcastSync(workspaceId);
   }
 
@@ -253,7 +250,6 @@ export class WorkspaceController {
   getScheduledPois(
     @Param('workspaceId') workspaceId: string,
   ): Promise<PlanDayScheduledPoisGroupDto[]> {
-    this.logger.log(`[getScheduledPois] 시작 - workspaceId: ${workspaceId}`);
     return this.poiService.getScheduledPois(workspaceId);
   }
 }
