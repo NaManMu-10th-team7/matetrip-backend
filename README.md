@@ -45,7 +45,7 @@ recommend_nearby_places 도구 실행
   ↓
 AI 응답 + 추천 장소 tool_data
   ↓
-WebSocket 브로드캐스트 → 모든 참여자 지도에 표시
+Socket.IO 브로드캐스트 → 모든 참여자 지도에 표시
 ```
 
 - 채팅 한 줄로:
@@ -60,14 +60,14 @@ WebSocket 브로드캐스트 → 모든 참여자 지도에 표시
 
 ---
 
-### 🤝 실시간 협업 워크스페이스 (WebSocket)
+### 🤝 실시간 협업 워크스페이스 (Socket.IO)
 
 <img width="975" height="553" alt="image" src="https://github.com/user-attachments/assets/8d073ffd-7033-453a-b85e-ae210765a745" />
 
 > `Socket.IO` + `Redis Adapter`로 **다중 서버 환경에서도 실시간 동기화**
 
 
-- **WebSocket 기반 실시간 동기화**
+- **Socket.IO 기반 실시간 동기화**
   - Socket.IO + Redis Adapter를 통한 다중 서버 환경 지원
   - 여러 사용자가 동시에 여행 계획 수립 및 편집
   - 실시간 채팅 및 POI(관심 지점) 관리
@@ -94,6 +94,7 @@ WebSocket 브로드캐스트 → 모든 참여자 지도에 표시
 ---
 
 ### 🎯 지능형 여행 메이트 매칭
+<img width="1158" height="902" alt="image" src="https://github.com/user-attachments/assets/5a83c355-9a9b-43be-b987-c045c1966b11" />
 
 
 - **모집글 기반 여행 메이트 찾기**
