@@ -35,7 +35,6 @@
 - FastAPI + LangGraph로 구현한 **MateTrip AI 서버**와 연동
 
 ```TEXT
-// 예시 
 사용자: "@AI 제주도 해녀촌 근처 맛집 추천해줘"
   ↓
 Chat Gateway → AI Server /chat/v2
