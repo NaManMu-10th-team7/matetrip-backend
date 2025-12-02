@@ -349,4 +349,7 @@ matetrip-back/
 ---
 
 ## 🔗 Related
-MateTrip AI Server (FastAPI + LangGraph): AI 에이전트 & 추천/경로 최적화 서버
+1. [MateTrip AI Server](https://github.com/NaManMu-10th-team7/matetrip-ai)
+  - AI 에이전트 & 워커 서버
+
+2. [MateTrip Front](https://github.com/NaManMu-10th-team7/matetrip-frontend)
