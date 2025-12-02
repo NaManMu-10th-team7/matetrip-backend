@@ -296,8 +296,57 @@ matetrip-back/
 - **Auth** : JWT, bcrypt
 - **AWS** : S3 (이미지 저장), Chime SDK (화상 회의), Bedrock
 
-## API 문서
+## 📡 핵심 API (일부)
 
+### 🤖 AI 기반 여행 컨설팅
+**WebSocket Gateway:** `chat.gateway.ts:54`
+- `message` - 채팅으로 "@AI 멘션" 시 AI 에이전트 호출
+
+
+**핵심 서비스**
+- `workspace-ai.service.ts` - AI 서버 연동
+- `poi.service.ts` - POI 생성/일정 추가
+
+
+**REST API** `workspace.controller.ts`
+- AI 에이전트 연동용 내부 API
+- AI 서버(에이전트)가 채팅 도중 일정 생성/수정 작업이 필요할 때 워크스페이스 백엔드와 통신하기 위해 호출하는 **서버-투-서버 전용 API*
+- `POST /workspace/:id/ai/schedule-batch` - AI가 생성한 여행 코스 초안을 **해당 워크스페이스 일정에 일괄 반영**하는 엔드포인트 
+- `POST /workspace/:id/ai/replace-schedule` - 기존 일정 중 일부 장소를, AI가 제안한 **대체 장소로 교체**하는 엔드포인트  
+
+---
+
+### 🤝 실시간 협업 워크스페이스
+**WebSocket Gateway:** `chat.gateway.ts`, `poi.gateway.ts`
+- `sync` - 전체 POI/일정 실시간 동기화
+- `mark/addSchedule/removeSchedule` - POI 상태 변경 브로드캐스트
+- `reorder` - 드래그앤드롭 순서 변경
+- `cursorMove/poi:hover` - 협업 커서 공유
+
+**REST API:** `workspace.controller.ts`
+- `GET /workspace/:id/scheduled-pois` - 일정 POI 조회
+- `POST /workspace/:id/reviews` - 여행 후기 작성
+
+**핵심 서비스:**
+- `poi-cache.service.ts` - Redis 기반 POI 캐싱
+- `plan-day.service.ts` - 일별 일정 관리
+- `chat-message.service.ts` - 채팅 저장/조회
+
+---
+
+### 🎯 지능형 메이트 매칭
+**REST API:** `profile.controller.ts`, `post.controller.ts`
+- `POST /profile/matching/search` - 벡터 유사도 기반 메이트 추천
+- `GET /profile/matching/detailsearch` - 모집글 + 매칭 점수 통합 검색
+- `PATCH /profile/my` - 프로필 수정 시 임베딩 자동 갱신
+- `PATCH /post-participation/:id/accept` - 참여 승인 → 워크스페이스 자동 생성
+
+**핵심 서비스:**
+- `matching.service.ts` - 하이브리드 매칭 알고리즘
+  - 벡터 유사도 70% + 여행 스타일 15% + 성향 10% + MBTI 5%
+- `profile.service.ts` - AWS Titan Embeddings 기반 프로필 임베딩
+
+---
 
 ## 🔗 Related
 MateTrip AI Server (FastAPI + LangGraph): AI 에이전트 & 추천/경로 최적화 서버
